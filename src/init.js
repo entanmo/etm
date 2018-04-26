@@ -1,0 +1,152 @@
+/*
+ * Copyright © 2018 EnTanMo Foundation
+ *
+ * See the LICENSE file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with the EnTanMo Foundation,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ */
+
+'use strict';
+
+var path = require('path');
+var fs = require('fs');
+
+var Logger = require('./log/logger');
+
+module.exports = function init(options) {
+    const { program, version } = options;
+
+    var baseDir = program.base || path.resolve('.');
+    
+    var pidFile = path.join(baseDir, 'etm.pid');
+    if (fs.existsSync(pidFile)) {
+        console.log('Failed: etm server already started.');
+        return ;
+    }
+    
+    const configDir = path.join(baseDir, 'config');
+    var appConfigFile = path.join(configDir, 'config.json');
+    if (program.config) {
+        appConfigFile = path.resolve(process.cwd(), program.config);
+    }
+    var appConfig = JSON.parse(fs.readFileSync(appConfigFile, 'utf8'));
+
+    if (!appConfig.dapp.masterpassword) {
+        var randomstring = require("randomstring");
+        appConfig.dapp.masterpassword = randomstring.generate({
+            length: 12,
+            readable: true,
+            charset: 'alphanumeric'
+        });
+        fs.writeFileSync(appConfigFile, JSON.stringify(appConfig, null, 2), "utf8");
+    }
+
+    appConfig.version = version;
+    appConfig.baseDir = baseDir;
+    appConfig.buildVersion = 'development';
+    appConfig.netVersion = process.env.NET_VERSION || 'localnet';
+    appConfig.publicDir = path.join(baseDir, 'public', 'dist');
+    appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps')
+
+    global.Config = appConfig;
+
+    var genesisblockFile = path.join(configDir, 'genesisBlock.json');
+    if (program.genesisblock) {
+        genesisblockFile = path.resolve(process.cwd(), program.genesisblock);
+    }
+    var genesisblock = JSON.parse(fs.readFileSync(genesisblockFile, 'utf8'));
+
+    if (program.port) {
+        appConfig.port = program.port;
+    }
+
+    if (program.address) {
+        appConfig.address = program.address;
+    }
+
+    if (program.peers) {
+        if (typeof program.peers === 'string') {
+            appConfig.peers.list = program.peers.split(',').map(function (peer) {
+                peer = peer.split(":");
+                return {
+                    ip: peer.shift(),
+                    port: peer.shift() || appConfig.port
+                };
+            });
+        } else {
+            appConfig.peers.list = [];
+        }
+    }
+
+    if (appConfig.netVersion === 'mainnet') {
+        var seeds = [
+            757137132,
+            1815983436,
+            759980934,
+            759980683,
+            1807690192,
+            1758431015,
+            1760474482,
+            1760474149,
+            759110497,
+            757134616
+        ];
+        var ip = require('ip');
+        for (var i = 0; i < seeds.length; ++i) {
+            appConfig.peers.list.push({ ip: ip.fromLong(seeds[i]), port: 80 });
+        }
+    }
+
+    if (program.log) {
+        appConfig.logLevel = program.log;
+    }
+
+    var protoFile = path.join(baseDir, 'src', 'proto', 'index.proto');
+    if (!fs.existsSync(protoFile)) {
+        console.log('Failed: proto file not exists!');
+        return;
+    }
+
+    if (program.daemon) {
+        console.log('etm server started as daemon ...');
+        require('daemon')({cwd: process.cwd()});
+        fs.writeFileSync(pidFile, process.pid, 'utf8');
+    }
+
+    var logger = new Logger({
+        filename: path.join(baseDir, 'logs', 'debug.log'),
+        echo: program.deamon ? null : appConfig.logLevel,
+        errorLevel: appConfig.logLevel
+    });
+
+    /*
+    var options = {
+        dbFile: program.blockchain || path.join(baseDir, 'blockchain.db'),
+        appConfig: appConfig,
+        genesisblock: genesisblock,
+        logger: logger,
+        protoFile: protoFile
+    };
+    */
+
+    if (program.reindex) {
+        appConfig.loading.verifyOnLoading = true;
+    }
+
+    global.featureSwitch = {}
+    global.state = {}
+
+    return {
+        dbFile: program.blockchain || path.join(baseDir, 'blockchain.db'),
+        appConfig: appConfig,
+        genesisblock: genesisblock,
+        logger: logger,
+        protoFile: protoFile
+    };
+}
