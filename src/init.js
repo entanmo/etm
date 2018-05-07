@@ -22,6 +22,7 @@ var Logger = require('./log/logger');
 module.exports = function init(options) {
     const { program, version } = options;
 
+    // 获取工作目录
     var baseDir = program.base || path.resolve('.');
     
     var pidFile = path.join(baseDir, 'etm.pid');
@@ -30,8 +31,7 @@ module.exports = function init(options) {
         return ;
     }
     
-    const configDir = path.join(baseDir, 'config');
-    var appConfigFile = path.join(configDir, 'config.json');
+    var appConfigFile = path.join(baseDir, 'config', 'config.json');
     if (program.config) {
         appConfigFile = path.resolve(process.cwd(), program.config);
     }
@@ -56,7 +56,7 @@ module.exports = function init(options) {
 
     global.Config = appConfig;
 
-    var genesisblockFile = path.join(configDir, 'genesisBlock.json');
+    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock.json');
     if (program.genesisblock) {
         genesisblockFile = path.resolve(process.cwd(), program.genesisblock);
     }
