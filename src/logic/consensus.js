@@ -137,10 +137,32 @@ Consensus.prototype.createPropose = function (keypair, block, address) {
     address: address
   };
   var hash = this.getProposeHash(propose);
+
+  var pow = this.pow(hash.toString("hex"),address);
+  propose.powHash= pow.hash;
+  propose.nonce= pow.nonce;
+
   propose.hash = hash.toString("hex");
   propose.signature = ed.Sign(hash, keypair).toString("hex");
   return propose;
 }
+
+Consensus.prototype.pow = function (hash,address) {
+  var target = _getIndex(address);
+  var nonce = 0;
+  var powHash;
+  while(true){
+    var src = hash + nonce.toString();
+    powHash = crypto.createHash('sha256').update(src).digest('hex');
+    if(powHash.indexOf(target) == 0){
+      break;
+    }
+    nonce++;
+  }
+  global.library.logger.log('pow:'+powHash+','+nonce);
+  return {hash:powHash,nonce:nonce};
+}
+
 
 Consensus.prototype.getProposeHash  = function (propose) {
   var bytes = new ByteBuffer();
@@ -200,6 +222,9 @@ Consensus.prototype.acceptPropose = function (propose, cb) {
   if (propose.hash != hash.toString("hex")) {
     return setImmediate(cb, "Propose hash is not correct");
   }
+  if (!this.verifyPOW(propose)) {
+    return setImmediate(cb, "Vefify propose powHash failed");
+  }
   try {
     var signature = new Buffer(propose.signature, "hex");
     var publicKey = new Buffer(propose.generatorPublicKey, "hex");
@@ -213,4 +238,19 @@ Consensus.prototype.acceptPropose = function (propose, cb) {
   }
 }
 
+Consensus.prototype.verifyPOW = function (propose) {
+  var target = _getIndex(propose.address);
+  var src = propose.hash + propose.nonce.toString();
+  var res = crypto.createHash('sha256').update(src).digest('hex');
+  global.library.logger.log('verifyPOW:'+propose.powHash+','+propose.nonce);
+  if(res == propose.powHash && res.indexOf(target) == 0){
+    return true;
+  }
+  return false;
+}
+
+var _getIndex = function(address){
+
+  return '00000';
+}
 module.exports = Consensus;
