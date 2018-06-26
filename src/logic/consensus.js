@@ -63,7 +63,9 @@ Consensus.prototype.getVoteHash = function (height, id) {
   if (global.featureSwitch.enableLongId) {
     bytes.writeString(id)
   } else {
-    var idBytes = bignum(id).toBuffer({ size: 8 });
+    var idBytes = bignum(id).toBuffer({
+      size: 8
+    });
     for (var i = 0; i < 8; i++) {
       bytes.writeByte(idBytes[i]);
     }
@@ -137,19 +139,47 @@ Consensus.prototype.createPropose = function (keypair, block, address) {
     address: address
   };
   var hash = this.getProposeHash(propose);
+
+  var pow = this.pow(hash.toString("hex"), address);
+  propose.powHash = pow.hash;
+  propose.nonce = pow.nonce;
+
   propose.hash = hash.toString("hex");
   propose.signature = ed.Sign(hash, keypair).toString("hex");
   return propose;
 }
 
-Consensus.prototype.getProposeHash  = function (propose) {
+Consensus.prototype.pow = function (hash, address) {
+  var target = this.getAddressIndex(address);
+  var nonce = 0;
+  var powHash;
+  while (true) {
+    var src = hash + nonce.toString();
+    powHash = crypto.createHash('sha256').update(src).digest('hex');
+    if (powHash.indexOf(target) == 0) {
+      break;
+    }
+    nonce++;
+  }
+
+  global.library.logger.log('pow:' + powHash + ',' + nonce);
+  return {
+    hash: powHash,
+    nonce: nonce
+  };
+}
+
+
+Consensus.prototype.getProposeHash = function (propose) {
   var bytes = new ByteBuffer();
   bytes.writeLong(propose.height);
 
   if (global.featureSwitch.enableLongId) {
     bytes.writeString(propose.id)
   } else {
-    var idBytes = bignum(propose.id).toBuffer({ size: 8 });
+    var idBytes = bignum(propose.id).toBuffer({
+      size: 8
+    });
     for (var i = 0; i < 8; i++) {
       bytes.writeByte(idBytes[i]);
     }
@@ -200,6 +230,9 @@ Consensus.prototype.acceptPropose = function (propose, cb) {
   if (propose.hash != hash.toString("hex")) {
     return setImmediate(cb, "Propose hash is not correct");
   }
+  if (!this.verifyPOW(propose)) {
+    return setImmediate(cb, "Vefify propose powHash failed");
+  }
   try {
     var signature = new Buffer(propose.signature, "hex");
     var publicKey = new Buffer(propose.generatorPublicKey, "hex");
@@ -211,6 +244,23 @@ Consensus.prototype.acceptPropose = function (propose, cb) {
   } catch (e) {
     return setImmediate(cb, "Verify signature exception: " + e.toString());
   }
+}
+
+Consensus.prototype.verifyPOW = function (propose) {
+  var target = this.getAddressIndex(propose.address);
+  var src = propose.hash + propose.nonce.toString();
+  var res = crypto.createHash('sha256').update(src).digest('hex');
+
+  global.library.logger.log('verifyPOW:' + propose.powHash + ',' + propose.nonce);
+  if (res == propose.powHash && res.indexOf(target) == 0) {
+    return true;
+  }
+  return false;
+}
+
+Consensus.prototype.getAddressIndex = function (address) {
+
+  return '00000';
 }
 
 module.exports = Consensus;
