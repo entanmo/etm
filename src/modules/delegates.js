@@ -574,6 +574,25 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
   });
 }
 
+//get Delegate index
+Delegates.prototype.getDelegateIndex = function (height, delegateKey ,cb) {
+  self.generateDelegateList(height, function (err, activeDelegates) {
+    if (err) {
+      return cb(err);
+    }
+    var delegateIndex = -1;
+    for (var i = 0 ; i < activeDelegates.length ; i++) {
+      var key = activeDelegates[i];
+      if(delegateKey && key == delegateKey){
+        delegateIndex = i;
+        continue;
+      }
+    }
+
+   cb(delegateIndex);
+  });
+}
+
 // Public methods
 Delegates.prototype.generateDelegateList = function (height, cb) {
   __private.getKeysSortByVote(function (err, truncDelegateList) {
