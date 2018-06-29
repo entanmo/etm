@@ -153,6 +153,8 @@ message BlockPropose {
   required string address = 5;
   required bytes hash = 6;
   required bytes signature = 7;
+  required int64 nonce = 8;
+  required bytes powHash = 9;
 }
 
 message BlockVotes {

@@ -1313,17 +1313,17 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
             return next("No public ip");
           }
           var serverAddr = library.config.publicIp + ':' + library.config.port;
-          var propose;
-          try {
-            propose = library.base.consensus.createPropose(keypair, block, serverAddr);
-          } catch (e) {
-            return next("Failed to create propose: " + e.toString());
-          }
-          library.base.consensus.setPendingBlock(block);
-          library.base.consensus.addPendingVotes(localVotes);
-          __private.proposeCache[propose.hash] = true;
-          library.bus.message("newPropose", propose, true);
-          return next();
+          library.base.consensus.createPropose(keypair, block, serverAddr, (err, propose) => {
+            if (err) {
+              return next("Failed to create propose: " + e.toString());
+            }
+
+            library.base.consensus.setPendingBlock(block);
+            library.base.consensus.addPendingVotes(localVotes);
+            __private.proposeCache[propose.hash] = true;
+            library.bus.message("newPropose", propose, true);
+            return next();
+          });
         }
       },
     ], cb);

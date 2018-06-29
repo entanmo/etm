@@ -589,7 +589,7 @@ Delegates.prototype.getDelegateIndex = function (height, delegateKey ,cb) {
       }
     }
 
-   cb(delegateIndex);
+   cb(null,delegateIndex);
   });
 }
 

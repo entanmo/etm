@@ -129,7 +129,7 @@ Consensus.prototype.addPendingVotes = function (votes) {
   return this.pendingVotes;
 }
 
-Consensus.prototype.createPropose = function (keypair, block, address) {
+Consensus.prototype.createPropose = function (keypair, block, address, cb) {
   assert(keypair.publicKey.toString("hex") == block.generatorPublicKey);
   var propose = {
     height: block.height,
@@ -139,34 +139,45 @@ Consensus.prototype.createPropose = function (keypair, block, address) {
     address: address
   };
   var hash = this.getProposeHash(propose);
-
-  var pow = this.pow(hash.toString("hex"), address);
-  propose.powHash = pow.hash;
-  propose.nonce = pow.nonce;
-
   propose.hash = hash.toString("hex");
   propose.signature = ed.Sign(hash, keypair).toString("hex");
-  return propose;
+
+  this.pow(propose, (err, pow) => {
+    if (err) {
+      return cb(err);
+    }
+
+    propose.powHash = pow.hash;
+    propose.nonce = pow.nonce;
+
+    cb(null, propose);
+  });
 }
 
-Consensus.prototype.pow = function (hash, address) {
-  var target = this.getAddressIndex(address);
-  var nonce = 0;
-  var powHash;
-  while (true) {
-    var src = hash + nonce.toString();
-    powHash = crypto.createHash('sha256').update(src).digest('hex');
-    if (powHash.indexOf(target) == 0) {
-      break;
+Consensus.prototype.pow = function (propose, cb) {
+  this.getAddressIndex(propose, (err, target) => {
+    if (err) {
+      return cb(err);
     }
-    nonce++;
-  }
 
-  global.library.logger.log('pow:' + powHash + ',' + nonce);
-  return {
-    hash: powHash,
-    nonce: nonce
-  };
+    var nonce = 0;
+    var powHash;
+    while (true) {
+      var src = propose.hash + nonce.toString();
+      powHash = crypto.createHash('sha256').update(src).digest('hex');
+      if (powHash.indexOf(target) == 0) {
+        break;
+      }
+      nonce++;
+    }
+
+    global.library.logger.log('pow:' + powHash + ',' + nonce);
+
+    cb(null, {
+      hash: powHash,
+      nonce: nonce
+    });
+  });
 }
 
 
@@ -230,37 +241,60 @@ Consensus.prototype.acceptPropose = function (propose, cb) {
   if (propose.hash != hash.toString("hex")) {
     return setImmediate(cb, "Propose hash is not correct");
   }
-  if (!this.verifyPOW(propose)) {
-    return setImmediate(cb, "Vefify propose powHash failed");
-  }
-  try {
-    var signature = new Buffer(propose.signature, "hex");
-    var publicKey = new Buffer(propose.generatorPublicKey, "hex");
-    if (ed.Verify(hash, signature, publicKey)) {
-      return setImmediate(cb);
-    } else {
-      return setImmediate(cb, "Vefify signature failed");
+  this.verifyPOW(propose, (err, ok) => {
+    if (err) {
+      return setImmediate(cb, err);
     }
-  } catch (e) {
-    return setImmediate(cb, "Verify signature exception: " + e.toString());
-  }
+
+    if (!ok) {
+      return setImmediate(cb, "Verify porpose powHash failed.");
+    }
+
+    try {
+      var signature = new Buffer(propose.signature, "hex");
+      var publicKey = new Buffer(propose.generatorPublicKey, "hex");
+      if (ed.Verify(hash, signature, publicKey)) {
+        return setImmediate(cb);
+      } else {
+        return setImmediate(cb, "Vefify signature failed");
+      }
+    } catch (e) {
+      return setImmediate(cb, "Verify signature exception: " + e.toString());
+    }
+  });
 }
 
-Consensus.prototype.verifyPOW = function (propose) {
-  var target = this.getAddressIndex(propose.address);
-  var src = propose.hash + propose.nonce.toString();
-  var res = crypto.createHash('sha256').update(src).digest('hex');
+Consensus.prototype.verifyPOW = function (propose, cb) {
+  this.getAddressIndex(propose, (err, target) => {
+    if (err) {
+      return cb(err);
+    }
 
-  global.library.logger.log('verifyPOW:' + propose.powHash + ',' + propose.nonce);
-  if (res == propose.powHash && res.indexOf(target) == 0) {
-    return true;
-  }
-  return false;
+    var src = propose.hash + propose.nonce.toString();
+    var res = crypto.createHash('sha256').update(src).digest('hex');
+
+    global.library.logger.log('verifyPOW:' + propose.powHash + ',' + propose.nonce);
+
+    if (res == propose.powHash && res.indexOf(target) == 0) {
+      return cb(null, true);
+    }
+    return cb(null, false);
+  });
 }
 
-Consensus.prototype.getAddressIndex = function (address) {
+Consensus.prototype.getAddressIndex = function (propose, cb) {
+  global.library.modules['delegates'].getDelegateIndex(propose.height, propose.generatorPublicKey, function (err, index) {
+    if (err) {
+      return cb(err);
+    }
 
-  return '00000';
+    if (index < 0) {
+      return cb(new Error('Failed to get address index.'));
+    }
+    index = index % 32;
+    var strIndex = index.toString(2);
+    cb(null, strIndex);
+  });
 }
 
 module.exports = Consensus;
