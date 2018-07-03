@@ -1315,7 +1315,7 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
           var serverAddr = library.config.publicIp + ':' + library.config.port;
           library.base.consensus.createPropose(keypair, block, serverAddr, (err, propose) => {
             if (err) {
-              return next("Failed to create propose: " + e.toString());
+              return next("Failed to create propose: " + err.toString());
             }
 
             library.base.consensus.setPendingBlock(block);

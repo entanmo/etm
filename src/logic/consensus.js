@@ -21,6 +21,8 @@ var ed = require('../utils/ed.js');
 var ip = require('ip');
 var bignum = require('../utils/bignumber');
 var slots = require('../utils/slots.js');
+const PoW = require('./pow');
+const POW_TIMEOUT = 10 * 1000;
 
 function Consensus(scope, cb) {
   this.scope = scope;
@@ -160,6 +162,7 @@ Consensus.prototype.pow = function (propose, cb) {
       return cb(err);
     }
 
+    /*
     var nonce = 0;
     var powHash;
     while (true) {
@@ -177,6 +180,27 @@ Consensus.prototype.pow = function (propose, cb) {
       hash: powHash,
       nonce: nonce
     });
+    */
+
+    const defaultResponser = PoW.defaultResponser;
+    defaultResponser.onError = function (uuid, data) {
+      cb(data.reason);
+    };
+
+    defaultResponser.onPoW = function (uuid, data) {
+      global.library.logger.log(`pow - hash(${data.hash}), nonce(${data.nonce})`);
+      cb(null, {
+        hash: data.hash,
+        nonce: data.nonce
+      });
+    };
+
+    defaultResponser.onTimeout = function (uuid, data) {
+      global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
+      cb(new Error('Error: Timeout'));
+    };
+
+    PoW.pow(propose.hash, target, POW_TIMEOUT);
   });
 }
 
