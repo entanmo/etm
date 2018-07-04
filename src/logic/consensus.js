@@ -182,12 +182,12 @@ Consensus.prototype.pow = function (propose, cb) {
     });
     */
 
-    const defaultResponser = PoW.defaultResponser;
-    defaultResponser.onError = function (uuid, data) {
+    const responser = PoW.currentResponser;
+    responser.onError = function (uuid, data) {
       cb(data.reason);
     };
 
-    defaultResponser.onPoW = function (uuid, data) {
+    responser.onPoW = function (uuid, data) {
       global.library.logger.log(`pow - hash(${data.hash}), nonce(${data.nonce})`);
       cb(null, {
         hash: data.hash,
@@ -195,7 +195,7 @@ Consensus.prototype.pow = function (propose, cb) {
       });
     };
 
-    defaultResponser.onTimeout = function (uuid, data) {
+    responser.onTimeout = function (uuid, data) {
       global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
       cb(new Error('Error: Timeout'));
     };

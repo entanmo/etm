@@ -116,6 +116,7 @@ let gCurrentUUID = 0;
 module.exports = {
     setResponser: function (responser) {
         powImpl.responser = responser;
+        module.exports.currentResponser = powImpl.responser;
     },
 
     getResponser: function () {

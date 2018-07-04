@@ -1,35 +1,34 @@
 'use strict';
 
-const crypto = require('crypto');
-const { PowState } = require('./constants');
+const Handler = require('./handler');
 
-class CPUHandler {
+class CPUHandler extends Handler {
     constructor() {
-        this._state = PowState.PENDING;
+        super();
+        this._state = Handler.PowState.PENDING;
         this._blockLoop = 100000;
     }
 
     pow(src, target, cb) {
-        if (this._state === PowState.RUNNING) {
+        if (this._state === Handler.PowState.RUNNING) {
             return setImmediate(() => {
                 cb('Error: PoW is running.');
             });
         }
-        this._state = PowState.RUNNING;
+        this._state = Handler.PowState.RUNNING;
         let nonce = 0;
         const self = this;
 
        (function _pow() {
-            if (self._state === PowState.PENDING) {
+            if (self._state === Handler.PowState.PENDING) {
                 return ;
             }
             for (let i = 0; i < self._blockLoop; i++) {
-                const hasher = crypto.createHash('sha256').update(src + nonce.toString());
-                const hashResult = hasher.digest('hex');
-                if (hashResult.indexOf(target) === 0) {
-                    self._state = PowState.PENDING;
+                const hash = Handler.sha256(src + nonce.toString()).digest('hex');
+                if (hash.indexOf(target) === 0) {
+                    self._state = Handler.PowState.PENDING;
                     return cb(null, {
-                        hash: hashResult,
+                        hash: hash,
                         nonce: nonce
                     });
                 }
@@ -45,15 +44,15 @@ class CPUHandler {
     }
 
     pending(cb) {
-        if (this._state === PowState.PENDING) {
+        if (this._state === Handler.PowState.PENDING) {
             return setImmediate(() => {
-                cb(null, PowState.PENDING);
+                cb(null, Handler.PowState.PENDING);
             });
         }
 
-        this._state = PowState.PENDING;
+        this._state = Handler.PowState.PENDING;
         setImmediate(() => {
-            cb(null, PowState.RUNNING);
+            cb(null, Handler.PowState.RUNNING);
         });
     }
 }

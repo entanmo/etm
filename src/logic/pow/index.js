@@ -2,9 +2,8 @@
 
 const PoW = require('./src/pow');
 const { PowState } = require('./src/constants');
-const DefaultResponser = require('./src/default_responser');
+const Responser = require('./src/responser');
 
 PoW.PowState = PowState;
-PoW.setResponser(new DefaultResponser());
-PoW.defaultResponser = PoW.getResponser();
+PoW.setResponser(new Responser());
 module.exports = PoW;
