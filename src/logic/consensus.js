@@ -152,7 +152,7 @@ Consensus.prototype.createPropose = function (keypair, block, address, cb) {
     }
 
     propose.hash = pow.hash;
-    propose.signature = ed.Sign(hash, keypair).toString('hex');
+    propose.signature = ed.Sign(Buffer.from(propose.hash, 'hex'), keypair).toString('hex');
     propose.nonce = pow.nonce;
 
     cb(null, propose);
@@ -160,7 +160,7 @@ Consensus.prototype.createPropose = function (keypair, block, address, cb) {
 }
 
 Consensus.prototype.pow = function (propose, cb) {
-  var hash = this.getProposeHash(propose);
+  var hash = this.getProposeHash(propose).toString('hex');
   this.getAddressIndex(propose, (err, target) => {
     if (err) {
       return cb(err);
@@ -284,7 +284,7 @@ Consensus.prototype.acceptPropose = function (propose, cb) {
     try {
       var signature = new Buffer(propose.signature, "hex");
       var publicKey = new Buffer(propose.generatorPublicKey, "hex");
-      if (ed.Verify(propose.hash, signature, publicKey)) {
+      if (ed.Verify(Buffer.from(propose.hash, 'hex'), signature, publicKey)) {
         return setImmediate(cb);
       } else {
         return setImmediate(cb, "Vefify signature failed");
@@ -296,7 +296,7 @@ Consensus.prototype.acceptPropose = function (propose, cb) {
 }
 
 Consensus.prototype.verifyPOW = function (propose, cb) {
-  var hash = this.getProposeHash(propose);
+  var hash = this.getProposeHash(propose).toString('hex');
   this.getAddressIndex(propose, (err, target) => {
     if (err) {
       return cb(err);
