@@ -5,6 +5,8 @@ const { fork } = require('child_process');
 const { OperationReq, OperationResp } = require('./constants');
 const powImpl = fork(path.resolve(__dirname, 'pow_impl.js'));
 
+let onReadyEvent = null;
+
 powImpl.request = function (uuid, op, params, cb) {
     const reqData = {
         uuid: uuid,
@@ -91,6 +93,12 @@ powImpl.on('message', (ipcResp) => {
 
     const opResp = ipcResp.opresp;
     const uuid = ipcResp.uuid;
+    if (opResp === OperationResp.MINT_READY) {
+        if (onReadyEvent || typeof onReadyEvent === "function") {
+            onReadyEvent();
+        }
+        return;
+    }
     const handler = powImpl.mapresponsehandlers[opResp];
     if (handler != null) {
         return handler(uuid, ipcResp);
@@ -121,6 +129,11 @@ module.exports = {
 
     getResponser: function () {
         return powImpl.responser;
+    },
+
+    onReady: function (cb) {
+        // cb();
+        onReadyEvent = cb;
     },
     
     pow: function (src, target, timeout) {

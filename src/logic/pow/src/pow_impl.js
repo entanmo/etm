@@ -22,12 +22,21 @@ function noop() {
     // Nothing to do
 }
 
+const CPUHandler = require('./cpu_handler');
+const GPUHandler = require('./gpu_handler');
+
 class PowImpl {
     constructor() {
-        // pow handler init
-        // default cpu handler
-        const CPUHandler = require('./cpu_handler');
-        this._handler = new CPUHandler();
+        // init with GPUHandler by default
+        
+        this._handler = new GPUHandler();
+        if (!this._handler.setup()) {
+            this._handler = new CPUHandler();
+        }
+        setImmediate(() => {
+            this._opResp(null, OperationResp.MINT_READY, null);
+        });
+        // this._handler = new CPUHandler();
         this._ipcHandlers = {};
         this._bindIpcHandlers();
         this._timeoutHandler = null;
@@ -58,8 +67,10 @@ class PowImpl {
         const self = this;
         function _doPoW() {  
             self._opResp(uuid, OperationResp.START_POW, null);
+            /*
             self._promisifyPow(src, target, timeout)
                 .then((data) => {
+                    console.log((new Date()).getTime(), "-------------------------- onPow callback", data);
                     if (data.opstate === 'timeout') {
                         self._opResp(uuid, OperationResp.TIMEOUT, {
                             desc: `timeout of ${timeout}ms with ${uuid}`
@@ -80,6 +91,28 @@ class PowImpl {
                     });
                     self._opResp(uuid, OperationResp.STOP_POW, null);
                 });
+                */
+            self.mint(src, target, timeout, (err, result) => {
+                if (err) {
+                    self._opResp(uuid, OperationResp.ERROR, {
+                        reason: err
+                    });
+                    return;
+                }
+
+                if (result.opstate === "timeout") {
+                    self._opResp(uuid, OperationResp.TIMEOUT, {
+                        desc: `timeout of ${timeout}ms with ${uuid}`
+                    });
+                } else {
+                    self._opResp(uuid, OperationResp.POW, {
+                        src: result.src,
+                        target: result.target,
+                        hash: result.hash,
+                        nonce: result.nonce,
+                    });
+                }
+            });
         }
 
         if (this.isRunning()) {
@@ -100,6 +133,64 @@ class PowImpl {
         _doPoW();
     }
 
+    mint(src, target, timeout, cb) {
+        if (typeof timeout !== "number") {
+            timeout = 0;
+        }
+
+        let localCallback = cb;
+        if (timeout <= 0) {
+            this._handler.pow(src, target, (err, result) => {
+                if (err) {
+                    return localCallback(err);
+                }
+
+                localCallback(null, {
+                    opstate: 'pow',
+                    src: src,
+                    target: target,
+                    hash: result.hash,
+                    nonce: result.nonce
+                });
+            });
+        } else {
+            const timer = process.hrtime();
+            function timeouthandler() {
+                if (!localCallback || typeof localCallback !== "function") {
+                    return;
+                }
+
+                const duration = process.hrtime(timer);
+                if (duration[0] * 1000 + duration[1] / 1000000 >= timeout) {
+                    localCallback({
+                        opstate: 'timeout',
+                    });
+                    localCallback = undefined;
+                }   
+
+                setTimeout(timeouthandler, 100);
+            }
+            setTimeout(timeouthandler, 100);
+
+            this._handler.pow(src, target, (err, result) => {
+                if (localCallback && typeof localCallback === "function") {
+                    if (err) {
+                        return localCallback(err);
+                    }
+
+                    localCallback(null, {
+                        opstate: 'pow',
+                        src: src,
+                        target: target,
+                        hash: result.hash,
+                        nonce: result.nonce
+                    });
+                    localCallback = undefined;
+                }
+            });
+        }
+    }
+
     _promisifyPow(src, target, timeout) {
         // console.log([src, target, timeout]);
         // emit start_pow event
@@ -112,6 +203,7 @@ class PowImpl {
             // No timeout
             return new Promise((resolve, reject) => {
                 this._handler.pow(src, target, (err, data) => {
+                    console.log((new Date()).getTime(), "---------------- pow back: ", err, data);
                     if (err) {
                         return reject(err);
                     }
@@ -123,6 +215,7 @@ class PowImpl {
                         hash: data.hash,
                         nonce: data.nonce
                     });
+                    console.log((new Date()).getTime(), '---------------------- pow back end.');
                 });
             });
         } else {
@@ -138,6 +231,7 @@ class PowImpl {
                 })),
                 new Promise((resolve, reject) => {
                     this._handler.pow(src, target, (err, data) => {
+                        console.log((new Date()).getTime(), "----------------- pow race back: ", err, data);
                         if (err) {
                             return reject(err);
                         }

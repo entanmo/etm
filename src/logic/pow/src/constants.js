@@ -14,11 +14,12 @@ const OperationReq = {
 const OperationResp = {
     ERROR:              -1,
     TIMEOUT:            -2,
-    START_POW:          0,
-    STOP_POW:           1,
-    TERM_POW:           2,
-    POW:                3,
-    STATE:              4,
+    MINT_READY:         0,
+    START_POW:          1,
+    STOP_POW:           2,
+    TERM_POW:           3,
+    POW:                4,
+    STATE:              5,
 }
 
 module.exports.PowState = PowState;

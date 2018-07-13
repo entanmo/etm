@@ -21,7 +21,8 @@ var ed = require('../utils/ed.js');
 var ip = require('ip');
 var bignum = require('../utils/bignumber');
 var slots = require('../utils/slots.js');
-const PoW = require('./pow');
+// const PoW = require('./pow');
+let PoW;
 const POW_TIMEOUT = 10 * 1000;
 
 function Consensus(scope, cb) {
@@ -29,7 +30,11 @@ function Consensus(scope, cb) {
   this.pendingBlock = null;
   this.pendingVotes = null;
   this.votesKeySet = {};
-  cb && setImmediate(cb, null, this);
+
+  PoW = require('./pow');
+  PoW.onReady(() => {
+    cb && setImmediate(cb, null, this);
+  });
 }
 
 Consensus.prototype.createVotes = function (keypairs, block) {
@@ -186,12 +191,17 @@ Consensus.prototype.pow = function (propose, cb) {
     });
     */
 
+    let timer ;
     const responser = PoW.currentResponser;
     responser.onError = function (uuid, data) {
+      const duration = process.hrtime(timer);
+      console.log(`----------------------- pow onError: ${duration[0] + duration[1] / 1000000000.0} sec`);
       cb(data.reason);
     };
 
     responser.onPoW = function (uuid, data) {
+      const duration = process.hrtime(timer);
+      console.log(`----------------------- pow onPoW: ${duration[0] + duration[1] / 1000000000.0} sec`);
       global.library.logger.log(`pow - hash(${data.hash}), nonce(${data.nonce})`);
       cb(null, {
         hash: data.hash,
@@ -200,12 +210,15 @@ Consensus.prototype.pow = function (propose, cb) {
     };
 
     responser.onTimeout = function (uuid, data) {
+      const duration = process.hrtime(timer);
+      console.log(`----------------------- pow onTimeout: ${duration[0] + duration[1] / 1000000000.0} sec`);
       global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
       cb(new Error('Error: Timeout'));
     };
 
     // PoW.pow(propose.hash, target, POW_TIMEOUT);
-    PoW.pow(hash, target, POW_TIMEOUT);
+    timer = process.hrtime();
+    PoW.pow(hash, target, 300);
   });
 }
 
