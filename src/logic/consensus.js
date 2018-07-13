@@ -23,7 +23,6 @@ var bignum = require('../utils/bignumber');
 var slots = require('../utils/slots.js');
 // const PoW = require('./pow');
 let PoW;
-const POW_TIMEOUT = 10 * 1000;
 
 function Consensus(scope, cb) {
   this.scope = scope;
@@ -218,7 +217,7 @@ Consensus.prototype.pow = function (propose, cb) {
 
     // PoW.pow(propose.hash, target, POW_TIMEOUT);
     timer = process.hrtime();
-    PoW.pow(hash, target, 300);
+    PoW.pow(hash, target, slots.interval * 1000);
   });
 }
 
@@ -348,7 +347,9 @@ Consensus.prototype.getAddressIndex = function (propose, cb) {
       return cb(new Error('Failed to get address index.'));
     }
     index = index % 32;
-    var strIndex = index.toString(2);
+    // 由于toString(2)并不能完全保障返回值是5个字符，所以为了统一为5个字符，
+    // 使用了String.prototype.padStart方法进行字符串宽度扩充
+    var strIndex = index.toString(2).padStart(5, '0');
     cb(null, strIndex);
   });
 }
