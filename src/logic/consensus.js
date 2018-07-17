@@ -338,7 +338,7 @@ Consensus.prototype.verifyPOW = function (propose, cb) {
 }
 
 Consensus.prototype.getAddressIndex = function (propose, cb) {
-  global.library.modules['delegates'].getDelegateIndex(propose.height, propose.generatorPublicKey, function (err, index) {
+  global.library.modules['delegates'].getDelegateIndex(propose.timestamp,propose.height, propose.generatorPublicKey, function (err, index) {
     if (err) {
       return cb(err);
     }
