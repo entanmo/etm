@@ -40,33 +40,34 @@ __private.keypairs = {};
 __private.forgingEanbled = true;
 
 
-var _getDelegeteIndex = function (height, limit) {
-  const hex = {
-    0: [0, 0, 0, 0],
-    1: [0, 0, 0, 1],
-    2: [0, 0, 1, 0],
-    3: [0, 0, 1, 1],
-    4: [0, 1, 0, 0],
-    5: [0, 1, 0, 1],
-    6: [0, 1, 1, 0],
-    7: [0, 1, 1, 1],
-    8: [1, 0, 0, 0],
-    9: [1, 0, 0, 1],
-    a: [1, 0, 1, 0],
-    b: [1, 0, 1, 1],
-    c: [1, 1, 0, 0],
-    d: [1, 1, 0, 1],
-    e: [1, 1, 1, 0],
-    f: [1, 1, 1, 1],
-  }
-  let hash256Int = [];
-  let hash = modules.blocks.getLastBlock().id;
-  for (var j = 0; j < hash.length; j++) {
-    let str = hash[j];
-    hash256Int = hash256Int.concat(hex[str]);
-  }
-  let index = chaos(hash256Int, height, limit);
-  return index - 1;
+var _getDelegeteIndex = function (lastBlockId, slot, limit) {
+    const hex = {
+      0: [0, 0, 0, 0],
+      1: [0, 0, 0, 1],
+      2: [0, 0, 1, 0],
+      3: [0, 0, 1, 1],
+      4: [0, 1, 0, 0],
+      5: [0, 1, 0, 1],
+      6: [0, 1, 1, 0],
+      7: [0, 1, 1, 1],
+      8: [1, 0, 0, 0],
+      9: [1, 0, 0, 1],
+      a: [1, 0, 1, 0],
+      b: [1, 0, 1, 1],
+      c: [1, 1, 0, 0],
+      d: [1, 1, 0, 1],
+      e: [1, 1, 1, 0],
+      f: [1, 1, 1, 1],
+    }
+    let hash256Int = [];
+    // 取上此高度一个块的id，但是有些id(初始块id)不是64位字符，因此做一次hash
+    let hash = crypto.createHash('sha256').update(lastBlockId).digest('hex');
+    for (var j = 0; j < hash.length; j++) {
+      let str = hash[j];
+      hash256Int = hash256Int.concat(hex[str]);
+    }
+    let index = chaos(hash256Int, slot, limit);
+    return index - 1;
 }
 
 
@@ -472,28 +473,29 @@ __private.getKeysSortByVote = function (cb) {
   });
 }
 
-__private.getBlockSlotData = function (slot, height, cb) {
+__private.getBlockSlotData = function (slot, lastBlockId,height, cb) {
   self.generateDelegateList(height, function (err, activeDelegates) {
     if (err) {
       return cb(err);
     }
 
-    let index = _getDelegeteIndex(slot, activeDelegates.length);
-    let delegate_id = activeDelegates[index];
-    if (__private.keypairs[delegate_id]) {
-      return cb(null, { time: slots.getSlotTime(slot), keypair: __private.keypairs[delegate_id]});
-    }
-    
-    // var currentSlot = slot;
-    // var lastSlot = slots.getLastSlot(currentSlot);
-    // for (; currentSlot < lastSlot; currentSlot += 1) {
-    //   var delegate_pos = currentSlot % slots.delegates;
-    //   var delegate_id = activeDelegates[delegate_pos];
-
-    //   if (delegate_id && __private.keypairs[delegate_id]) {
-    //     return cb(null, {time: slots.getSlotTime(currentSlot), keypair: __private.keypairs[delegate_id]});
-    //   }
+    // let index = _getDelegeteIndex(slot, activeDelegates.length);
+    // let delegate_id = activeDelegates[index];
+    // if (__private.keypairs[delegate_id]) {
+    //   return cb(null, { time: slots.getSlotTime(slot), keypair: __private.keypairs[delegate_id]});
     // }
+    
+    var currentSlot = slot;
+    var lastSlot = slots.getLastSlot(currentSlot);
+    for (; currentSlot < lastSlot; currentSlot += 1) {
+      // var delegate_pos = currentSlot % slots.delegates;
+      var delegate_pos = _getDelegeteIndex(lastBlockId,currentSlot, activeDelegates.length);
+      var delegate_id = activeDelegates[delegate_pos];
+
+      if (delegate_id && __private.keypairs[delegate_id]) {
+        return cb(null, {time: slots.getSlotTime(currentSlot), keypair: __private.keypairs[delegate_id]});
+      }
+    }
     cb(null, null);
   });
 }
@@ -526,7 +528,7 @@ __private.loop = function (cb) {
   //   return setImmediate(cb);
   // }
 
-  __private.getBlockSlotData(currentSlot, lastBlock.height + 1, function (err, currentBlockData) {
+  __private.getBlockSlotData(currentSlot,lastBlock.id, lastBlock.height + 1, function (err, currentBlockData) {
     if (err || currentBlockData === null) {
       library.logger.trace('Loop:', 'skipping slot');
       return setImmediate(cb);
@@ -601,7 +603,7 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
       return cb(err);
     }
     var currentSlot = slots.getSlotNumber(propose.timestamp);
-    let index = _getDelegeteIndex(currentSlot,activeDelegates.length);
+    let index = _getDelegeteIndex(propose.previousBlock,currentSlot,activeDelegates.length);
     let delegateKey = activeDelegates[index];
     // var delegateKey = activeDelegates[currentSlot % slots.delegates];
 
@@ -614,36 +616,19 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
 }
 
 //get Delegate index
-Delegates.prototype.getDelegateIndex = function (timestamp,height, delegateKey ,cb) {
-  self.generateDelegateList(height, function (err, activeDelegates) {
+Delegates.prototype.getDelegateIndex = function (propose ,cb) {
+  self.generateDelegateList(propose.height, function (err, activeDelegates) {
     if (err) {
       return cb(err);
     }
     // let block = modules.blocks.getLastBlock();
-    let currentSlot = slots.getSlotNumber(timestamp);
-    let index = _getDelegeteIndex(currentSlot, activeDelegates.length);
+    let currentSlot = slots.getSlotNumber(propose.timestamp);
+    let index = _getDelegeteIndex(propose.previousBlock,currentSlot, activeDelegates.length);
     let key = activeDelegates[index];
-    if (delegateKey && key == delegateKey) {
+    if (propose.generatorPublicKey && key == propose.generatorPublicKey) {
       return cb(null, index);
     }
     cb("Failed to get delegete index");
-
-    // let index = _getDelegeteIndex(height,101);
-
-    // var delegateIndex = -1;
-    // for (var i = 0 ; i < activeDelegates.length ; i++) {
-    //   var key = activeDelegates[i];
-    //   if(delegateKey && key == delegateKey){
-    //     delegateIndex = i;
-    //     continue;
-    //   }
-    // }
-
-    // if(index == delegateIndex){
-
-    //   return cb(null,delegateIndex);
-    // }
-    // cb('get index error');
   });
 }
 
@@ -814,7 +799,7 @@ Delegates.prototype.validateBlockSlot = function (block, cb) {
       return cb(err);
     }
     var currentSlot = slots.getSlotNumber(block.timestamp);
-    let index = _getDelegeteIndex(currentSlot,activeDelegates.length);
+    let index = _getDelegeteIndex(block.previousBlock,currentSlot,activeDelegates.length);
     let delegateKey = activeDelegates[index];
     // var delegateKey = activeDelegates[currentSlot % slots.delegates];
 

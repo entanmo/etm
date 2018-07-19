@@ -142,7 +142,8 @@ Consensus.prototype.createPropose = function (keypair, block, address, cb) {
     id: block.id,
     timestamp: block.timestamp,
     generatorPublicKey: block.generatorPublicKey,
-    address: address
+    address: address,
+    previousBlock:block.previousBlock
   };
   /*
   var hash = this.getProposeHash(propose);
@@ -338,7 +339,7 @@ Consensus.prototype.verifyPOW = function (propose, cb) {
 }
 
 Consensus.prototype.getAddressIndex = function (propose, cb) {
-  global.library.modules['delegates'].getDelegateIndex(propose.timestamp,propose.height, propose.generatorPublicKey, function (err, index) {
+  global.library.modules['delegates'].getDelegateIndex(propose, function (err, index) {
     if (err) {
       return cb(err);
     }
