@@ -142,8 +142,7 @@ Consensus.prototype.createPropose = function (keypair, block, address, cb) {
     id: block.id,
     timestamp: block.timestamp,
     generatorPublicKey: block.generatorPublicKey,
-    address: address,
-    previousBlock:block.previousBlock
+    address: address
   };
   /*
   var hash = this.getProposeHash(propose);
@@ -218,7 +217,7 @@ Consensus.prototype.pow = function (propose, cb) {
 
     // PoW.pow(propose.hash, target, POW_TIMEOUT);
     timer = process.hrtime();
-    PoW.pow(hash, target, slots.interval * 1000);
+    PoW.pow(hash, target, (slots.interval-1) * 1000);
   });
 }
 

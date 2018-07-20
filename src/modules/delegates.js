@@ -40,7 +40,7 @@ __private.keypairs = {};
 __private.forgingEanbled = true;
 
 
-var _getDelegeteIndex = function (lastBlockId, slot, limit) {
+var _getDelegeteIndex = function (height, slot, limit,cb) {
     const hex = {
       0: [0, 0, 0, 0],
       1: [0, 0, 0, 1],
@@ -60,16 +60,23 @@ var _getDelegeteIndex = function (lastBlockId, slot, limit) {
       f: [1, 1, 1, 1],
     }
     let hash256Int = [];
-    // 取上此高度一个块的id，但是有些id(初始块id)不是64位字符，因此做一次hash
+
+  modules.blocks.getBlock({'height':height-1},function(err,res){
+    if(err){
+      return cb('Get getBlock from last block height error:'+err);
+    }
+
+    let lastBlockId = res.block.id;
     let hash = crypto.createHash('sha256').update(lastBlockId).digest('hex');
     for (var j = 0; j < hash.length; j++) {
       let str = hash[j];
       hash256Int = hash256Int.concat(hex[str]);
     }
     let index = chaos(hash256Int, slot, limit);
-    return index - 1;
+    cb(null,index - 1) ;
+  })
+  
 }
-
 
 function Delegate() {
   this.create = function (data, trs) {
@@ -473,30 +480,40 @@ __private.getKeysSortByVote = function (cb) {
   });
 }
 
-__private.getBlockSlotData = function (slot, lastBlockId,height, cb) {
+__private.getBlockSlotData = function (slot, height, cb) {
   self.generateDelegateList(height, function (err, activeDelegates) {
     if (err) {
       return cb(err);
     }
 
-    // let index = _getDelegeteIndex(slot, activeDelegates.length);
-    // let delegate_id = activeDelegates[index];
-    // if (__private.keypairs[delegate_id]) {
-    //   return cb(null, { time: slots.getSlotTime(slot), keypair: __private.keypairs[delegate_id]});
-    // }
-    
     var currentSlot = slot;
     var lastSlot = slots.getLastSlot(currentSlot);
-    for (; currentSlot < lastSlot; currentSlot += 1) {
-      // var delegate_pos = currentSlot % slots.delegates;
-      var delegate_pos = _getDelegeteIndex(lastBlockId,currentSlot, activeDelegates.length);
-      var delegate_id = activeDelegates[delegate_pos];
+    __private.asyncGetDelegeteIndex(height, currentSlot,lastSlot, activeDelegates,cb);
+  });
+}
+__private.asyncGetDelegeteIndex = function (height, currentSlot,lastSlot, activeDelegates,cb) {
+  _getDelegeteIndex(height, currentSlot, activeDelegates.length, function (err, index) {
+    if (err) {
+      return cb(err);
+    }
 
-      if (delegate_id && __private.keypairs[delegate_id]) {
-        return cb(null, {time: slots.getSlotTime(currentSlot), keypair: __private.keypairs[delegate_id]});
+    let delegateKey = activeDelegates[index];
+    if (delegateKey && __private.keypairs[delegateKey]) {
+      // library.logger.info("slot: " +currentSlot+", index:"+index+", delegateKey:"+delegateKey);
+      return cb(null,{
+        time: slots.getSlotTime(currentSlot),
+        keypair: __private.keypairs[delegateKey]
+      });
+    }
+    else{
+      currentSlot++;
+      if(currentSlot<lastSlot){
+        __private.asyncGetDelegeteIndex(height, currentSlot,lastSlot, activeDelegates,cb)
+      }
+      else{
+        cb("not fund delegeteKey in keypairs");
       }
     }
-    cb(null, null);
   });
 }
 
@@ -528,7 +545,7 @@ __private.loop = function (cb) {
   //   return setImmediate(cb);
   // }
 
-  __private.getBlockSlotData(currentSlot,lastBlock.id, lastBlock.height + 1, function (err, currentBlockData) {
+  __private.getBlockSlotData(currentSlot, lastBlock.height + 1, function (err, currentBlockData) {
     if (err || currentBlockData === null) {
       library.logger.trace('Loop:', 'skipping slot');
       return setImmediate(cb);
@@ -603,15 +620,24 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
       return cb(err);
     }
     var currentSlot = slots.getSlotNumber(propose.timestamp);
-    let index = _getDelegeteIndex(propose.previousBlock,currentSlot,activeDelegates.length);
-    let delegateKey = activeDelegates[index];
-    // var delegateKey = activeDelegates[currentSlot % slots.delegates];
+    _getDelegeteIndex(propose.height, currentSlot, activeDelegates.length, function (err, index) {
+      if (err) {
+        return cb(err);
+      }
 
-    if (delegateKey && propose.generatorPublicKey == delegateKey) {
-      return cb();
-    }
+      let delegateKey = activeDelegates[index];
+      if (delegateKey && propose.generatorPublicKey == delegateKey) {
+        return cb();
+      }
+    });
+    // let delegateKey = activeDelegates[index];
+    // // var delegateKey = activeDelegates[currentSlot % slots.delegates];
 
-    cb("Failed to validate propose slot");
+    // if (delegateKey && propose.generatorPublicKey == delegateKey) {
+    //   return cb();
+    // }
+
+    // cb("Failed to validate propose slot");
   });
 }
 
@@ -623,12 +649,40 @@ Delegates.prototype.getDelegateIndex = function (propose ,cb) {
     }
     // let block = modules.blocks.getLastBlock();
     let currentSlot = slots.getSlotNumber(propose.timestamp);
-    let index = _getDelegeteIndex(propose.previousBlock,currentSlot, activeDelegates.length);
-    let key = activeDelegates[index];
-    if (propose.generatorPublicKey && key == propose.generatorPublicKey) {
-      return cb(null, index);
-    }
-    cb("Failed to get delegete index");
+    _getDelegeteIndex(propose.height, currentSlot, activeDelegates.length, function (err, index) {
+      if (err) {
+        return cb(err);
+      }
+
+      let delegateKey = activeDelegates[index];
+      if (delegateKey && propose.generatorPublicKey == delegateKey) {
+        return cb(null, index);
+      }
+      cb("Failed to get delegete index");
+    });
+    // let index = _getDelegeteIndex(propose.previousBlock,currentSlot, activeDelegates.length);
+    // let key = activeDelegates[index];
+    // if (propose.generatorPublicKey && key == propose.generatorPublicKey) {
+    //   return cb(null, index);
+    // }
+    // cb("Failed to get delegete index");
+
+    // let index = _getDelegeteIndex(height,101);
+
+    // var delegateIndex = -1;
+    // for (var i = 0 ; i < activeDelegates.length ; i++) {
+    //   var key = activeDelegates[i];
+    //   if(delegateKey && key == delegateKey){
+    //     delegateIndex = i;
+    //     continue;
+    //   }
+    // }
+
+    // if(index == delegateIndex){
+
+    //   return cb(null,delegateIndex);
+    // }
+    // cb('get index error');
   });
 }
 
@@ -799,15 +853,27 @@ Delegates.prototype.validateBlockSlot = function (block, cb) {
       return cb(err);
     }
     var currentSlot = slots.getSlotNumber(block.timestamp);
-    let index = _getDelegeteIndex(block.previousBlock,currentSlot,activeDelegates.length);
-    let delegateKey = activeDelegates[index];
-    // var delegateKey = activeDelegates[currentSlot % slots.delegates];
+    _getDelegeteIndex(block.height, currentSlot, activeDelegates.length, function (err, index) {
+      if (err) {
+        return cb(err);
+      }
 
-    if (delegateKey && block.generatorPublicKey == delegateKey) {
-      return cb();
-    }
+      let delegateKey = activeDelegates[index];
+      if (delegateKey && block.generatorPublicKey == delegateKey) {
+        return cb();
+      }
+  
+      cb("Failed to verify slot, expected delegate: " + delegateKey);
+    });
+    // let index = _getDelegeteIndex(block.previousBlock,currentSlot,activeDelegates.length);
+    // let delegateKey = activeDelegates[index];
+    // // var delegateKey = activeDelegates[currentSlot % slots.delegates];
 
-    cb("Failed to verify slot, expected delegate: " + delegateKey);
+    // if (delegateKey && block.generatorPublicKey == delegateKey) {
+    //   return cb();
+    // }
+
+    // cb("Failed to verify slot, expected delegate: " + delegateKey);
   });
 }
 
