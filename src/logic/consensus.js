@@ -266,7 +266,7 @@ Consensus.prototype.normalizeVotes = function (votes) {
       signatures: {
         type: "array",
         minLength: 1,
-        maxLength: 101
+        maxLength: slots.delegates
       }
     },
     required: ["height", "id", "signatures"]

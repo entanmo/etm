@@ -13,6 +13,7 @@
  */
 
 'use strict';
+var slots = require('../utils/slots.js');
 
 module.exports = {
     delegate: {
@@ -112,7 +113,7 @@ module.exports = {
             limit: {
                 type: "integer",
                 minimum: 0,
-                maximum: 101
+                maximum: slots.delegates
             },
             offset: {
                 type: "integer",

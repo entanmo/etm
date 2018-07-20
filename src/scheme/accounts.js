@@ -13,6 +13,7 @@
  */
 
 'use strict';
+var slots = require('../utils/slots.js');
 
 module.exports = {
     open: {
@@ -127,7 +128,7 @@ module.exports = {
             votes: {
             type: 'array',
             minLength: 1,
-            maxLength: 101,
+            maxLength: slots.delegates,
             uniqueItems: true
             }
         },

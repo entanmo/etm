@@ -189,7 +189,7 @@ module.exports = function setup(options, done) {
         });
   
         z_schema.registerFormat('listDelegates', function (obj) {
-          obj.limit = 101;
+          obj.limit = slots.delegates;
           return true;
         });
   

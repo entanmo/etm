@@ -13,7 +13,7 @@
  */
 
 'use strict';
-
+var slots = require('../utils/slots.js');
 var constants = require('../utils/constants');
 
 module.exports = {
@@ -198,13 +198,13 @@ module.exports = {
             delegates: {
             type: "array",
             minLength: 5,
-            maxLength: 101,
+            maxLength: slots.delegates,
             uniqueItems: true
             },
             unlockDelegates: {
             type: "integer",
             minimum: 3,
-            maximum: 101
+            maximum: slots.delegates
             }
         },
         required: ["type", "name", "category", "delegates", "unlockDelegates"]

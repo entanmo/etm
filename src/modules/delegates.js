@@ -667,7 +667,7 @@ Delegates.prototype.getDelegateIndex = function (propose ,cb) {
     // }
     // cb("Failed to get delegete index");
 
-    // let index = _getDelegeteIndex(height,101);
+    // let index = _getDelegeteIndex(height,slots.delegates);
 
     // var delegateIndex = -1;
     // for (var i = 0 ; i < activeDelegates.length ; i++) {
@@ -766,9 +766,9 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
           return cb(err);
         }
         var total_votes = (existing_votes + additions) - removals;
-        if (total_votes > 101) {
-           var exceeded = total_votes - 101;
-           return cb("Maximum number of 101 votes exceeded (" + exceeded + " too many).");
+        if (total_votes > slots.delegates) {
+           var exceeded = total_votes - slots.delegates;
+           return cb("Maximum number of "+slots.delegates+" votes exceeded (" + exceeded + " too many).");
          } else {
            return cb();
          }
@@ -889,12 +889,12 @@ Delegates.prototype.getDelegates = function (query, cb) {
       return cb(err);
     }
 
-    var limit = query.limit || 101;
+    var limit = query.limit || slots.delegates;
 		var offset = query.offset || 0;
 		var orderField = query.orderBy || 'rate:asc';
 
     orderField = orderField ? orderField.split(':') : null;
-    limit = limit > 101 ? 101 : limit;
+    limit = limit > slots.delegates ? slots.delegates : limit;
 
     var orderBy = orderField ? orderField[0] : null;
     var sortMode = orderField && orderField.length == 2 ? orderField[1] : 'asc';
@@ -1081,7 +1081,7 @@ shared.getDelegates = function (req, cb) {
       limit: {
         type: "integer",
         minimum: 0,
-        maximum: 101
+        maximum: slots.delegates
       },
       offset: {
         type: "integer",

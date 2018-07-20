@@ -331,7 +331,7 @@ Round.prototype.tick = function (block, cb) {
       return done();
     }
 
-    if (__private.delegatesByRound[round].length !== slots.delegates && block.height !== 1 && block.height !== 101) {
+    if (__private.delegatesByRound[round].length !== slots.delegates && block.height !== 1 && block.height !== slots.delegates) {
       return done();
     }
 
@@ -480,7 +480,7 @@ Round.prototype.onBind = function (scope) {
 
 Round.prototype.onBlockchainReady = function () {
   var round = self.calc(modules.blocks.getLastBlock().height);
-  library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / 101 as integer) + (case when b.height % 101 > 0 then 1 else 0 end))) = $round",
+  library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / "+slots.delegates+" as integer) + (case when b.height % "+slots.delegates+" > 0 then 1 else 0 end))) = $round",
     {
       round: round
     },

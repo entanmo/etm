@@ -124,7 +124,7 @@ function Vote() {
         votes: {
           type: "array",
           minLength: 1,
-          maxLength: 101,
+          maxLength: slots.delegetes,
           uniqueItems: true
         }
       },
@@ -655,12 +655,12 @@ shared.getDelegates = function (req, cb) {
             return cb(err.toString());
           }
 
-          var limit = query.limit || 101;
+          var limit = query.limit || slots.delegates;
           var offset = query.offset || 0;
           var orderField = query.orderBy;
 
           orderField = orderField ? orderField.split(':') : null;
-          limit = limit > 101 ? 101 : limit;
+          limit = limit > slots.delegates ? slots.delegates : limit;
 
           var orderBy = orderField ? orderField[0] : null;
           var sortMode = orderField && orderField.length == 2 ? orderField[1] : 'asc';

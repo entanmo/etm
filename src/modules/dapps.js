@@ -35,6 +35,7 @@ var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js')
 var amountHelper = require('../utils/amount.js');
 var scheme = require('../scheme/dapps');
+var slots = require('../utils/slots.js')
 
 var modules, library, self, __private = {}, shared = {};
 
@@ -748,7 +749,7 @@ function DApp() {
       }
     }
 
-    if (!dapp.delegates || dapp.delegates.length < 5 || dapp.delegates.length > 101) {
+    if (!dapp.delegates || dapp.delegates.length < 5 || dapp.delegates.length > slots.delegates) {
       return setImmediate(cb, "Invalid dapp delegates");
     }
     for (let i in dapp.delegates) {
@@ -892,13 +893,13 @@ function DApp() {
         delegates: {
           type: "array",
           minLength: 5,
-          maxLength: 101,
+          maxLength: slots.delegetes,
           uniqueItems: true
         },
         unlockDelegates: {
           type: "integer",
           minimum: 3,
-          maximum: 101
+          maximum: slots.delegetes
         }
       },
       required: ["type", "name", "category", "delegates", "unlockDelegates"]

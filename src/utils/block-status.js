@@ -15,6 +15,7 @@
 'use strict';
 
 var constants = require('./constants.js');
+var slots = require('./slots.js')
 
 function BlockStatus() {
   var milestones = [
@@ -65,7 +66,7 @@ function BlockStatus() {
 
   this.calcSupply = function (height) {
     var height = parseHeight(height);
-    height -= height % 101;
+    height -= height % slots.delegates;
     var milestone = this.calcMilestone(height);
     var supply    = constants.totalAmount;
     var rewards   = [];
