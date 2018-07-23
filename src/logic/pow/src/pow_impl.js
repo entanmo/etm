@@ -22,9 +22,6 @@ function noop() {
     // Nothing to do
 }
 
-const CPUHandler = require('./cpu_handler');
-const GPUHandler = require('./gpu_handler');
-
 const path = require('path');
 const fs = require('fs');
 const MINER_CFG = path.resolve('miner-cfg.json');
