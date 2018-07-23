@@ -35,7 +35,7 @@
     "lodash": "^4.17.5",
     "mathjs": "^4.1.2",
     "method-override": "^2.3.10",
-    "node-pow-addon": "https://gitee.com/just-anohaker/node-addon.git",
+    "node-pow-addon": "https://gitee.com/just-anohaker/multi-node.git",
     "protocol-buffers": "^4.0.4",
     "randomstring": "^1.1.5",
     "request": "^2.85.0",

@@ -11,8 +11,8 @@ class GPUHandler extends Handler {
         this._blockLoop = 100000;
     }
 
-    setup() {
-        return powAddon.setup(1);
+    setup(cfgPath) {
+        return powAddon.setup(cfgPath);
     }
 
     pow(src, target, cb) {

@@ -25,10 +25,38 @@ function noop() {
 const CPUHandler = require('./cpu_handler');
 const GPUHandler = require('./gpu_handler');
 
+const path = require('path');
+const fs = require('fs');
+const MINER_CFG = path.resolve('miner-cfg.json');
+
 class PowImpl {
     constructor() {
+        // 1、判断配置矿机配置文件是否存在
+        if (fs.existsSync(MINER_CFG)) {
+            // 2、读取矿机配置文件
+            const minerCfg = require(MINER_CFG);
+            // 3、判断是否使用GPU
+            if (minerCfg.enableGPU) {
+                const GPUHandler = require('./gpu_handler');
+                this._handler = new GPUHandler();
+                if (!this._handler.setup(MINER_CFG)) {
+                    // 4、GPU功能失败的情况下使用CPU
+                    const CPUHandler = require('./cpu_handler');
+                    this._handler = new CPUHandler();
+                }
+            }
+        } else {
+            // 5、如果未进行配置，则默认使用CPU
+            const CPUHandler = require('./cpu_handler');
+            this._handler = new CPUHandler();
+        }
+        // 6、发送准备就绪消息
+        setImmediate(() => {
+            this._opResp(null, OperationResp.MINT_READY, null);
+        });
+
+        /*
         // init with GPUHandler by default
-        
         this._handler = new GPUHandler();
         if (!this._handler.setup()) {
             this._handler = new CPUHandler();
@@ -37,6 +65,7 @@ class PowImpl {
             this._opResp(null, OperationResp.MINT_READY, null);
         });
         // this._handler = new CPUHandler();
+        */
         this._ipcHandlers = {};
         this._bindIpcHandlers();
         this._timeoutHandler = null;
