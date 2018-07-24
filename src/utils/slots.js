@@ -37,13 +37,13 @@ function getEpochTime(time) {
 
 module.exports = {
 
-  interval: 1,
+  interval: 3,      // 出块时间
 
-  delegates: 31,
+  delegates: 101,    // 代理数量（不为101时需要同步修改gegesisBlock.json）
 
-  leading:5,//前导位数
+  leading: 5,        // 前导位数
 
-  powTimeOut:0.7,//pow超时时间（单位s）
+  powTimeOut: 2,   // pow超时时间（单位s）
 
   getTime: function (time) {
     return getEpochTime(time);
