@@ -37,9 +37,13 @@ function getEpochTime(time) {
 
 module.exports = {
 
-  interval: 10,
+  interval: 1,
 
-  delegates: 101,
+  delegates: 31,
+
+  leading:5,//前导位数
+
+  powTimeOut:0.7,//pow超时时间（单位s）
 
   getTime: function (time) {
     return getEpochTime(time);
