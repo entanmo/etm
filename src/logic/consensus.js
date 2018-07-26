@@ -144,11 +144,6 @@ Consensus.prototype.createPropose = function (keypair, block, address, cb) {
     generatorPublicKey: block.generatorPublicKey,
     address: address
   };
-  /*
-  var hash = this.getProposeHash(propose);
-  propose.hash = hash.toString("hex");
-  propose.signature = ed.Sign(hash, keypair).toString("hex");
-  */
 
   this.pow(propose, (err, pow) => {
     if (err) {
@@ -169,26 +164,6 @@ Consensus.prototype.pow = function (propose, cb) {
     if (err) {
       return cb(err);
     }
-
-    /*
-    var nonce = 0;
-    var powHash;
-    while (true) {
-      var src = propose.hash + nonce.toString();
-      powHash = crypto.createHash('sha256').update(src).digest('hex');
-      if (powHash.indexOf(target) == 0) {
-        break;
-      }
-      nonce++;
-    }
-
-    global.library.logger.log('pow:' + powHash + ',' + nonce);
-
-    cb(null, {
-      hash: powHash,
-      nonce: nonce
-    });
-    */
 
     let timer ;
     const responser = PoW.currentResponser;
@@ -278,12 +253,6 @@ Consensus.prototype.normalizeVotes = function (votes) {
 }
 
 Consensus.prototype.acceptPropose = function (propose, cb) {
-  /*
-  var hash = this.getProposeHash(propose);
-  if (propose.hash != hash.toString("hex")) {
-    return setImmediate(cb, "Propose hash is not correct");
-  }
-  */
   this.verifyPOW(propose, (err, ok) => {
     if (err) {
       return setImmediate(cb, err);
@@ -322,18 +291,6 @@ Consensus.prototype.verifyPOW = function (propose, cb) {
       return cb(null, true);
     }
     return cb(null, false);
-
-    /*
-    var src = propose.hash + propose.nonce.toString();
-    var res = crypto.createHash('sha256').update(src).digest('hex');
-    
-    global.library.logger.log('verifyPOW:' + propose.hash + ',' + propose.nonce);
-    
-    if (res == propose.powHash && res.indexOf(target) == 0) {
-      return cb(null, true);
-    }
-    return cb(null, false);
-    */
   });
 }
 

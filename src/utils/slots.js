@@ -39,7 +39,7 @@ module.exports = {
 
   interval: 3,      // 出块时间
 
-  delegates: 101,    // 代理数量（不为101时需要同步修改gegesisBlock.json）
+  delegates: 31,    // 代理数量（不为101时需要同步修改gegesisBlock.json）
 
   leading: 5,        // 前导位数
 
