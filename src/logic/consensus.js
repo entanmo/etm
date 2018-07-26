@@ -165,33 +165,33 @@ Consensus.prototype.pow = function (propose, cb) {
       return cb(err);
     }
 
-    let timer ;
-    const responser = PoW.currentResponser;
-    responser.onError = function (uuid, data) {
-      const duration = process.hrtime(timer);
-      console.log(`----------------------- pow onError: ${duration[0] + duration[1] / 1000000000.0} sec`);
-      cb(data.reason);
-    };
+    // let timer ;
+    // const responser = PoW.currentResponser;
+    // responser.onError = function (uuid, data) {
+    //   const duration = process.hrtime(timer);
+    //   console.log(`----------------------- pow onError: ${duration[0] + duration[1] / 1000000000.0} sec`);
+    //   cb(data.reason);
+    // };
 
-    responser.onPoW = function (uuid, data) {
-      const duration = process.hrtime(timer);
-      console.log(`----------------------- pow onPoW: ${duration[0] + duration[1] / 1000000000.0} sec`);
-      global.library.logger.log(`pow - hash(${data.hash}), nonce(${data.nonce})`);
-      cb(null, {
-        hash: data.hash,
-        nonce: data.nonce
-      });
-    };
+    // responser.onPoW = function (uuid, data) {
+    //   const duration = process.hrtime(timer);
+    //   console.log(`----------------------- pow onPoW: ${duration[0] + duration[1] / 1000000000.0} sec`);
+    //   global.library.logger.log(`pow - hash(${data.hash}), nonce(${data.nonce})`);
+    //   cb(null, {
+    //     hash: data.hash,
+    //     nonce: data.nonce
+    //   });
+    // };
 
-    responser.onTimeout = function (uuid, data) {
-      const duration = process.hrtime(timer);
-      console.log(`----------------------- pow onTimeout: ${duration[0] + duration[1] / 1000000000.0} sec`);
-      global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
-      cb(new Error('Error: Timeout'));
-    };
+    // responser.onTimeout = function (uuid, data) {
+    //   const duration = process.hrtime(timer);
+    //   console.log(`----------------------- pow onTimeout: ${duration[0] + duration[1] / 1000000000.0} sec`);
+    //   global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
+    //   cb(new Error('Error: Timeout'));
+    // };
 
-    // PoW.pow(propose.hash, target, POW_TIMEOUT);
-    */
+    // // PoW.pow(propose.hash, target, POW_TIMEOUT);
+    
     const timer = process.hrtime();
     function onError(uuid, data) {
       const duration = process.hrtime(timer);
