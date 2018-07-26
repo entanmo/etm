@@ -477,7 +477,8 @@ __private.getBlockSlotData = function (slot, height, cb) {
       return cb(err);
     }
 
-    modules.blocks.getBlock({'height': height - 1}, function(err, res){
+    var prevHeight = height > 2 ? height - 2 : height - 1;
+    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
       if (err) {
         return cb('Get getBlock from last block height error:' + err);
       }
@@ -604,7 +605,8 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
       return cb(err);
     }
     
-    modules.blocks.getBlock({'height': propose.height - 1}, function(err, res){
+    var prevHeight = propose.height > 2 ? propose.height - 2 : propose.height - 1;
+    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
       if (err) {
         return cb('Get getBlock from last block height error:' + err);
       }
@@ -629,7 +631,8 @@ Delegates.prototype.getDelegateIndex = function (propose ,cb) {
       return cb(err);
     }
 
-    modules.blocks.getBlock({'height': propose.height - 1}, function(err, res){
+    var prevHeight = propose.height > 2 ? propose.height - 2 : propose.height - 1;
+    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
       if (err) {
         return cb('Get getBlock from last block height error:' + err);
       }
@@ -813,7 +816,8 @@ Delegates.prototype.validateBlockSlot = function (block, cb) {
       return cb(err);
     }
 
-    modules.blocks.getBlock({'height': block.height - 1}, function(err, res){
+    var prevHeight = block.height > 2 ? block.height - 2 : block.height - 1;
+    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
       if (err) {
         return cb('Get getBlock from last block height error:' + err);
       }

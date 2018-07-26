@@ -144,11 +144,6 @@ Consensus.prototype.createPropose = function (keypair, block, address, cb) {
     generatorPublicKey: block.generatorPublicKey,
     address: address
   };
-  /*
-  var hash = this.getProposeHash(propose);
-  propose.hash = hash.toString("hex");
-  propose.signature = ed.Sign(hash, keypair).toString("hex");
-  */
 
   this.pow(propose, (err, pow) => {
     if (err) {
@@ -170,54 +165,33 @@ Consensus.prototype.pow = function (propose, cb) {
       return cb(err);
     }
 
-    /*
-    var nonce = 0;
-    var powHash;
-    while (true) {
-      var src = propose.hash + nonce.toString();
-      powHash = crypto.createHash('sha256').update(src).digest('hex');
-      if (powHash.indexOf(target) == 0) {
-        break;
-      }
-      nonce++;
-    }
+    // let timer ;
+    // const responser = PoW.currentResponser;
+    // responser.onError = function (uuid, data) {
+    //   const duration = process.hrtime(timer);
+    //   console.log(`----------------------- pow onError: ${duration[0] + duration[1] / 1000000000.0} sec`);
+    //   cb(data.reason);
+    // };
 
-    global.library.logger.log('pow:' + powHash + ',' + nonce);
+    // responser.onPoW = function (uuid, data) {
+    //   const duration = process.hrtime(timer);
+    //   console.log(`----------------------- pow onPoW: ${duration[0] + duration[1] / 1000000000.0} sec`);
+    //   global.library.logger.log(`pow - hash(${data.hash}), nonce(${data.nonce})`);
+    //   cb(null, {
+    //     hash: data.hash,
+    //     nonce: data.nonce
+    //   });
+    // };
 
-    cb(null, {
-      hash: powHash,
-      nonce: nonce
-    });
-    */
+    // responser.onTimeout = function (uuid, data) {
+    //   const duration = process.hrtime(timer);
+    //   console.log(`----------------------- pow onTimeout: ${duration[0] + duration[1] / 1000000000.0} sec`);
+    //   global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
+    //   cb(new Error('Error: Timeout'));
+    // };
 
-    /*
-    let timer ;
-    const responser = PoW.currentResponser;
-    responser.onError = function (uuid, data) {
-      const duration = process.hrtime(timer);
-      console.log(`----------------------- pow onError: ${duration[0] + duration[1] / 1000000000.0} sec`);
-      cb(data.reason);
-    };
-
-    responser.onPoW = function (uuid, data) {
-      const duration = process.hrtime(timer);
-      console.log(`----------------------- pow onPoW: ${duration[0] + duration[1] / 1000000000.0} sec`);
-      global.library.logger.log(`pow - hash(${data.hash}), nonce(${data.nonce})`);
-      cb(null, {
-        hash: data.hash,
-        nonce: data.nonce
-      });
-    };
-
-    responser.onTimeout = function (uuid, data) {
-      const duration = process.hrtime(timer);
-      console.log(`----------------------- pow onTimeout: ${duration[0] + duration[1] / 1000000000.0} sec`);
-      global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
-      cb(new Error('Error: Timeout'));
-    };
-
-    // PoW.pow(propose.hash, target, POW_TIMEOUT);
-    */
+    // // PoW.pow(propose.hash, target, POW_TIMEOUT);
+    
     const timer = process.hrtime();
     function onError(uuid, data) {
       const duration = process.hrtime(timer);
@@ -307,12 +281,6 @@ Consensus.prototype.normalizeVotes = function (votes) {
 }
 
 Consensus.prototype.acceptPropose = function (propose, cb) {
-  /*
-  var hash = this.getProposeHash(propose);
-  if (propose.hash != hash.toString("hex")) {
-    return setImmediate(cb, "Propose hash is not correct");
-  }
-  */
   this.verifyPOW(propose, (err, ok) => {
     if (err) {
       return setImmediate(cb, err);
@@ -351,18 +319,6 @@ Consensus.prototype.verifyPOW = function (propose, cb) {
       return cb(null, true);
     }
     return cb(null, false);
-
-    /*
-    var src = propose.hash + propose.nonce.toString();
-    var res = crypto.createHash('sha256').update(src).digest('hex');
-    
-    global.library.logger.log('verifyPOW:' + propose.hash + ',' + propose.nonce);
-    
-    if (res == propose.powHash && res.indexOf(target) == 0) {
-      return cb(null, true);
-    }
-    return cb(null, false);
-    */
   });
 }
 
