@@ -184,14 +184,14 @@ class PowImpl {
                 });
             });
         } else {
-            const timer = process.hrtime();
+            const timer = Date.now();
             function timeouthandler() {
                 if (!localCallback || typeof localCallback !== "function") {
                     return;
                 }
-
-                const duration = process.hrtime(timer);
-                if (duration[0] * 1000 + duration[1] / 1000000 >= timeout) {
+                
+                const duration = Date.now();
+                if (duration - timer >= timeout) {
                     localCallback(null, {
                         opstate: 'timeout',
                     });

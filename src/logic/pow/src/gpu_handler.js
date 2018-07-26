@@ -13,7 +13,7 @@ class GPUHandler extends Handler {
 
     destructor() {
         super.destructor(this);
-        
+
         if (powAddon.stop) {
             powAddon.stop();
         }
@@ -24,18 +24,14 @@ class GPUHandler extends Handler {
     }
 
     pow(src, target, cb) {
-        const timer = process.hrtime();
         if (this._state === Handler.PowState.RUNNING) {
             return setImmediate(() => {
-                cb("Error: Pow is running");
+                cb(new Error("Error: Pow is running"));
             });
         }
 
         this._state = Handler.PowState.RUNNING;
-
         powAddon.mint(src, target, (result) => {
-            const duration = process.hrtime(timer);
-            console.log((new Date()).getTime(), "--------------- mint duration: ", (duration[0] + duration[1] / 1000000000.0), "sec", result);
             this._state = Handler.PowState.PENDING;
             if (!result.done) {
                 cb(new Error("Mint failure."));

@@ -12,7 +12,7 @@ class CPUHandler extends Handler {
     pow(src, target, cb) {
         if (this._state === Handler.PowState.RUNNING) {
             return setImmediate(() => {
-                cb('Error: PoW is running.');
+                cb(new Error('Error: PoW is running.'));
             });
         }
         this._state = Handler.PowState.RUNNING;
