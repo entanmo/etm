@@ -188,7 +188,7 @@ class PowImpl {
 
                 const duration = process.hrtime(timer);
                 if (duration[0] * 1000 + duration[1] / 1000000 >= timeout) {
-                    localCallback({
+                    localCallback(null, {
                         opstate: 'timeout',
                     });
                     localCallback = undefined;

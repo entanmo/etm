@@ -6,6 +6,7 @@ const { OperationReq, OperationResp } = require('./constants');
 const powImpl = fork(path.resolve(__dirname, 'pow_impl.js'));
 
 let onReadyEvent = null;
+let powResponser = {};
 
 powImpl.request = function (uuid, op, params, cb) {
     const reqData = {
@@ -24,44 +25,44 @@ powImpl.request = function (uuid, op, params, cb) {
 
 
 powImpl.onErrorEvent = function onerrorevent(uuid, resp) {
-    if (this.responser && typeof this.responser['onError'] === 'function') {
-        this.responser.onError(uuid, resp.data);
+    if (powResponser.onError) {
+        powResponser.onError(uuid, resp.data);
     }
 }
 
 powImpl.onTimeoutEvent = function ontimeoutevent(uuid, resp) {
-    if (this.responser && typeof this.responser['onTimeout'] === 'function') {
-        this.responser.onTimeout(uuid, resp.data);
+    if (powResponser.onTimeout) {
+        powResponser.onTimeout(uuid, resp.data);
     }
 }
 
 powImpl.onStartPoWEvent = function onstartpowevent(uuid, resp) {
-    if (this.responser && typeof this.responser['onStartPoW'] === 'function') {
-        this.responser.onStartPoW(uuid, resp.data);
+    if (powResponser.onStartPoW) {
+        powResponser.onStartPoW(uuid, resp.data);
     }
 }
 
 powImpl.onStopPoWEvent = function onstoppowevent(uuid, resp) {
-    if (this.responser && typeof this.responser['onStopPoW'] === 'function') {
-        this.responser.onStopPoW(uuid, resp.data);
+    if (powResponser.onStopPoW) {
+        powResponser.onStopPoW(uuid, resp.data);
     }
 }
 
 powImpl.onTermPoWEvent = function ontermpowevent(uuid, resp) {
-    if (this.responser && typeof this.responser['onTermPoW'] === 'function') {
-        this.responser.onTermPoW(uuid, resp.data);
+    if (powResponser.onTermPoW) {
+        powResponser.onTermPoW(uuid, resp.data);
     }
 }
 
 powImpl.onPoWEvent = function onpowevent(uuid, resp) {
-    if (this.responser && typeof this.responser['onPoW'] === 'function') {
-        this.responser.onPoW(uuid, resp.data);
+    if (powResponser.onPoW) {
+        powResponser.onPoW(uuid, resp.data);
     }
 }
 
 powImpl.onStateEvent = function onstateevent(uuid, resp) {
-    if (this.responser && typeof this.responser['onState'] === 'function') {
-        this.responser.onState(uuid, resp.data);
+    if (powResponser.onState) {
+        powResponser.onState(uuid, resp.data);
     }
 }
 
@@ -122,22 +123,44 @@ powImpl.on('exit', (code, signal) => {
 
 let gCurrentUUID = 0;
 module.exports = {
-    setResponser: function (responser) {
-        powImpl.responser = responser;
-        module.exports.currentResponser = powImpl.responser;
-    },
-
-    getResponser: function () {
-        return powImpl.responser;
-    },
-
     onReady: function (cb) {
         // cb();
         onReadyEvent = cb;
     },
     
-    pow: function (src, target, timeout) {
+    pow: function (src, target, timeout, powEvents) {
         // TODO: validate src, target, timeout
+        powResponser = {};
+        if (powEvents) {
+            // onError
+            if (powEvents.onError && typeof powEvents.onError === "function") {
+                powResponser.onError = powEvents.onError;
+            }
+            // onTimeout
+            if (powEvents.onTimeout && typeof powEvents.onTimeout === "function") {
+                powResponser.onTimeout = powEvents.onTimeout;
+            }
+            // onStartPoW
+            if (powEvents.onStartPoW && typeof powEvents.onStartPoW === "function") {
+                powResponser.onStartPoW = powEvents.onStartPoW;
+            }
+            // onStopPoW
+            if (powEvents.onStopPoW && typeof powEvents.onStopPoW === "function") {
+                powResponser.onStopPoW = powEvents.onStopPoW;
+            }
+            // onTermPoW
+            if (powEvents.onTermPoW && typeof powEvents.onTermPoW === "function") {
+                powResponser.onTermPoW = powEvents.onTermPoW;
+            }
+            // onPoW
+            if (powEvents.onPoW && typeof powEvents.onPoW === "function") {
+                powResponser.onPoW = powEvents.onPoW;
+            }
+            // onState
+            if (powEvents.onState && typeof powEvents.onState === "function") {
+                powResponser.onState = powEvents.onState;
+            }
+        }
         
         if (timeout == null) {
             timeout = 0;
