@@ -11,6 +11,14 @@ class GPUHandler extends Handler {
         this._blockLoop = 100000;
     }
 
+    destructor() {
+        super.destructor(this);
+        
+        if (powAddon.stop) {
+            powAddon.stop();
+        }
+    }
+
     setup(cfgPath) {
         return powAddon.setup(cfgPath);
     }

@@ -8,6 +8,10 @@ const { PowState } = require('./constants');
  */
 
 class Handler {
+    constructor() {}
+
+    destructor() {}
+
     pow(src, target, cb) {
         throw new Error('function[pow] must be implemented by subclass')
     }

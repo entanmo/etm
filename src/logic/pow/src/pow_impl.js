@@ -68,6 +68,10 @@ class PowImpl {
         this._timeoutHandler = null;
     }
 
+    destructor() {
+        this._handler.destructor();
+    }
+
     currentState() {
         return this._handler.getState();
     }
@@ -343,4 +347,26 @@ process.on('message', (ipcReq) => {
     const op = ipcReq.opreq;
     const params = ipcReq.params;
     powImpl.ipcHandler(uuid, op, params);
+});
+
+process.once('cleanup', () => {
+    console.log('PoW fork process Cleaning up...');
+
+    powImpl.destructor();
+});
+
+process.on('SIGTERM', () => {
+    process.emit('cleanup');
+});
+
+process.once('SIGINT', () => {
+    process.emit('cleanup');
+});
+
+process.on("uncaughtException", (err) => {
+    process.emit('cleanup');
+});
+
+process.once('exit', () => {
+    console.log('PoW fork process exited.');
 });
