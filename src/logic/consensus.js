@@ -238,11 +238,11 @@ Consensus.prototype.pow = function (propose, cb) {
     function onTimeout(uuid, data) {
       const duration = process.hrtime(timer);
       console.log(`----------------------- pow onTimeout: ${duration[0] + duration[1] / 1000000000.0} sec`);
-      global.library.logger.log(`pow timeout in ${POW_TIMEOUT}ms`);
+      global.library.logger.log(`pow timeout in ${slots.powTimeOut * 1000}ms`);
       cb(new Error('Error: Timeout'));
     }
 
-    PoW.pow(hash, target, (slots.interval-1) * 1000, {
+    PoW.pow(hash, target, slots.powTimeOut * 1000, {
       onError: onError,
       onPoW: onPoW,
       onTimeout: onTimeout
@@ -375,10 +375,7 @@ Consensus.prototype.getAddressIndex = function (propose, cb) {
     if (index < 0) {
       return cb(new Error('Failed to get address index.'));
     }
-    index = index % 32;
-    // 由于toString(2)并不能完全保障返回值是5个字符，所以为了统一为5个字符，
-    // 使用了String.prototype.padStart方法进行字符串宽度扩充
-    var strIndex = index.toString(2).padStart(5, '0');
+    var strIndex = index.toString(2).padStart(slots.leading, '0');
     cb(null, strIndex);
   });
 }
