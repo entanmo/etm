@@ -79,7 +79,6 @@ function _onprocesserror(uuid) {
     }
 }
 
-powImpl.responser = null;
 powImpl.mapresponsehandlers = {}
 powImpl.mapresponsehandlers[OperationResp.ERROR] = powImpl.onErrorEvent.bind(powImpl);
 powImpl.mapresponsehandlers[OperationResp.TIMEOUT] = powImpl.onTimeoutEvent.bind(powImpl);
