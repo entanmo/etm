@@ -300,6 +300,7 @@ Consensus.prototype.getAddressIndex = function (propose, cb) {
     if (index < 0) {
       return cb(new Error('Failed to get address index.'));
     }
+    index = index % (math.pow(2, slots.leading) - 1);
     var strIndex = index.toString(2).padStart(slots.leading, '0');
     cb(null, strIndex);
   });
