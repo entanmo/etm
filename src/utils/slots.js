@@ -37,7 +37,7 @@ function getEpochTime(time) {
 
 module.exports = {
 
-  interval: 3,      // 出块时间
+  interval: 10,      // 出块时间
 
   delegates: 101,    // 代理数量（不为101时需要同步修改gegesisBlock.json）
 

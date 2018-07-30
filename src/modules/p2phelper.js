@@ -61,7 +61,9 @@ P2PHelper.prototype.onBind = function (scope) {
 }
 
 P2PHelper.prototype.onBlockchainReady = function () {
+    console.log('========================== onBlockchainReady =======================');
     setImmediate(function nextUpdatePublicIp() {
+        console.log('================ nextUpdatePublicIp ================');
         modules.peer.list({limit: 1}, function (err, peers) {
             if (!err && peers.length) {
                 var peer = peers[0];
@@ -81,6 +83,7 @@ P2PHelper.prototype.onBlockchainReady = function () {
                     forever: true
                 };
                 request(req, function (err, response, body) {
+                    console.log('================= acquireSelfIp =================', body);
                     if (err || response.statusCode != 200) {
                         return ;
                     }
