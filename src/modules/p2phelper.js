@@ -61,10 +61,6 @@ P2PHelper.prototype.onBind = function (scope) {
 }
 
 P2PHelper.prototype.onBlockchainReady = function () {
-
-}
-
-P2PHelper.prototype.onPeerReady = function () {
     setImmediate(function nextUpdatePublicIp() {
         modules.peer.list({limit: 1}, function (err, peers) {
             if (!err && peers.length) {
@@ -101,6 +97,9 @@ P2PHelper.prototype.onPeerReady = function () {
         });
         setTimeout(nextUpdatePublicIp, 5 * 1000);
     });
+}
+
+P2PHelper.prototype.onPeerReady = function () {
 }
 
 shared.acquireIp = function (req, cb) {
