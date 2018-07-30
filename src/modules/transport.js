@@ -57,6 +57,7 @@ __private.attachApi = function () {
 
   router.use(function (req, res, next) {
     var peerIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log('^^^^^^^^^^^^^^^^^^^^^^^^ Transport router: ', peerIp, req.connection.remoteAddress);
 
     if (!peerIp) {
       return res.status(500).send({ success: false, error: "Wrong header data" });
@@ -111,8 +112,10 @@ __private.attachApi = function () {
         peer.dappId = req.body.dappId;
       }
 
+      console.log('************************************* transport route use--: ', peer);
       if (peer.port && peer.port > 0 && peer.port <= 65535) {
         if (modules.peer.isCompatible(peer.version)) {
+          console.log('*********************** state 2');
           peer.version && modules.peer.update(peer);
         } else {
           return res.status(500).send({
