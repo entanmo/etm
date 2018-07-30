@@ -19,6 +19,7 @@ const sandboxHelper = require('../utils/sandbox');
 const ip = require('ip');
 const request = require('request');
 const net = require('net');
+var extend = require('extend');
 
 var modules, library, self, __private = {}, shared = {};
 
@@ -64,9 +65,7 @@ P2PHelper.prototype.onBind = function (scope) {
 }
 
 P2PHelper.prototype.onBlockchainReady = function () {
-    // console.log('========================== onBlockchainReady =======================');
     setImmediate(function nextUpdatePublicIp() {
-        // console.log('================ nextUpdatePublicIp ================');
         modules.peer.list({limit: 1}, function (err, peers) {
             if (!err && peers.length) {
                 var peer = peers[0];
@@ -86,7 +85,6 @@ P2PHelper.prototype.onBlockchainReady = function () {
                     forever: true
                 };
                 request(req, function (err, response, body) {
-                    // console.log('================= acquireSelfIp =================', body);
                     if (err || response.statusCode != 200) {
                         return ;
                     }
@@ -109,16 +107,19 @@ P2PHelper.prototype.onBlockchainReady = function () {
 P2PHelper.prototype.onPeerReady = function () {
 }
 
-shared.acquireIp = function (req, cb) {
+P2PHelper.prototype.sandboxApi = function (call, args, cb) {
+    sandboxHelper.callMethod(shared, call, args, cb);
+}
+
+shared.acquireIp = function (req, res) {
     const remoteAddress = req.socket.remoteAddress;
     const remoteFamily = req.socket.remoteFamily;
     library.logger.info("acquireIp: ", remoteAddress, remoteFamily);
-    setImmediate(() => {
-        cb(null, {
-            ip: remoteAddress,
-            family: remoteFamily
-        });
-    });
+    const response = {
+        ip: remoteAddress,
+        family: remoteFamily
+    };
+    return res.json(extend({}, {"success": true}, response));
 }
 
 module.exports = P2PHelper;

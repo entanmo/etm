@@ -57,7 +57,6 @@ __private.attachApi = function () {
 
   router.use(function (req, res, next) {
     var peerIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    console.log('^^^^^^^^^^^^^^^^^^^^^^^^ Transport router: ', peerIp, req.connection.remoteAddress);
 
     if (!peerIp) {
       return res.status(500).send({ success: false, error: "Wrong header data" });
@@ -112,10 +111,8 @@ __private.attachApi = function () {
         peer.dappId = req.body.dappId;
       }
 
-      console.log('************************************* transport route use--: ', peer);
       if (peer.port && peer.port > 0 && peer.port <= 65535) {
         if (modules.peer.isCompatible(peer.version)) {
-          console.log('*********************** state 2');
           peer.version && modules.peer.update(peer);
         } else {
           return res.status(500).send({
@@ -133,7 +130,6 @@ __private.attachApi = function () {
   router.get('/list', function (req, res) {
     res.set(__private.headers);
     modules.peer.listWithDApp({ limit: 100 }, function (err, peers) {
-      console.log('======================= Transport route list ==============: ', peers);
       return res.status(200).json({ peers: !err ? peers : [] });
     })
   });
@@ -680,7 +676,6 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     req.body = options.data;
   }
 
-  console.log('================== getFromPeer =======', url);
   return request(req, function (err, response, body) {
     if (err || response.statusCode != 200) {
       library.logger.debug('Request', {
