@@ -821,7 +821,7 @@ Transport.prototype.onDappReady = function (dappId, broadcast) {
   }
 }
 
-Transport.prototype.onPublicIpChanged = function (ip, portbroadcast) {
+Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
   if (broadcast) {
     self.broadcast({}, {api: '/ip/changed', data: {ip: ip, port: port}, method: "POST"});
   }
