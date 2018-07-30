@@ -25,6 +25,7 @@ function map(root, config) {
     }
     router[route[0]](route[1], function (req, res, next) {
       var reqParams = {
+        origin: req,
         body: route[0] == "get" ? req.query : req.body,
         params: req.params
       }

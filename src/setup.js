@@ -93,7 +93,8 @@ const config = {
     'uia': './modules/uia.js',
     'dapps': './modules/dapps.js',
     'sql': './modules/sql.js',
-    'blocks': './modules/blocks.js'
+    'blocks': './modules/blocks.js',
+    'p2phelper': './modules/p2phelper.js'
   },
 
   api: {
