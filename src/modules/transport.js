@@ -130,6 +130,7 @@ __private.attachApi = function () {
   router.get('/list', function (req, res) {
     res.set(__private.headers);
     modules.peer.listWithDApp({ limit: 100 }, function (err, peers) {
+      console.log('======================= Transport route list ==============: ', peers);
       return res.status(200).json({ peers: !err ? peers : [] });
     })
   });
