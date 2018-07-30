@@ -670,6 +670,7 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     req.body = options.data;
   }
 
+  console.log('================== getFromPeer =======', url);
   return request(req, function (err, response, body) {
     if (err || response.statusCode != 200) {
       library.logger.debug('Request', {
