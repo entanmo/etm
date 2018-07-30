@@ -90,7 +90,7 @@ P2PHelper.prototype.onBlockchainReady = function () {
                     if (body.ip && typeof body.ip === "string" && net.isIPv4(body.ip)) {
                         const currentIp = library.config.publicIp;
                         const newIp = body.ip;
-                        if (currentIp === newIp) {
+                        if (currentIp !== newIp) {
                             library.logger.log("acquireSelfIp: ", newIp);
                             library.config.publicIp = newIp;
                         }                        
