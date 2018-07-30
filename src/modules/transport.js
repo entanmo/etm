@@ -568,6 +568,12 @@ __private.attachApi = function () {
     });
   });
 
+  router.post('/ip/changed', function (req, res) {
+    const body = req.body;
+    modules.peer.state(ip.toLong(body.ip), parseInt(body.port), 2);
+    res.sendStatus(200);
+  });
+
   router.use(function (req, res, next) {
     res.status(500).send({ success: false, error: "API endpoint not found" });
   });
@@ -817,6 +823,12 @@ Transport.prototype.onDappReady = function (dappId, broadcast) {
       dappId: dappId
     }
     self.broadcast({}, { api: '/dappReady', data: data, method: "POST" })
+  }
+}
+
+Transport.prototype.onPublicIpChanged = function (ip, portbroadcast) {
+  if (broadcast) {
+    self.broadcast({}, {api: '/ip/changed', data: {ip: ip, port: port}, method: "POST"});
   }
 }
 

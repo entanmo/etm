@@ -40,9 +40,12 @@ __private.attachApi = function () {
         res.status(500).send({success: false, error: "Blockchain is loading"});
     });
 
+    /*
     router.map(shared, {
         "get /": "acquireIp"
     });
+    */
+   router.get("/", shared.acquireIp.bind(shared));
 
     router.use(function(req, res) {
         res.status(500).send({success: false, error: "API endpoint not found"});
@@ -93,6 +96,7 @@ P2PHelper.prototype.onBlockchainReady = function () {
                         if (currentIp !== newIp) {
                             library.logger.log("acquireSelfIp: ", newIp);
                             library.config.publicIp = newIp;
+                            modules.transport.onPublicIpChanged(library.config.publicIp, library.config.port, true);
                         }                        
                     }
                 });
@@ -106,8 +110,8 @@ P2PHelper.prototype.onPeerReady = function () {
 }
 
 shared.acquireIp = function (req, cb) {
-    const remoteAddress = req.origin.socket.remoteAddress;
-    const remoteFamily = req.origin.socket.remoteFamily;
+    const remoteAddress = req.socket.remoteAddress;
+    const remoteFamily = req.socket.remoteFamily;
     library.logger.info("acquireIp: ", remoteAddress, remoteFamily);
     setImmediate(() => {
         cb(null, {
