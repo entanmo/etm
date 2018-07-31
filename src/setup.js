@@ -145,7 +145,7 @@ module.exports = function setup(options, done) {
 
     // portMapping(appConfig.port,appConfig.port);
 
-    scheduleUPNP(upnpPort, () => {    
+    scheduleUPNP(appConfig.port, () => {    
     if (!appConfig.publicIp) {
       appConfig.publicIp = getPublicIp();
     }
