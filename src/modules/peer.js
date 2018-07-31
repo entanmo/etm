@@ -273,7 +273,7 @@ Peer.prototype.listWithDApp = function (options, cb) {
 
 Peer.prototype.heartbeat = function (ip, port, cb) {
   const isFrozenList = library.config.peers.list.find(function (peer) {
-    return peer.ip == ip.fromLong(pip) && peer.port == port;
+    return peer.ip == ip.fromLong(ip) && peer.port == port;
   });
   if (isFrozenList !== undefined) return cb && cb();
 
