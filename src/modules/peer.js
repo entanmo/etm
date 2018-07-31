@@ -271,21 +271,21 @@ Peer.prototype.listWithDApp = function (options, cb) {
   });
 }
 
-Peer.prototype.heartbeat = function (ip, port, cb) {
+Peer.prototype.heartbeat = function (pip, port, cb) {
   const isFrozenList = library.config.peers.list.find(function (peer) {
-    return peer.ip == ip.fromLong(ip) && peer.port == port;
+    return peer.ip == ip.fromLong(pip) && peer.port == port;
   });
   if (isFrozenList !== undefined) return cb && cb();
 
   library.dbLite.query("SELECT * FROM peers WHERE ip = $ip AND port = $port AND state = 0;", {
-    ip: ip,
+    ip: pip,
     port: port,
   }, function (err, rows) {
     if (err) {
       return cb && cb();
     }
     if (rows.length) {
-      self.state(ip, port, 1);
+      self.state(pip, port, 1);
     }
     cb && cb();
   });
