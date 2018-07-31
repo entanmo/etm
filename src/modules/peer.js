@@ -282,12 +282,12 @@ Peer.prototype.heartbeat = function (ip, port, cb) {
     port: port,
   }, function (err, rows) {
     if (err) {
-      return cb();
+      return cb && cb();
     }
     if (rows.length) {
       self.state(ip, port, 1);
     }
-    cb();
+    cb && cb();
   });
 }
 
