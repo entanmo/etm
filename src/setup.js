@@ -24,6 +24,7 @@ var z_schema = require('z-schema');
 var ip = require('ip');
 var Sequence = require('./utils/sequence.js');
 var slots = require('./utils/slots.js');
+var natUpnp = require('nat-upnp');
 
 function getPublicIp() {
     var publicIp = null;
@@ -45,6 +46,18 @@ function getPublicIp() {
     return publicIp;
 }
 
+function portMapping(publicPort, privatePort) {
+  var client = natUpnp.createClient();
+  client.portMapping({
+    public: publicPort,
+    private: privatePort,
+    ttl: 10
+  }, function (err) {
+    if(err){
+      console.log('UPnP port Mapping Error:', err);
+    }
+  });
+}
 /*
 const moduleNames = [
   'server',
@@ -107,11 +120,18 @@ module.exports = function setup(options, done) {
     var dbFile = options.dbFile;
     var appConfig = options.appConfig;
     var genesisblock = options.genesisblock;
-  
+
+    portMapping(appConfig.port,appConfig.port);
+    
     if (!appConfig.publicIp) {
       appConfig.publicIp = getPublicIp();
     }
-    
+    else{
+      if (ip.isPrivate(appConfig.publicIp)) {
+        appConfig.publicIp = null;
+        }
+    }
+
     async.auto({
       config: function (cb) {
         cb(null, appConfig);
