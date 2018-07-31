@@ -564,11 +564,20 @@ __private.attachApi = function () {
     });
   });
 
-  router.post('/ip/changed', function (req, res) {
+  router.post('/p2p/ipChanged', function (req, res) {
     const body = req.body;
+
     modules.peer.state(ip.toLong(body.ip), parseInt(body.port), 2);
+
     res.sendStatus(200);
   });
+
+  router.post('/p2p/heartBeat', function (req, res) {
+    const body = req.body;
+
+    modules.peer.heartbeat(ip.toLong(body.ip), parseInt(body.port));
+    res.sendStatus(200);
+  })
 
   router.use(function (req, res, next) {
     res.status(500).send({ success: false, error: "API endpoint not found" });
@@ -823,7 +832,21 @@ Transport.prototype.onDappReady = function (dappId, broadcast) {
 
 Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
   if (broadcast) {
-    self.broadcast({}, {api: '/ip/changed', data: {ip: ip, port: port}, method: "POST"});
+    const data = {
+      ip: ip,
+      port: port
+    };
+    self.broadcast({}, {api: '/p2p/ipChanged', data: data, method: "POST"});
+  }
+}
+
+Transport.prototype.onHeartBeat = function (ip, port, broadcast) {
+  if (broadcast) {
+    const data = {
+      ip: ip,
+      port: port
+    };
+    self.broadcast({}, {api: '/p2p/heartBeat', data: data, method: "POST"})
   }
 }
 

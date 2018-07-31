@@ -51,11 +51,33 @@ function portMapping(publicPort, privatePort) {
   client.portMapping({
     public: publicPort,
     private: privatePort,
-    ttl: 10
   }, function (err) {
     if(err){
       console.log('UPnP port Mapping Error:', err);
     }
+  });
+}
+
+function scheduleUPNP(upnpPort, cb) {
+  var client = natUpnp.createClient();
+  client.portMapping({
+    public: upnpPort,
+    private: upnpPort,
+  }, function (err) {
+    if (err) {
+      console.log(`UPNP(${upnpPort}, ${upnpPort}) Failure.......`);
+      return cb();
+    }
+
+    setTimeout(function nextUpnp() {
+      client.portMapping({
+        public: upnpPort,
+        private: upnpPort
+      });
+
+      setTimeout(nextUpnp, 60 * 1000);
+    }, 60 * 1000);
+    cb();
   });
 }
 /*
@@ -121,8 +143,9 @@ module.exports = function setup(options, done) {
     var appConfig = options.appConfig;
     var genesisblock = options.genesisblock;
 
-    portMapping(appConfig.port,appConfig.port);
-    
+    // portMapping(appConfig.port,appConfig.port);
+
+    scheduleUPNP(upnpPort, () => {    
     if (!appConfig.publicIp) {
       appConfig.publicIp = getPublicIp();
     }
@@ -545,5 +568,6 @@ module.exports = function setup(options, done) {
           cb();
       }],
     }, done);
+  });
 };
 

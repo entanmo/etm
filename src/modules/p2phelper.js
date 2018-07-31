@@ -19,7 +19,8 @@ const sandboxHelper = require('../utils/sandbox');
 const ip = require('ip');
 const request = require('request');
 const net = require('net');
-var extend = require('extend');
+const extend = require('extend');
+const async = require('async');
 
 var modules, library, self, __private = {}, shared = {};
 
@@ -46,7 +47,7 @@ __private.attachApi = function () {
         "get /": "acquireIp"
     });
     */
-   router.get("/", shared.acquireIp.bind(shared));
+    router.get("/", shared.acquireIp.bind(shared));
 
     router.use(function(req, res) {
         res.status(500).send({success: false, error: "API endpoint not found"});
@@ -60,16 +61,10 @@ __private.attachApi = function () {
     });
 }
 
-P2PHelper.prototype.onBind = function (scope) {
-    modules = scope;
-}
-
-P2PHelper.prototype.onBlockchainReady = function () {
-    setImmediate(function nextUpdatePublicIp() {
-        modules.peer.list({limit: 1}, function (err, peers) {
-            if (!err && peers.length) {
-                var peer = peers[0];
-
+P2PHelper.prototype.broadcast = function (cb) {
+    modules.peer.list({limit: 20}, function (err, peers) {
+        if (!err) {
+            async.detectLimit(peers, 5, function (peer, cb) {
                 var url = "/api/p2phelper";
                 if (peer.address) {
                     url = "http://" + peer.address + url;
@@ -77,30 +72,69 @@ P2PHelper.prototype.onBlockchainReady = function () {
                     url = "http://" + ip.fromLong(peer.ip) + ":" + peer.port + url;
                 }
 
-                var req = {
+                const req = {
                     url: url,
                     method: "GET",
                     json: true,
                     timeout: library.config.peers.options.timeout,
                     forever: true
                 };
-                request(req, function (err, response, body) {
-                    if (err || response.statusCode != 200) {
-                        return ;
+                request(req, function (err, resp, body) {
+                    if (err || resp.statusCode !== 200) {
+                        return cb(null, false);
                     }
-                    if (body.ip && typeof body.ip === "string" && net.isIPv4(body.ip)) {
+
+                    if (body.ip && typeof body.ip === "string" && !ip.isPrivate(body.ip)) {
                         const currentIp = library.config.publicIp;
                         const newIp = body.ip;
                         if (currentIp !== newIp) {
                             library.logger.log("acquireSelfIp: ", newIp);
                             library.config.publicIp = newIp;
-                            modules.transport.onPublicIpChanged(library.config.publicIp, library.config.port, true);
-                        }                        
+                            setImmediate(() => {
+                                library.bus.message("publicIpChanged", library.config.publicIp, library.config.port, true);
+                            });
+                        }
+                        return cb(null, true);
                     }
+
+                    return cb(null, false);
                 });
-            }
-        });
-        setTimeout(nextUpdatePublicIp, 5 * 1000);
+            }, function (err, result) {
+                if (result === undefined) {
+                    // TODO -- DetachLimit failure, so after 1 second to repeat.
+                    setTimeout(() => {
+                        self.broadcast();
+                    }, 1 * 1000);
+                }
+            })
+        }
+    });
+}
+
+P2PHelper.prototype.onBind = function (scope) {
+    modules = scope;
+}
+
+P2PHelper.prototype.onBlockchainReady = function () {
+    setImmediate(function nextUpdatePublicIp() {
+        self.broadcast();
+        setTimeout(nextUpdatePublicIp, 65 * 1000);
+    });
+
+    setImmediate(function nextHeartBeat() {
+        if (library.config.publicIp) {
+            library.bus.message('heartBeat', library.config.publicIp, library.config.port, true);
+        }
+        setTimeout(nextHeartBeat, 60 * 1000);
+    });
+
+    setImmediate(function nextCheckPublicIp() {
+        if (!library.config.publicIp) {
+            self.broadcast();
+            setTimeout(nextCheckPublicIp, 1 * 1000);
+        } else {
+            setTimeout(nextCheckPublicIp, 600 * 1000);
+        }
     });
 }
 
