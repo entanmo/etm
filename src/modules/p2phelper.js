@@ -116,6 +116,10 @@ P2PHelper.prototype.onBind = function (scope) {
 }
 
 P2PHelper.prototype.onBlockchainReady = function () {
+    // 未配置acquireip选项，则不启用自动获取公网ip的操作
+    if (!library.config.acquireip) {
+        return ;
+    }
     setImmediate(function nextUpdatePublicIp() {
         self.broadcast();
         setTimeout(nextUpdatePublicIp, 65 * 1000);

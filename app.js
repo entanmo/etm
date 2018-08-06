@@ -63,6 +63,9 @@ function main() {
     .option('-e, --execute <path>', 'exe')
     .option('--dapps <dir>', 'DApps directory')
     .option('--base <dir>', 'Base directory')
+    .option('--no-upnp', "Disable unpn feature")
+    .option('--no-acquireip', "Disable acquire ip feature")
+    .option('--no-checkpriip', "Disable check private ip type")
     .parse(process.argv);
 
   const options = {
@@ -92,6 +95,10 @@ function main() {
       if (program.execute) {
         // only for debug use
         // require(path.resolve(program.execute))(scope);
+      }
+
+      if (!scope.config.acquireip && scope.config.publicIp == null) {
+        scope.logger.warn('Acquire ip is disable, But public ip is not config.');
       }
 
       scope.bus.message('bind', scope.modules);

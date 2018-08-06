@@ -58,7 +58,12 @@ function portMapping(publicPort, privatePort) {
   });
 }
 
-function scheduleUPNP(upnpPort, cb) {
+function scheduleUPNP(upnp, upnpPort, cb) {
+  if (!upnp) {
+    return cb();
+  }
+
+  // enable upnp 
   var client = natUpnp.createClient();
   client.portMapping({
     public: upnpPort,
@@ -145,16 +150,16 @@ module.exports = function setup(options, done) {
 
     // portMapping(appConfig.port,appConfig.port);
 
-    scheduleUPNP(appConfig.port, () => {    
+    scheduleUPNP(appConfig.upnp, appConfig.port, () => {    
     if (!appConfig.publicIp) {
       appConfig.publicIp = getPublicIp();
     }
     else{
-      if (ip.isPrivate(appConfig.publicIp)) {
+      if (appConfig.checkpriip && ip.isPrivate(appConfig.publicIp)) {
         appConfig.publicIp = null;
         }
     }
-
+    
     async.auto({
       config: function (cb) {
         cb(null, appConfig);

@@ -53,6 +53,9 @@ module.exports = function init(options) {
     appConfig.netVersion = process.env.NET_VERSION || 'localnet';
     appConfig.publicDir = path.join(baseDir, 'public', 'dist');
     appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps')
+    appConfig.upnp = program.upnp;
+    appConfig.acquireip = program.acquireip;
+    appConfig.checkpriip = program.checkpriip;
 
     global.Config = appConfig;
 
