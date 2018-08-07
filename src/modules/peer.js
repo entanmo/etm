@@ -260,8 +260,8 @@ Peer.prototype.list = function (options, cb) {
 Peer.prototype.listWithDApp = function (options, cb) {
   options.limit = options.limit || 100;
 
-  library.dbLite.query("select p.ip, p.port, p.state, p.os, p.version from peers p " + (options.dappId ? " inner join peers_dapp pd on p.id = pd.peerId and pd.dappId = $dappId " : "") + " where p.state > 0 ORDER BY RANDOM() LIMIT $limit", options, {
-  // library.dbLite.query("select p.ip, p.port, p.state, p.os, p.version, pd.dappId from peers p inner join peers_dapp pd on p.id = pd.peerId  where p.state > 0 ORDER BY RANDOM() LIMIT $limit", options, {
+  // library.dbLite.query("select p.ip, p.port, p.state, p.os, p.version from peers p " + (options.dappId ? " inner join peers_dapp pd on p.id = pd.peerId and pd.dappId = $dappId " : "") + " where p.state > 0 ORDER BY RANDOM() LIMIT $limit", options, {
+  library.dbLite.query("select p.ip, p.port, p.state, p.os, p.version, pd.dappId from peers p inner join peers_dapp pd on p.id = pd.peerId  where p.state > 0 ORDER BY RANDOM() LIMIT $limit", options, {
     "ip": String,
     "port": Number,
     "state": Number,
