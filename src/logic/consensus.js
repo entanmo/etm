@@ -41,6 +41,7 @@ Consensus.prototype.createVotes = function (keypairs, block) {
   var votes = {
     height: block.height,
     id: block.id,
+    timestamp:block.timestamp,
     signatures: []
   };
   keypairs.forEach(function (el) {
@@ -126,7 +127,8 @@ Consensus.prototype.addPendingVotes = function (votes) {
         this.pendingVotes = {
           height: votes.height,
           id: votes.id,
-          signatures: []
+          signatures: [],
+          timestamp:votes.timestamp
         };
       }
       this.pendingVotes.signatures.push(item);

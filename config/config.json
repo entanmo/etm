@@ -13,7 +13,8 @@
     "list": [],
     "blackList": [],
     "options": {
-      "timeout": 4000
+      "timeout": 4000,
+      "pingTimeout":500
     }
   },
   "forging": {

@@ -161,6 +161,7 @@ message BlockVotes {
   required int64 height = 1;
   required string id = 2;
   repeated BlockVoteSignature signatures = 3;
+  required int32 timestamp = 4;
 }
 
 message BlockVoteSignature {

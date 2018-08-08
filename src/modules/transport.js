@@ -27,6 +27,7 @@ var sandboxHelper = require('../utils/sandbox.js');
 var LimitCache = require('../utils/limit-cache.js');
 var shell = require('../utils/shell.js');
 var scheme = require('../scheme/transport');
+var ByteBuffer = require("bytebuffer");
 
 // Private fields
 var modules, library, self, __private = {}, shared = {};
@@ -34,7 +35,8 @@ var modules, library, self, __private = {}, shared = {};
 __private.headers = {};
 __private.loaded = false;
 __private.messages = {};
-__private.invalidTrsCache = new LimitCache()
+__private.invalidTrsCache = new LimitCache();
+__private.votesCache = {};
 
 // Constructor
 function Transport(cb, scope) {
@@ -579,6 +581,32 @@ __private.attachApi = function () {
     res.sendStatus(200);
   })
 
+  router.post('/vote/forward', function (req, res) {
+    const body = req.body;
+    var votes = body.votes;
+
+    // 当前签名是否已经收到过
+    var votesId = self.getVotesId(votes);
+    if (__private.votesCache[votesId]) {
+      return res.sendStatus(200);
+    }
+    __private.votesCache[votesId] = true;
+    
+    // 当前签名的块是否是链的下一个块
+    var lastBlock = library.modules.blocks.getLastBlock();
+    if(!lastBlock || lastBlock.height + 1 != votes.height){
+      return res.sendStatus(200);
+    }
+
+    // 是否超出出块时间
+    var curTimestamp = slots.getTime();
+    if(body.votes.timestamp && curTimestamp - body.votes.timestamp < slots.interval){
+      self.sendVotes(body.votes, body.address);
+    }
+    
+    res.sendStatus(200);
+  })
+
   router.use(function (req, res, next) {
     res.status(500).send({ success: false, error: "API endpoint not found" });
   });
@@ -685,6 +713,10 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     req.body = options.data;
   }
 
+  if(options.changeReqTimeout){
+    req.timeout = library.config.peers.options.pingTimeout;
+  }
+  
   return request(req, function (err, response, body) {
     if (err || response.statusCode != 200) {
       library.logger.debug('Request', {
@@ -768,6 +800,53 @@ Transport.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);
 }
 
+Transport.prototype.getVotesId = function (votes) {
+  var bytes = new ByteBuffer();
+  // height
+  bytes.writeLong(votes.height);
+
+  // id
+  if (global.featureSwitch.enableLongId) {
+    bytes.writeString(votes.id)
+  } else {
+    var idBytes = bignum(votes.id).toBuffer({
+      size: 8
+    });
+    for (var i = 0; i < 8; i++) {
+      bytes.writeByte(idBytes[i]);
+    }
+  }
+
+  // timestamp
+  bytes.writeInt(votes.timestamp);
+
+  // signatures
+  for (var j = 0; j < votes.signatures.length; j++) {
+    if (global.featureSwitch.enableLongId) {
+      bytes.writeString(votes.signatures[j].key);
+      bytes.writeString(votes.signatures[j].sig);
+    } else {
+      var idBytesKey = bignum(votes.signatures[j].key).toBuffer({
+        size: 8
+      });
+      for (var i = 0; i < 8; i++) {
+        bytes.writeByte(idBytesKey[i]);
+      }
+
+      var idBytesSig = bignum(votes.signatures[j].sig).toBuffer({
+        size: 8
+      });
+      for (var i = 0; i < 8; i++) {
+        bytes.writeByte(idBytesSig[i]);
+      }
+    }
+  }
+
+  bytes.flip();
+  return crypto.createHash('sha256').update(bytes.toBuffer()).digest();
+}
+
+
 // Events
 Transport.prototype.onBind = function (scope) {
   modules = scope;
@@ -809,6 +888,8 @@ Transport.prototype.onNewBlock = function (block, votes, broadcast) {
     };
     self.broadcast({}, { api: '/blocks', data: data, method: "POST" });
     library.network.io.sockets.emit('blocks/change', {});
+
+    __private.votesCache = {};// 清除签名缓存
   }
 }
 
@@ -854,7 +935,15 @@ Transport.prototype.sendVotes = function (votes, address) {
   self.getFromPeer({ address: address }, {
     api: '/votes',
     data: votes,
-    method: "POST"
+    method: "POST",
+    changeReqTimeout:true
+  }, (err, res) => {
+    if (err) { //不能连通address，广播到转发接口
+      self.broadcast({}, {api: '/vote/forward', data: {votes:votes,address: address}, method: "POST"})
+    }
+    else{
+      __private.votesCache = {}
+    }
   });
 }
 
