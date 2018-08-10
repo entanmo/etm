@@ -40,7 +40,7 @@ __private.keypairs = {};
 __private.forgingEanbled = true;
 
 
-var _getDelegeteIndex = function (lastBlockId, slot, limit,cb) {
+var _getDelegeteIndex = function (lastBlockId, slot, limit) {
     const hex = {
       0: [0, 0, 0, 0],
       1: [0, 0, 0, 1],
