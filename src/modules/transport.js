@@ -595,14 +595,19 @@ __private.attachApi = function () {
     // 当前签名的块是否是链的下一个块
     var lastBlock = library.modules.blocks.getLastBlock();
     if(!lastBlock || lastBlock.height + 1 != votes.height){
+      library.logger.debug(`/vote/forward get from ${body.address}, but is in invalid height(${votes.height}, ${lastBlock.height})`);
       return res.sendStatus(200);
     }
 
+    /*
     // 是否超出出块时间
     var curTimestamp = slots.getTime();
     if(body.votes.timestamp && curTimestamp - body.votes.timestamp < slots.interval){
       self.sendVotes(body.votes, body.address);
     }
+    */
+    library.logger.debug(`/vote/forward forward sendVotes from ${body.address}`);
+    self.sendVotes(body.votes, body.address);
     
     res.sendStatus(200);
   })
@@ -705,7 +710,7 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     json: true,
     headers: extend({}, __private.headers, options.headers),
     timeout: library.config.peers.options.timeout,
-    forever: true
+    forever: false
   };
   if (Object.prototype.toString.call(options.data) === "[object Object]" || util.isArray(options.data)) {
     req.json = options.data;
@@ -939,9 +944,11 @@ Transport.prototype.sendVotes = function (votes, address) {
     changeReqTimeout:true
   }, (err, res) => {
     if (err) { //不能连通address，广播到转发接口
+      library.logger.debug(`sendVote to ${address} failure, so broadcast...`);
       self.broadcast({}, {api: '/vote/forward', data: {votes:votes,address: address}, method: "POST"})
     }
     else{
+      library.logger.debug(`sendVotes to ${address} success.`);
       __private.votesCache = {}
     }
   });
