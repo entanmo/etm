@@ -612,7 +612,7 @@ __private.attachApi = function () {
       self.sendVotes(body.votes, body.address);
     }
     */
-    library.logger.debug(`/vote/forward forward sendVotes${votesId} from ${body.address}`);
+    library.logger.debug(`/vote/forward forward sendVotes(${votesId.toString('hex')}) from ${body.address}`);
     self.sendVotes(body.votes, body.address);
     
     res.sendStatus(200);
@@ -950,11 +950,11 @@ Transport.prototype.sendVotes = function (votes, address) {
     changeReqTimeout:true
   }, (err, res) => {
     if (err) { //不能连通address，广播到转发接口
-      library.logger.debug(`sendVotes(${self.getVotesId(votes)}) to ${address} failure, so broadcast...`);
+      library.logger.debug(`sendVotes(${self.getVotesId(votes).toString('hex')}) to ${address} failure, so broadcast...`);
       self.broadcast({}, {api: '/vote/forward', data: {votes:votes,address: address}, method: "POST"})
     }
     else{
-      library.logger.debug(`sendVotes(${self.getVotesId(votes)}) to ${address} success.`);
+      library.logger.debug(`sendVotes(${self.getVotesId(votes).toString('hex')}) to ${address} success.`);
       // __private.votesCache = {}
     }
   });
