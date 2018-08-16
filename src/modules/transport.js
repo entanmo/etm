@@ -593,10 +593,10 @@ __private.attachApi = function () {
     }
     __private.votesCache[votesId] = true;
     */
-    if (__private.votesCache.has(votesId)) {
+    if (__private.votesCache.has(votesId.toString('hex'))) {
       return res.sendStatus(200);
     }
-    __private.votesCache.set(votesId, true);
+    __private.votesCache.set(votesId.toString('hex'), true);
     
     // 当前签名的块是否是链的下一个块
     var lastBlock = library.modules.blocks.getLastBlock();
