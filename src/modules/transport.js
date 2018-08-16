@@ -36,7 +36,7 @@ __private.headers = {};
 __private.loaded = false;
 __private.messages = {};
 __private.invalidTrsCache = new LimitCache();
-__private.votesCache = {};
+__private.votesCache = new LimitCache();
 
 // Constructor
 function Transport(cb, scope) {
@@ -587,10 +587,16 @@ __private.attachApi = function () {
 
     // 当前签名是否已经收到过
     var votesId = self.getVotesId(votes);
+    /*
     if (__private.votesCache[votesId]) {
       return res.sendStatus(200);
     }
     __private.votesCache[votesId] = true;
+    */
+    if (__private.votesCache.has(votesId)) {
+      return res.sendStatus(200);
+    }
+    __private.votesCache.set(votesId, true);
     
     // 当前签名的块是否是链的下一个块
     var lastBlock = library.modules.blocks.getLastBlock();
@@ -606,7 +612,7 @@ __private.attachApi = function () {
       self.sendVotes(body.votes, body.address);
     }
     */
-    library.logger.debug(`/vote/forward forward sendVotes from ${body.address}`);
+    library.logger.debug(`/vote/forward forward sendVotes${votesId} from ${body.address}`);
     self.sendVotes(body.votes, body.address);
     
     res.sendStatus(200);
@@ -894,7 +900,7 @@ Transport.prototype.onNewBlock = function (block, votes, broadcast) {
     self.broadcast({}, { api: '/blocks', data: data, method: "POST" });
     library.network.io.sockets.emit('blocks/change', {});
 
-    __private.votesCache = {};// 清除签名缓存
+    // __private.votesCache = {};// 清除签名缓存
   }
 }
 
@@ -944,12 +950,12 @@ Transport.prototype.sendVotes = function (votes, address) {
     changeReqTimeout:true
   }, (err, res) => {
     if (err) { //不能连通address，广播到转发接口
-      library.logger.debug(`sendVote to ${address} failure, so broadcast...`);
+      library.logger.debug(`sendVotes(${self.getVotesId(votes)}) to ${address} failure, so broadcast...`);
       self.broadcast({}, {api: '/vote/forward', data: {votes:votes,address: address}, method: "POST"})
     }
     else{
-      library.logger.debug(`sendVotes to ${address} success.`);
-      __private.votesCache = {}
+      library.logger.debug(`sendVotes(${self.getVotesId(votes)}) to ${address} success.`);
+      // __private.votesCache = {}
     }
   });
 }

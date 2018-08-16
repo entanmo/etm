@@ -618,6 +618,17 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
       if (delegateKey && propose.generatorPublicKey == delegateKey) {
         return cb();
       }
+
+      library.logger.debug(
+        "Failed to validate propose slot -- ", 
+        index, 
+        delegateKey, 
+        propose.generatorPublicKey, 
+        propose.height,
+        lastBlockId, 
+        currentSlot, 
+        activeDelegates
+      );
       
       cb("Failed to validate propose slot");
     });
