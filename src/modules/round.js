@@ -163,9 +163,11 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
       return done();
     }
 
+    /*
     if (__private.unDelegatesByRound[round].length !== slots.delegates && previousBlock.height !== 1) {
       return done();
     }
+    */
     library.logger.warn('Unexpected roll back cross round', {
       round: round,
       prevRound: prevRound,
