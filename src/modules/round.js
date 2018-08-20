@@ -152,22 +152,27 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
 
     __private.feesByRound[round] = (__private.feesByRound[round] || 0);
     __private.feesByRound[round] -= block.totalFee;
+    __private.unFeesByRound[round] = (__private.unFeesByRound[round] || 0)
+    __private.unFeesByRound[round] += block.totalFee
 
     __private.rewardsByRound[round] = (__private.rewardsByRound[round] || []);
-    __private.rewardsByRound[round].pop()
+    let removedReward = __private.rewardsByRound[round].pop()
+    __private.unRewardsByRound[round] = (__private.unRewardsByRound[round] || [])
+    __private.unRewardsByRound[round].push(removedReward)
 
     __private.delegatesByRound[round] = __private.delegatesByRound[round] || [];
-    __private.delegatesByRound[round].pop()
+    let removedDelegate = __private.delegatesByRound[round].pop()
+    __private.unDelegatesByRound[round] = (__private.unDelegatesByRound[round] || [])
+    __private.unDelegatesByRound[round].push(removedDelegate)
+    
 
     if (prevRound === round && previousBlock.height !== 1) {
       return done();
     }
 
-    /*
     if (__private.unDelegatesByRound[round].length !== slots.delegates && previousBlock.height !== 1) {
       return done();
     }
-    */
     library.logger.warn('Unexpected roll back cross round', {
       round: round,
       prevRound: prevRound,
