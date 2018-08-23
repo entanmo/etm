@@ -1,9 +1,34 @@
+const hex = {
+    0: [0, 0, 0, 0],
+    1: [0, 0, 0, 1],
+    2: [0, 0, 1, 0],
+    3: [0, 0, 1, 1],
+    4: [0, 1, 0, 0],
+    5: [0, 1, 0, 1],
+    6: [0, 1, 1, 0],
+    7: [0, 1, 1, 1],
+    8: [1, 0, 0, 0],
+    9: [1, 0, 0, 1],
+    a: [1, 0, 1, 0],
+    b: [1, 0, 1, 1],
+    c: [1, 1, 0, 0],
+    d: [1, 1, 0, 1],
+    e: [1, 1, 1, 0],
+    f: [1, 1, 1, 1],
+  }
+
 /*
  *  @Param hash256 256 比特数组
  *  @Param height  当前高度 
  *  @Param limit   代理数目
  */
-function chaos(hash256, height, limit) {
+function chaos(hash, height, limit) {
+    var hash256 = [];
+    for (var j = 0; j < hash.length; j++) {
+      let str = hash[j];
+      hash256 = hash256.concat(hex[str]);
+    }
+
     var rand = new Random(height);
     var iMin = 3;
     var iMax = 13;
