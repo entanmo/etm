@@ -25,7 +25,7 @@ var ed = require('../utils/ed.js');
 var rmdir = require('rimraf');
 var ip = require('ip');
 var valid_url = require('valid-url');
-var DecompressZip = require('decompress-zip');
+var decompress = require('decompress');
 var Sandbox = require('etm-vm');
 var dappCategory = require('../utils/dapp-category.js');
 var TransactionTypes = require('../utils/transaction-types.js');
@@ -1914,31 +1914,18 @@ __private.downloadLink = function (dapp, dappPath, cb) {
       });
     },
     decompressZip: function (serialCb) {
-      var unzipper = new DecompressZip(tmpPath)
-
-      unzipper.on("error", function (err) {
-        fs.exists(tmpPath, function (exists) {
-          fs.unlink(tmpPath);
-        });
-        rmdir(dappPath, function () { });
-        serialCb("Failed to decompress zip file: " + err);
-      });
-
-      unzipper.on("extract", function (log) {
+      decompress(tmpPath, dappPath).then(files => {
         library.logger.info(dapp.transactionId + " Finished extracting");
         fs.exists(tmpPath, function (exists) {
           fs.unlink(tmpPath);
         });
-        serialCb(null);
-      });
-
-      unzipper.on("progress", function (fileIndex, fileCount) {
-        library.logger.info(dapp.transactionId + " Extracted file " + (fileIndex + 1) + " of " + fileCount);
-      });
-
-      unzipper.extract({
-        path: dappPath,
-        strip: 1
+        serialCb(null)
+      }).catch(err => {
+        fs.exists(tmpPath, function (exists) {
+          fs.unlinkSync(tmpPath);
+        });
+        rmdir(dappPath, function () { });
+        serialCb("Failed to decompress zip file: " + err);
       });
     }
   },
@@ -2097,18 +2084,18 @@ __private.launch = function (body, cb) {
 
       installedIds: async.apply(__private.getInstalledIds),
 
-      symlink: ['dapp', 'installedIds', function (next, results) {
+      symlink: ['dapp', 'installedIds', function (results, next) {
         if (results.installedIds.indexOf(body.id) < 0) {
           return next('Dapp not installed');
         }
         __private.symlink(results.dapp, next);
       }],
 
-      launch: ['symlink', function (next, results) {
+      launch: ['symlink', function (results, next) {
         __private.launchApp(results.dapp, body.params, next);
       }],
 
-      route: ['launch', function (next, results) {
+      route: ['launch', function (results, next) {
         __private.dappRoutes(results.dapp, function (err) {
           if (err) {
             return __private.stop(results.dapp, next);
