@@ -2098,18 +2098,18 @@ __private.launch = function (body, cb) {
 
       installedIds: async.apply(__private.getInstalledIds),
 
-      symlink: ['dapp', 'installedIds', function (next, results) {
+      symlink: ['dapp', 'installedIds', function (results, next) {
         if (results.installedIds.indexOf(body.id) < 0) {
           return next('Dapp not installed');
         }
         __private.symlink(results.dapp, next);
       }],
 
-      launch: ['symlink', function (next, results) {
+      launch: ['symlink', function (results, next) {
         __private.launchApp(results.dapp, body.params, next);
       }],
 
-      route: ['launch', function (next, results) {
+      route: ['launch', function (results, next) {
         __private.dappRoutes(results.dapp, function (err) {
           if (err) {
             return __private.stop(results.dapp, next);
