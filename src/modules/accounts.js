@@ -278,7 +278,7 @@ __private.attachApi = function () {
 __private.openAccount = function (secret, cb) {
   var hash = crypto.createHash('sha256').update(secret, 'utf8').digest();
   var keypair = ed.MakeKeypair(hash);
-  publicKey = keypair.publicKey.toString('hex')
+  var publicKey = keypair.publicKey.toString('hex')
   var address = self.generateAddressByPublicKey2(publicKey);
   self.getAccount({ address: address }, function (err, account) {
     if (err) return cb(err)
