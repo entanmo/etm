@@ -318,27 +318,28 @@ __private.openAccount2 = function (publicKey, cb) {
 
 // Public methods
 Accounts.prototype.generateAddressByPublicKey = function (publicKey) {
-  var publicKeyHash = crypto.createHash('sha256').update(publicKey, 'hex').digest();
-  var temp = new Buffer(8);
-  for (var i = 0; i < 8; i++) {
-    temp[i] = publicKeyHash[7 - i];
-  }
+  // var publicKeyHash = crypto.createHash('sha256').update(publicKey, 'hex').digest();
+  // var temp = new Buffer(8);
+  // for (var i = 0; i < 8; i++) {
+  //   temp[i] = publicKeyHash[7 - i];
+  // }
 
-  var address = bignum.fromBuffer(temp).toString();
-  if (!address) {
-    throw Error("wrong publicKey " + publicKey);
-  }
-  return address;
+  // var address = bignum.fromBuffer(temp).toString();
+  // if (!address) {
+  //   throw Error("wrong publicKey " + publicKey);
+  // }
+  // return address;
+  return addressHelper.generateBase58CheckAddress(publicKey)
 }
 
 Accounts.prototype.generateAddressByPublicKey2 = function (publicKey) {
   if (!global.featureSwitch.enableUIA) {
     return self.generateAddressByPublicKey(publicKey)
   }
-  var oldAddress = self.generateAddressByPublicKey(publicKey)
-  if (library.balanceCache.getNativeBalance(oldAddress)) {
-    return oldAddress
-  }
+  // var oldAddress = self.generateAddressByPublicKey(publicKey)
+  // if (library.balanceCache.getNativeBalance(oldAddress)) {
+  //   return oldAddress
+  // }
   return addressHelper.generateBase58CheckAddress(publicKey)
 }
 

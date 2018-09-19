@@ -145,6 +145,14 @@ module.exports = function init(options) {
     global.featureSwitch = {}
     global.state = {}
 
+    global.featureSwitch.enableLongId = true
+    global.featureSwitch.enable1_3_0 = true
+    global.featureSwitch.enableClubBonus = (!!global.state.clubInfo)
+    global.featureSwitch.enableMoreLockTypes = true
+    global.featureSwitch.enableLockReset = true
+    global.featureSwitch.enableUIA = true
+
+
     return {
         dbFile: program.blockchain || path.join(baseDir, 'blockchain.db'),
         appConfig: appConfig,
