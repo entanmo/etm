@@ -19,11 +19,11 @@ var slots = require('./slots.js')
 
 function BlockStatus() {
   var milestones = [
-    350000000, // Initial Reward
-    300000000, // Milestone 1
+    300000000, // Initial Reward
+    250000000, // Milestone 1
     200000000, // Milestone 2
-    100000000, // Milestone 3
-    50000000  // Milestone 4
+    150000000, // Milestone 3
+    100000000  // Milestone 4
   ];
 
   var distance = 3000000, // Distance between each milestone

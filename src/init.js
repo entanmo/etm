@@ -123,7 +123,7 @@ module.exports = function init(options) {
     }
 
     var logger = new Logger({
-        filename: path.join(baseDir, 'logs', 'debug.log'),
+        filename: path.join(baseDir, 'logs', 'etm.log'),
         echo: program.deamon ? null : appConfig.logLevel,
         errorLevel: appConfig.logLevel
     });
