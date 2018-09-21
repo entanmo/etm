@@ -43,7 +43,7 @@
     "rimraf": "^2.6.2",
     "shelljs": "^0.8.1",
     "socket.io": "^2.1.0",
-    "sodium": "https://gitee.com/just-anohaker/node-sodium.git",
+    "sodium": "^2.0.1",
     "strftime": "^0.10.0",
     "underscore": "^1.8.2",
     "util-extend": "^1.0.3",
