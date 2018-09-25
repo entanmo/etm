@@ -39,7 +39,6 @@ module.exports.connect = function (connectString, cb) {
     "CREATE TABLE IF NOT EXISTS peers (id INTEGER NOT NULL PRIMARY KEY, ip INTEGER NOT NULL, port TINYINT NOT NULL, state TINYINT NOT NULL, os VARCHAR(64), version VARCHAR(11), clock INT)",
     "CREATE TABLE IF NOT EXISTS peers_dapp (peerId INT NOT NULL, dappId VARCHAR(20) NOT NULL, FOREIGN KEY(peerId) REFERENCES peers(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS storages(content VARBINARY(4096), transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
-    "CREATE TABLE IF NOT EXISTS lock_votes(publicKey BINARY(32) NOT NULL, amount BIGINT NOT NULL, blockHeight BIGINT NOT NULL, votes BIGINT, transactionId VARCHAR(64), state INT NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
 
     // UIA transactions
     "CREATE TABLE IF NOT EXISTS issuers(name VARCHAR(16) NOT NULL PRIMARY KEY, desc VARCHAR(4096) NOT NULL, issuerId VARCHAR(50), transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",

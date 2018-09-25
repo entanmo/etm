@@ -26,9 +26,6 @@ var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js');
 var scheme = require('../scheme/transactions');
 
-const LockVotes = require("../logic/lock_votes");
-const UnlockVotes = require("../logic/unlock_votes");
-
 var genesisblock = null;
 // Private fields
 var modules, library, self, __private = {}, shared = {};
@@ -358,8 +355,6 @@ function Transactions(cb, scope) {
   library.base.transaction.attachAssetType(TransactionTypes.SEND, new Transfer());
   library.base.transaction.attachAssetType(TransactionTypes.STORAGE, new Storage());
   library.base.transaction.attachAssetType(TransactionTypes.LOCK, new Lock());
-  library.base.transaction.attachAssetType(TransactionTypes.LOCK_VOTES, new LockVotes());
-  library.base.transaction.attachAssetType(TransactionTypes.UNLOCK_VOTES, new UnlockVotes());
 
   setImmediate(cb, null, self);
 }
@@ -393,7 +388,6 @@ __private.attachApi = function () {
   });
 
   __private.attachStorageApi();
-  __private.attachLockVoteApi();
 }
 
 __private.attachStorageApi = function () {
@@ -419,32 +413,6 @@ __private.attachStorageApi = function () {
     if (!err) return next();
     library.logger.error(req.url, err.toString());
     res.status(500).send({ success: false, error: err.toString() });
-  });
-}
-
-__private.attachLockVoteApi = function () {
-  var router = new Router();
-
-  router.use(function (req, res, next) {
-    if (modules) return next();
-    res.status(500).send({success: false, error: "Blockchain is loading"});
-  });
-
-  router.map(shared, {
-    "get /get": "getLockVote",
-    "put /": "putLockVote",
-    "put /remove": "deleteLockVote"
-  });
-
-  router.use(function (req, res, next) {
-    res.status(500).send({success: false, error: "API endpoint not found"});
-  });
-
-  library.network.app.use("/api/lockvote", router);
-  library.network.app.use(function (err, req, res, next) {
-    if (!err) return next();
-    library.logger.error(req.url, err.toString());
-    res.status(500).send({success: false, error: err.toString()});
   });
 }
 
@@ -1365,18 +1333,6 @@ shared.getStorage = function (req, cb) {
         cb(null, transacton);
       });
   });
-}
-
-shared.putLockVote = function (req, cb) {
-
-}
-
-shared.getLockVote = function (req, cb) {
-
-}
-
-shared.removeLockVote = function (req, cb) {
-  
 }
 
 // Export
