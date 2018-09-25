@@ -47,6 +47,11 @@ module.exports = function init(options) {
         fs.writeFileSync(appConfigFile, JSON.stringify(appConfig, null, 2), "utf8");
     }
 
+    if(!(appConfig.forging && appConfig.forging.secret && Array.isArray(appConfig.forging.secret) && appConfig.forging.secret.length < 2)){
+        console.log('secret error,the length needs to be less than or equal to 1');
+        return;
+    }
+
     appConfig.version = version;
     appConfig.baseDir = baseDir;
     appConfig.buildVersion = 'development';
