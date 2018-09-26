@@ -432,6 +432,8 @@ __private.attachLockVoteApi = function () {
 
   router.map(shared, {
     "get /get": "getLockVote",
+    "get /:id": "getLockVote",
+    "get /all": "getAllLockVotes",
     "put /": "putLockVote",
     "put /remove": "deleteLockVote"
   });
@@ -1460,7 +1462,7 @@ shared.putLockVote = function (req, cb) {
                 keypair: keypair,
                 requester: keypair,
                 secondKeypair: secondKeypair,
-                args: body.args
+                args: body.args || []
               });
             } catch (e) {
               return cb(e.toString());
@@ -1495,7 +1497,7 @@ shared.putLockVote = function (req, cb) {
               sender: account,
               keypair: keypair,
               secondKeypair: secondKeypair,
-              args: body.args
+              args: body.args || []
             });
           } catch (e) {
             return cb(e.toString());
@@ -1516,8 +1518,122 @@ shared.putLockVote = function (req, cb) {
 }
 
 shared.getLockVote = function (req, cb) {
-  // TODO
-  setImmediate(cb, "APIendpoint unimplement");
+  var query;
+  if (req.body && req.body.id) {
+    query = req.body;
+  } else if (req.params && req.params.id) {
+    query = req.params;
+  }
+  library.scheme.validate(query, {
+    type: "object",
+    properties: {
+      id: {
+        type: "string",
+        minLength: 1
+      }
+    },
+    required: ["id"]
+  }, function (err) {
+    if (err) {
+      return cb(err[0].toString());
+    }
+
+    library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
+      "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
+      "lv.lockAmount, lv.state, " +
+      "(select max(height) + 1 from blocks) - b.height " +
+      "from trs t " +
+      "inner join blocks b on t.blockId = b.id " +
+      "inner join lock_votes lv on lv.transactionId = t.id " +
+      "where t.id = $id",
+      { id: query.id },
+      [
+        't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
+        't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
+        'lv_lockAmount', 'lv_state', 'confirmations'
+      ],
+      function (err, rows) {
+        if (err || !rows.length) {
+          return cb(err || "Can't find transaction: " + query.id);
+        }
+
+        var transacton = library.base.transaction.dbRead(rows[0]);
+        cb(null, transacton);
+      });
+  });
+}
+
+shared.getAllLockVotes = function (req, cb) {
+  var query = req.body;
+  library.scheme.validate(query, {
+    type: "object",
+    properties: {
+      address: {
+        type: "string",
+        minLength: 1,
+        maxLength: 50
+      },
+      state: {
+        type: "integer"
+      }
+    },
+    required: ["address"]
+  }, function (err) {
+    if (err) {
+      return cb(err[0].toString());
+    }
+
+    if (!addressHelper.isBase58CheckAddress(query.address)) {
+      return cb("Invalid address");
+    }
+
+    let state = body.state || 0
+    if (state !== 0 && state !== 1) {
+      return cb("Invalid state, Must be[0, 1]");
+    }
+
+    const condSql = "";
+    if (state == 0) {
+      condSql = " and lv.state = 0";
+    } else if (state == 1) {
+      condSql = " and lv.state = 1";
+    }
+    modules.accounts.getAccount({ address: query.address }, function (err, account) {
+      if (err) {
+        return cb(err.toString());
+      }
+
+      library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
+        "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
+        "lv.lockAmount, lv.state, " +
+        "(select max(height) + 1 from blocks) - b.height " +
+        "from trs t " +
+        "inner join blocks b on t.blockId = b.id " +
+        "inner join lock_votes lv on lv.transactionId = t.id " +
+        "where lv.address = $address" + condSql,
+        { address: query.address },
+        [
+          't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
+          't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
+          'lv_lockAmount', 'lv_state', 'confirmations'
+        ],
+        function (err, rows) {
+          if (err || !rows.length) {
+            return cb(err || "Can't find transaction: " + query.id);
+          }
+
+          let trs = [];
+          for (let i = 0; i < rows.length; i++) {
+            let transaction = library.base.transaction.dbRead(rows[i]);
+            if (transaction) {
+              trs.push(transaction);
+            }
+          }
+
+          cb(null, { trs: trs });
+        });
+    });
+  });
 }
 
 shared.removeLockVote = function (req, cb) {
@@ -1541,6 +1657,11 @@ shared.removeLockVote = function (req, cb) {
       multisigAccountPublicKey: {
         type: "string",
         format: "publicKey"
+      },
+      args: {
+        type: 'array',
+        minLength: 1,
+        uniqueItems: true
       }
     },
     required: ["secret"]
@@ -1605,7 +1726,8 @@ shared.removeLockVote = function (req, cb) {
                 type: TransactionTypes.UNLOCK_VOTES,
                 sender: account,
                 keypair: keypair,
-                secondKeypair: secondKeypair
+                secondKeypair: secondKeypair,
+                args: body.args || []
               });
             } catch (e) {
               return cb(e.toString());
@@ -1639,7 +1761,8 @@ shared.removeLockVote = function (req, cb) {
               type: TransactionTypes.UNLOCK_VOTES,
               sender: account,
               keypair: keypair,
-              secondKeypair: secondKeypair
+              secondKeypair: secondKeypair,
+              args: body.args || []
             });
           } catch (e) {
             return cb(e.toString());
