@@ -16,6 +16,8 @@ function UnlockVotes() {
       return cb('Invalid unlock transactions id!');
     }
 
+    //验证交易id是否已写入数据库
+
     cb(null, trs);
   }
 
@@ -36,18 +38,11 @@ function UnlockVotes() {
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
-    var key = sender.address + ':' + trs.type
-    if (library.oneoff.has(key)) {
-      return setImmediate(cb, 'Double submit')
-    }
-    library.oneoff.set(key, true)
-    setImmediate(cb)
+    setImmediate(cb);
   }
 
-  this.undeUnconfirmed = function (trs, sender, cb) {
-    var key = sender.address + ':' + trs.type
-    library.oneoff.delete(key)
-    setImmediate(cb)
+  this.undoUnconfirmed = function (trs, sender, cb) {
+    setImmediate(cb);
   }
 
   this.objectNormalize = function (trs) {

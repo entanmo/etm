@@ -41,18 +41,11 @@ function LockVotes() {
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
-    var key = sender.address + ':' + trs.type
-    if (library.oneoff.has(key)) {
-      return setImmediate(cb, 'Double submit')
-    }
-    library.oneoff.set(key, true)
-    setImmediate(cb)
+    setImmediate(cb);
   }
 
-  this.undeUnconfirmed = function (trs, sender, cb) {
-    var key = sender.address + ':' + trs.type
-    library.oneoff.delete(key)
-    setImmediate(cb)
+  this.undoUnconfirmed = function (trs, sender, cb) {
+    setImmediate(cb);
   }
 
   this.objectNormalize = function (trs) {
@@ -64,15 +57,15 @@ function LockVotes() {
   }
 
   this.ready = function (trs, sender) {
-    if (!__private.types[trs.type]) {
-      throw Error('Unknown transaction type ' + trs.type);
-    }
+    if (sender.multisignatures.length) {
+      if (!trs.signatures) {
+        return false;
+      }
 
-    if (!sender) {
-      return false;
+      return trs.signatures.length >= sender.multimin - 1;
+    } else {
+      return true;
     }
-
-    return __private.types[trs.type].ready.call(this, trs, sender);
   }
 
 }
