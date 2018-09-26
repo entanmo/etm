@@ -21,6 +21,7 @@ var ed = require('../utils/ed.js');
 var bignum = require('../utils/bignumber');
 var constants = require('../utils/constants.js');
 var slots = require('../utils/slots.js');
+const TransactionTypes = require("../utils/transaction-types");
 
 var genesisblock = null;
 
@@ -492,12 +493,16 @@ Transaction.prototype.apply = function (trs, block, sender, cb) {
     return setImmediate(cb, "Transaction is not ready: " + trs.id);
   }
 
-  if (trs.type === 7) return __private.types[trs.type].apply.call(this, trs, block, sender, cb);
-
+  if (trs.type === TransactionTypes.OUT_TRANSFER) return __private.types[trs.type].apply.call(this, trs, block, sender, cb);
+  
   var amount = trs.amount + trs.fee;
-
+  
   if (trs.blockId != genesisblock.block.id && sender.balance < amount) {
     return setImmediate(cb, "Insufficient balance: " + sender.balance);
+  }
+  
+  if (trs.type === TransactionTypes.LOCK_VOTES || trs.type === TransactionTypes.UNLOCK_VOTES) {
+    return __private.types[trs.type].apply.call(this, trs, block, sender, cb);
   }
 
   this.scope.account.merge(sender.address, {
@@ -518,6 +523,9 @@ Transaction.prototype.undo = function (trs, block, sender, cb) {
   if (trs.type === 7) return __private.types[trs.type].undo.call(this, trs, block, sender, cb);
 
   var amount = trs.amount + trs.fee;
+  if (trs.type === TransactionTypes.LOCK_VOTES || trs.type === TransactionTypes.UNLOCK_VOTES) {
+    return __private.types[trs.type].undo.call(this, trs, block, sender, cb);
+  }
 
   this.scope.account.merge(sender.address, {
     balance: amount,

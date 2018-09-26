@@ -46,11 +46,15 @@ function UnlockVotes() {
   }
 
   this.objectNormalize = function (trs) {
-    // TODO
+    return trs;
   }
 
   this.dbRead = function (raw) {
-    // TODO
+    return null;
+  }
+
+  this.dbSave = function (trs, cb) {
+
   }
 
   this.ready = function (trs, sender) {

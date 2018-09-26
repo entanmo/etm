@@ -11,14 +11,9 @@ function LockVotes() {
   }
 
   this.verify = function (trs, sender, cb) {
-    let amount = Number(trs.args[0]);
-    if(amount < 0){
+    let lockAmount = Number(trs.args[0]);
+    if(!Number.isSafeInteger(lockAmount) || lockAmount < 0){
       return cb('Invalid lock amount!');
-    }
-
-    let fee = this.calculateFee(trs, sender);
-    if(sender.balance < amount + fee){
-      return cb('Not enough balance');
     }
 
     cb(null, trs);
@@ -33,11 +28,37 @@ function LockVotes() {
   }
 
   this.apply = function (trs, block, sender, cb) {
-    // TODO
+    const lockAmount = Number(trs.args[0]);
+    const amount = lockAmount + trs.fee;
+    if(sender.balance < amount){
+      return cb('Not enough balance');
+    }
+
+    this.scope.account.merge(sender.address, {
+      balance: -amount,
+      blockId: block.id,
+      round: calc(block.height)
+    }, function (err, sender) {
+      /*
+      lock_votes(address VARCHAR(50) NOT NULL, lockAmount BIGINT NOT NULL, originHeight BIGINT NOT NULL, currentHeight BIGINT NOT NULL, transactionId VARCHAR(64), state INT NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
+      */
+      return library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
+        address: sender.address,
+        lockAmount: lockAmount,
+        originHeight: block.height,
+        currentHeight: block.height,
+        transactionId: trs.id
+      }, cb);
+    });
   }
 
   this.undo = function (trs, block, sender, cb) {
-    // TODO
+    const amount = Number(trs.args[0]) + trs.fee;
+    this.scope.account.merge(sender.address, {
+      balance: amount,
+      blockId: block.id,
+      round: calc(block.height)
+    }, function (err, sender) { return cb(err); });
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
@@ -53,7 +74,18 @@ function LockVotes() {
   }
 
   this.dbRead = function (raw) {
-    // TODO
+    if (typeof raw.lv_lockAmount !== "number" || typeof raw.lv_state !== "number") {
+      return null;
+    } else {
+      return {
+        lockAmount: raw.lv_lockAmount,
+        state: raw.lv_state
+      };
+    }
+  }
+
+  this.dbSave = function (trs, cb) {
+    return setImmediate(cb);
   }
 
   this.ready = function (trs, sender) {
