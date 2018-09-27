@@ -34,12 +34,12 @@ function UnlockVotes() {
       }
       for (let i = 0; i < ids.length; i++) {
         if (!lockSet.has(ids[i])) {
-          return cb('Invalid address not found', ids[i]);
+          return cb('Invalid lock transaction id:'+ ids[i]);
         }
       }
-    })
 
-    cb(null, trs);
+      cb(null, trs);
+    });
   }
 
   this.process = function (trs, sender, cb) {
@@ -53,7 +53,7 @@ function UnlockVotes() {
   this.apply = function (trs, block, sender, cb) {
     let ids = trs.args;
     let lockAmount = 0;
-    async.eachSeries(ids, function (id, cb0) {
+    async.eachSeries(ids, function (id, cb) {
       modules.transactions.getLockVote(id, function (err, trs) {
         if (err) {
           return cb(err);
@@ -63,8 +63,12 @@ function UnlockVotes() {
 
       library.dbLite.query("UPDATE lock_votes SET state = 0 WHERE transactionId = $transactionId", {
         transactionId: id
-      }, cb0);
-    }, function () {
+      }, cb);
+    }, function (err) {
+      if (err) {
+        return cb(err);
+      }
+
       library.base.account.merge(sender.address, {
         balance: lockAmount,
         blockId: block.id,
@@ -76,7 +80,7 @@ function UnlockVotes() {
   this.undo = function (trs, block, sender, cb) {
     let ids = trs.args;
     let lockAmount = 0;
-    async.eachSeries(ids, function (id, cb0) {
+    async.eachSeries(ids, function (id, cb) {
       modules.transactions.getLockVote(id, function (err, trs) {
         if (err) {
           return cb(err);
@@ -86,8 +90,12 @@ function UnlockVotes() {
 
       library.dbLite.query("UPDATE lock_votes SET state = 1 WHERE transactionId = $transactionId", {
         transactionId: id
-      }, cb0);
-    }, function () {
+      }, cb);
+    }, function (err) {
+      if (err) {
+        return cb(err);
+      }
+
       library.base.account.merge(sender.address, {
         balance: -lockAmount,
         blockId: block.id,
