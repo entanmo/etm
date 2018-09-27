@@ -1,4 +1,5 @@
 "use strict";
+var constants = require('../utils/constants.js');
 
 function LockVotes() {
   this.create = function (data, trs) {
@@ -12,7 +13,7 @@ function LockVotes() {
 
   this.verify = function (trs, sender, cb) {
     let lockAmount = Number(trs.args[0]);
-    if(!Number.isSafeInteger(lockAmount) || lockAmount < 0){
+    if(!Number.isSafeInteger(lockAmount) || lockAmount < constants.fixedPoint){
       return cb('Invalid lock amount!');
     }
 
