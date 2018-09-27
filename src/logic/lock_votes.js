@@ -34,10 +34,10 @@ function LockVotes() {
       return cb('Not enough balance');
     }
 
-    this.scope.account.merge(sender.address, {
+    library.base.account.merge(sender.address, {
       balance: -amount,
       blockId: block.id,
-      round: calc(block.height)
+      round: modules.round.calc(block.height)
     }, function (err, sender) {
       /*
       lock_votes(address VARCHAR(50) NOT NULL, lockAmount BIGINT NOT NULL, originHeight BIGINT NOT NULL, currentHeight BIGINT NOT NULL, transactionId VARCHAR(64), state INT NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
@@ -54,10 +54,10 @@ function LockVotes() {
 
   this.undo = function (trs, block, sender, cb) {
     const amount = Number(trs.args[0]) + trs.fee;
-    this.scope.account.merge(sender.address, {
+    library.base.account.merge(sender.address, {
       balance: amount,
       blockId: block.id,
-      round: calc(block.height)
+      round: modules.round.calc(block.height)
     }, function (err, sender) { return cb(err); });
   }
 
