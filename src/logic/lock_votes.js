@@ -74,10 +74,15 @@ function LockVotes() {
   }
 
   this.dbRead = function (raw) {
-    if (typeof raw.lv_lockAmount !== "number" || typeof raw.lv_state !== "number") {
+    if (typeof raw.lv_lockAmount !== "number" || typeof raw.lv_state !== "number" ||
+      typeof raw.lv_address !== "string" || typeof raw.lv_originHeight !== "number" ||
+      typeof raw.lv_currentHeight !== "number") {
       return null;
     } else {
       return {
+        address: raw.lv_address,
+        originHeight: raw.lv_originHeight,
+        currentHeight: raw.lv_currentHeight,
         lockAmount: raw.lv_lockAmount,
         state: raw.lv_state
       };

@@ -580,7 +580,7 @@ __private.getById = function (id, cb) {
 __private.getLockVote = function (id, cb) {
   library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
     "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
-    "lv.lockAmount, lv.state, " +
+    "lv.address, lv.originHeight, lv.currentHeight, lv.lockAmount, lv.state, " +
     "(select max(height) + 1 from blocks) - b.height " +
     "from trs t " +
     "inner join blocks b on t.blockId = b.id " +
@@ -590,7 +590,7 @@ __private.getLockVote = function (id, cb) {
     [
       't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
       't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
-      'lv_lockAmount', 'lv_state', 'confirmations'
+      'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', 'lv_state', 'confirmations'
     ],
     function (err, rows) {
       if (err || !rows.length) {
@@ -613,7 +613,7 @@ __private.listLockVotes = function (query, cb) {
   }
   library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
     "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
-    "lv.lockAmount, lv.state, " +
+    "lv.address, lv.originHeight, lv.currentHeight, lv.lockAmount, lv.state, " +
     "(select max(height) + 1 from blocks) - b.height " +
     "from trs t " +
     "inner join blocks b on t.blockId = b.id " +
@@ -623,7 +623,7 @@ __private.listLockVotes = function (query, cb) {
     [
       't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
       't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
-      'lv_lockAmount', 'lv_state', 'confirmations'
+      'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', 'lv_state', 'confirmations'
     ],
     function (err, rows) {
       if (err || !rows.length) {
