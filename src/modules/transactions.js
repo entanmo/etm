@@ -577,6 +577,71 @@ __private.getById = function (id, cb) {
     });
 }
 
+__private.getLockVote = function (id, cb) {
+  library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
+    "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
+    "lv.lockAmount, lv.state, " +
+    "(select max(height) + 1 from blocks) - b.height " +
+    "from trs t " +
+    "inner join blocks b on t.blockId = b.id " +
+    "inner join lock_votes lv on lv.transactionId = t.id " +
+    "where t.id = $id",
+    { id: id },
+    [
+      't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
+      't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
+      'lv_lockAmount', 'lv_state', 'confirmations'
+    ],
+    function (err, rows) {
+      if (err || !rows.length) {
+        return cb(err || "Can't find transaction: " + id);
+      }
+
+      var transacton = library.base.transaction.dbRead(rows[0]);
+      cb(null, transacton);
+    });
+}
+
+__private.listLockVotes = function (query, cb) {
+  let condSql = "";
+  if (typeof query.state === "number") {
+    if (query.state === 0) {
+      condSql = " and lv.state = 0";
+    } else if (query.state === 1) {
+      condSql = " and lv.state = 1";
+    }
+  }
+  library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
+    "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
+    "lv.lockAmount, lv.state, " +
+    "(select max(height) + 1 from blocks) - b.height " +
+    "from trs t " +
+    "inner join blocks b on t.blockId = b.id " +
+    "inner join lock_votes lv on lv.transactionId = t.id " +
+    "where lv.address = $address" + condSql,
+    { address: query.address },
+    [
+      't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
+      't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
+      'lv_lockAmount', 'lv_state', 'confirmations'
+    ],
+    function (err, rows) {
+      if (err || !rows.length) {
+        return cb(err || "Can't find transactions with " + query.address);
+      }
+
+      let trs = [];
+      for (let i = 0; i < rows.length; i++) {
+        let transaction = library.base.transaction.dbRead(rows[i]);
+        if (transaction) {
+          trs.push(transaction);
+        }
+      }
+
+      cb(null, { trs: trs, count: trs.length });
+    });
+}
+
 __private.addUnconfirmedTransaction = function (transaction, sender, cb) {
   self.applyUnconfirmed(transaction, sender, function (err) {
     if (err) {
@@ -796,6 +861,14 @@ Transactions.prototype.list = function (query, cb) {
 
 Transactions.prototype.getById = function (id, cb) {
   __private.getById(id, cb)
+}
+
+Transactions.prototype.listLockVotes = function (query, cb) {
+  __private.listLockVotes(query, cb);
+}
+
+Transactions.prototype.getLockVote = function (id, cb) {
+  __private.getLockVote(id, cb);
 }
 
 // Events
@@ -1538,28 +1611,7 @@ shared.getLockVote = function (req, cb) {
       return cb(err[0].toString());
     }
 
-    library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
-      "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
-      "lv.lockAmount, lv.state, " +
-      "(select max(height) + 1 from blocks) - b.height " +
-      "from trs t " +
-      "inner join blocks b on t.blockId = b.id " +
-      "inner join lock_votes lv on lv.transactionId = t.id " +
-      "where t.id = $id",
-      { id: query.id },
-      [
-        't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
-        't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
-        'lv_lockAmount', 'lv_state', 'confirmations'
-      ],
-      function (err, rows) {
-        if (err || !rows.length) {
-          return cb(err || "Can't find transaction: " + query.id);
-        }
-
-        var transacton = library.base.transaction.dbRead(rows[0]);
-        cb(null, transacton);
-      });
+    self.getLockVote(query.id, cb);
   });
 }
 
@@ -1603,35 +1655,7 @@ shared.getAllLockVotes = function (req, cb) {
         return cb(err.toString());
       }
 
-      library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
-        "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
-        "lv.lockAmount, lv.state, " +
-        "(select max(height) + 1 from blocks) - b.height " +
-        "from trs t " +
-        "inner join blocks b on t.blockId = b.id " +
-        "inner join lock_votes lv on lv.transactionId = t.id " +
-        "where lv.address = $address" + condSql,
-        { address: query.address },
-        [
-          't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
-          't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
-          'lv_lockAmount', 'lv_state', 'confirmations'
-        ],
-        function (err, rows) {
-          if (err || !rows.length) {
-            return cb(err || "Can't find transaction: " + query.id);
-          }
-
-          let trs = [];
-          for (let i = 0; i < rows.length; i++) {
-            let transaction = library.base.transaction.dbRead(rows[i]);
-            if (transaction) {
-              trs.push(transaction);
-            }
-          }
-
-          cb(null, { trs: trs });
-        });
+      self.listLockVotes(query, cb);
     });
   });
 }
