@@ -17,7 +17,7 @@ function UnlockVotes() {
     }
 
     //验证交易id是否已写入数据库
-    modules.transactions.listLockVotes({
+    modules.lockvote.listLockVotes({
       address: sender.address,
       state: 1
     }, function (err, res) {
@@ -54,7 +54,7 @@ function UnlockVotes() {
     let ids = trs.args;
     let lockAmount = 0;
     async.eachSeries(ids, function (id, cb) {
-      modules.transactions.getLockVote(id, function (err, trs) {
+      modules.lockvote.getLockVote(id, function (err, trs) {
         if (err) {
           return cb(err);
         }
@@ -81,7 +81,7 @@ function UnlockVotes() {
     let ids = trs.args;
     let lockAmount = 0;
     async.eachSeries(ids, function (id, cb) {
-      modules.transactions.getLockVote(id, function (err, trs) {
+      modules.lockvote.getLockVote(id, function (err, trs) {
         if (err) {
           return cb(err);
         }
