@@ -6,6 +6,7 @@ var Router = require('../utils/router.js');
 var TransactionTypes = require('../utils/transaction-types.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js');
+var slots = require("../utils/slots");
 
 const LockVotes = require("../logic/lock_votes");
 const UnlockVotes = require("../logic/unlock_votes");
@@ -129,6 +130,90 @@ LockVote.prototype.listLockVotes = function (query, cb) {
 
 LockVote.prototype.getLockVote = function (id, cb) {
     __private.getLockVote(id, cb);
+}
+
+LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
+    if (rate < 0 || rate > 1) {
+        return cb(new Error("Invalid rate"));
+    }
+
+    __private.listLockVotes({address: address, state: 1}, (err, result) => {
+        if (err) {
+            return cb(err);
+        }
+
+        if (result.count <= 0) {
+            return cb(null);
+        }
+
+        async.eachSeries(result.trs, (value, cb) => {
+            const info = value.asset;
+            let currentHeight = info.currentHeight;
+            if (info.originHeight == info.currentHeight) {
+                currentHeight = info.currentHeight + slots.getHeightPerDay();
+            }
+            if (blockHeight < currentHeight) {
+                return cb();
+            }
+
+            const deltaHeight = Math.ceil((blockHeight - currentHeight) * rate);
+            const newHeight = currentHeight + deltaHeight;
+            library.dbLite.query("UPDATE lock_votes SET currentHeight=$currentHeight where transactionId = $transactionId and state = 1",{
+                currentHeight: newHeight,
+                transactionId: value.id
+            }, cb);
+        }, (err) => {
+            return cb(err);
+        });
+    });
+}
+
+LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
+    // const SCHEME = 1; // 总体进行pow(v, 3/4)
+    const SCHEME = 2; // 单项进行pow(v, 3/4)再求和
+    __private.listLockVotes({address: address, state: 1}, (err, result) => {
+        if (err) {
+            return cb(err);
+        }
+
+        if (result.count <= 0) {
+            return cb();
+        }
+
+        let totalVotes = 0;
+
+        async.eachSeries(result.trs, (value, cb) => {
+            const info = value.asset;
+            let currentHeight = info.currentHeight;
+            if (info.originHeight == info.currentHeight) {
+                currentHeight = info.currentHeight + slots.getHeightPerDay();
+            }
+            if (blockHeight < currentHeight) {
+                return cb();
+            }
+
+            let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());
+            factor = Math.min(32, Math.max(1, factor));
+            let numOfVote;
+            if (SCHEME == 1) {
+                numOfVote = factor * info.lockAmount;
+            } else {
+                numOfVote = Math.pow(factor * info.lockAmount, 3/4);
+            }
+            totalVotes += numOfVote;
+            cb();
+        }, (err) => {
+            if (err) {
+                return cb(err);
+            }
+
+            if (SCHEME == 1) {
+                totalVotes = Math.pow(totalVotes, 3/4);
+            }
+
+            return cb(null, totalVotes);
+        });
+    });
 }
 
 // Events

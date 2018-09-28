@@ -58,12 +58,17 @@ function UnlockVotes() {
         if (err) {
           return cb(err);
         }
-        lockAmount += trs.lockAmount;
+        
+        library.dbLite.query("UPDATE lock_votes SET state = 0 WHERE transactionId = $transactionId", {
+          transactionId: id
+        }, (err) => {
+          if (err) {
+            return cb(err);
+          }
+          lockAmount += trs.asset.lockAmount;
+        });
       });
 
-      library.dbLite.query("UPDATE lock_votes SET state = 0 WHERE transactionId = $transactionId", {
-        transactionId: id
-      }, cb);
     }, function (err) {
       if (err) {
         return cb(err);
@@ -85,12 +90,16 @@ function UnlockVotes() {
         if (err) {
           return cb(err);
         }
-        lockAmount += trs.lockAmount;
+        
+        library.dbLite.query("UPDATE lock_votes SET state = 1 WHERE transactionId = $transactionId", {
+          transactionId: id
+        }, (err) => {
+          if (err) {
+            return cb(err);
+          }
+          lockAmount += trs.asset.lockAmount;
+        });
       });
-
-      library.dbLite.query("UPDATE lock_votes SET state = 1 WHERE transactionId = $transactionId", {
-        transactionId: id
-      }, cb);
     }, function (err) {
       if (err) {
         return cb(err);
