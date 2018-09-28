@@ -18,6 +18,7 @@ var async = require('async');
 var slots = require('../utils/slots.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var constants = require('../utils/constants.js');
+var ethos = require('../utils/ethos-mine.js');
 
 // Private fields
 var modules, library, self, __private = {}, shared = {};
@@ -281,19 +282,41 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
           }
 
           async.eachSeries(delegates, function (delegate, cb) {
-            modules.lockvote.calcLockVotes(delegate.address, block.height, function (err, totalVotes) {
 
-              let votes = Math.pow(totalVotes, 3/4);
-              library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
-                address: delegate.address,
-                amount: votes
-              }, cb);
-            }, function (err) {
-              self.flush(round, function (err2) {
-                cb(err || err2);
+            modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
+              if(err){
+                cb(err);
+              }
+
+              let totalVotes = 0;
+              async.eachSeries(voters, function (voter, cb) {
+                modules.lockvote.calcLockVotes(voter.address, block.height, function (err, votes) {
+                  if(err){
+                    cb(err);
+                  }
+
+                  totalVotes += votes;
+                });
+              },function(err){
+                if(err){
+                  cb(err);
+                }
+
+                let votes = Math.pow(totalVotes, 3 / 4);
+                library.dbLite.query('update mem_accounts set vote = $amount where address = $address', {
+                  address: delegate.address,
+                  amount: votes
+                }, cb);
               });
             });
+          },function (err) {
+                  
+            library.bus.message('finishRound', round);
+            self.flush(round, function (err2) {
+              cb(err || err2);
+            });
           });
+          
         });
 
 
@@ -464,26 +487,47 @@ Round.prototype.tick = function (block, cb) {
             "vote": -1,
             "publicKey": 1
           }
-        }, ["address"], function (err, delegates) {
+        }, ["publicKey","address"], function (err, delegates) {
           if (err) {
             return cb(err);
           }
 
           async.eachSeries(delegates, function (delegate, cb) {
-            modules.lockvote.calcLockVotes(delegate.address, block.height, function (err, totalVotes) {
-            
-              let votes = Math.pow(totalVotes, 3/4);
-              library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
-                address: delegate.address,
-                amount: votes
-              }, cb);
-            }, function (err) {
-              library.bus.message('finishRound', round);
-              self.flush(round, function (err2) {
+
+            modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
+              if(err){
+                cb(err);
+              }
+
+              let totalVotes = 0;
+              async.eachSeries(voters, function (voter, cb) {
+                modules.lockvote.calcLockVotes(voter.address, block.height, function (err, votes) {
+                  if(err){
+                    cb(err);
+                  }
+
+                  totalVotes += votes;
+                });
+              },function(err){
+                if(err){
+                  cb(err);
+                }
+
+                let votes = Math.pow(totalVotes, 3 / 4);
+                library.dbLite.query('update mem_accounts set vote = $amount where address = $address', {
+                  address: delegate.address,
+                  amount: votes
+                }, cb);
+              });
+            });
+          },function (err) {
+                  
+            library.bus.message('finishRound', round);
+            self.flush(round, function (err2) {
               cb(err || err2);
             });
-            });
           });
+
         });
 
 
@@ -564,6 +608,22 @@ Round.prototype.onBlockchainReady = function () {
 
 Round.prototype.onFinishRound = function (round) {
   library.network.io.sockets.emit('rounds/change', { number: round });
+
+  library.modules.delegates.isDelegatesContainKeypairs(round,function(err,isFind){
+    if(!err){
+      if(isFind) {
+        // ethos.stop();
+        console.log("++++++++++++++++++++++++++++++ stop")
+      }
+      else{
+        // ethos.start();
+        console.log("++++++++++++++++++++++++++++++ start")
+      }
+    }
+    else{
+      // ethos.stop();
+    }
+  })
 }
 
 Round.prototype.cleanup = function (cb) {

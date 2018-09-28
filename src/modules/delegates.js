@@ -40,12 +40,6 @@ __private.keypairs = {};
 __private.forgingEanbled = true;
 
 
-var _getDelegeteIndex = function (lastBlockId, slot, limit) {
-    let hash = crypto.createHash('sha256').update(lastBlockId).digest('hex');
-    let index = chaos(hash, slot, limit);
-    return index;
-}
-
 function Delegate() {
   this.create = function (data, trs) {
     trs.recipientId = null;
@@ -434,8 +428,8 @@ __private.getKeysSortByVote = function (cb) {
   modules.accounts.getAccounts({
     isDelegate: 1,
     sort: {"vote": -1, "publicKey": 1},
-    limit: slots.delegates
-  }, ["publicKey"], function (err, rows) {
+    limit: 1000 //slots.delegates * 2 - 1
+  }, ["publicKey","vote"], function (err, rows) {
     if (err) {
       cb(err)
     }
@@ -443,7 +437,8 @@ __private.getKeysSortByVote = function (cb) {
       return cb('No active delegates found')
     }
     cb(null, rows.map(function (el) {
-      return el.publicKey
+      // return el.publicKey
+      return el
     }))
   });
 }
@@ -465,7 +460,7 @@ __private.getBlockSlotData = function (slot, height, cb) {
       var lastSlot = slots.getLastSlot(currentSlot);
 
       for (; currentSlot < lastSlot; currentSlot += 1) {
-        var index = _getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
+        var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
         var delegateKey = activeDelegates[index];
         if (delegateKey && __private.keypairs[delegateKey]) {
           return cb(null, {
@@ -561,6 +556,45 @@ __private.loadMyDelegates = function (cb) {
   }, cb);
 }
 
+__private._getDelegeteIndex = function (lastBlockId, slot, limit) {
+  let hash = crypto.createHash('sha256').update(lastBlockId).digest('hex');
+  let index = chaos(hash, slot, limit);
+  return index;
+}
+
+__private._getRandomDelegateList = function (randomDelegateList, truncDelegateList, cb) {
+  var totalVotes = 0;
+  var countVotes = 0;
+  var randomIndex = 0;
+  for (var i = 0; i < truncDelegateList.length; i++) {
+    totalVotes += truncDelegateList[i].vote;
+  }
+
+  let hash = crypto.createHash('sha256').update("entanmo").digest('hex');
+  var randomNum = chaos(hash, truncDelegateList.length, totalVotes);
+  for (var k = 0; k < truncDelegateList.length; k++) {
+    countVotes += truncDelegateList[k].vote;
+    if (countVotes > randomNum) {
+      randomIndex = k;
+      var randomDelegate = truncDelegateList[k];
+      randomDelegate.index = k;
+      randomDelegateList.push(randomDelegate);
+      break;
+    }
+  }
+
+  if (randomDelegateList.length < slots.delegates) {
+    truncDelegateList.splice(randomIndex, 1);
+    __private._getRandomDelegateList(randomDelegateList, truncDelegateList, cb);
+  }
+  else {
+    randomDelegateList.sort(function (a, b) {
+      return a.index - b.index;
+    })
+    cb(randomDelegateList);
+  }
+}
+
 Delegates.prototype.getActiveDelegateKeypairs = function (height, cb) {
   self.generateDelegateList(height, function (err, delegates) {
     if (err) {
@@ -590,7 +624,7 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
 
       var lastBlockId = res.block.id;
       var currentSlot = slots.getSlotNumber(propose.timestamp);
-      var index = _getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
+      var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
       var delegateKey = activeDelegates[index];
       if (delegateKey && propose.generatorPublicKey == delegateKey) {
         return cb();
@@ -627,7 +661,7 @@ Delegates.prototype.getDelegateIndex = function (propose ,cb) {
 
       var lastBlockId = res.block.id;
       var currentSlot = slots.getSlotNumber(propose.timestamp);
-      var index = _getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
+      var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
       var delegateKey = activeDelegates[index];
       if (delegateKey && propose.generatorPublicKey == delegateKey) {
         return cb(null, index);
@@ -643,7 +677,6 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
     if (err) {
       return cb(err);
     }
-
     // var seedSource = modules.round.calc(height).toString();
     // var currentSeed = crypto.createHash('sha256').update(seedSource, 'utf8').digest();
     // for (var i = 0, delCount = truncDelegateList.length; i < delCount; i++) {
@@ -655,7 +688,54 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
     //   }
     //   currentSeed = crypto.createHash('sha256').update(currentSeed).digest();
     // }
-    cb(null, truncDelegateList);
+    // cb(null, truncDelegateList);
+
+    __private._getRandomDelegateList([],truncDelegateList,function(delegateList){
+
+      // 被选中受托人的投票者票系数减半（只做一次）
+      let round = modules.round.calc(height);
+      if (global.round !== round) {
+        global.round = round
+        async.eachSeries(delegateList, function (delegate, cb) {
+
+          modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
+            if (err) {
+              cb(err);
+            }
+
+            async.eachSeries(voters, function (voter, cb) {
+              modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, function (err) {
+                cb(err);
+
+              });
+            }, function (err) {
+              cb(err);
+            });
+          });
+        }, function (err) {
+          if (err) {
+            cb(err);
+          }
+        });
+      }
+
+      cb(null, delegateList.map(function (el) {
+        return el.publicKey
+      }));
+    })
+
+    // var round = modules.round.calc(height);
+    // var list = [];
+    // if (round % 2 == 0) {
+    //   list = truncDelegateList.slice(0, 21)
+    // } else {
+    //   list = truncDelegateList.slice(10, 31)
+    // }
+    // // console.log("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++AAAAAA",list)
+    // // console.log("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++BBBBBB",truncDelegateList)
+    // cb(null, list.map(function (el) {
+    //       return el.publicKey
+    //     }));
   });
 
 }
@@ -684,6 +764,13 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
           additions += 1;
         } else if (math == '-') {
           removals += 1;
+
+          // 撤销投票是投票系数减半
+          let bHeight = modules.block.getLastBlock().height + 1;
+          modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
+            cb(err);
+
+          });
         }
 
         if (additions > 1 || removals > 1) {
@@ -816,7 +903,7 @@ Delegates.prototype.validateBlockSlot = function (block, cb) {
 
       var lastBlockId = res.block.id;
       var currentSlot = slots.getSlotNumber(block.timestamp);
-      var index = _getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
+      var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
       var delegateKey = activeDelegates[index];
       if (delegateKey && block.generatorPublicKey == delegateKey) {
         return cb();
@@ -890,6 +977,52 @@ Delegates.prototype.enableForging = function () {
 
 Delegates.prototype.disableForging = function () {
   __private.forgingEanbled = false;
+}
+
+Delegates.prototype.isDelegatesContainKeypairs = function (round,cb) {
+  self.generateDelegateList(round * slots.delegates + 1, function(err,list){
+    if(!err){
+      let keypairsSet = new Set(Object.keys(__private.keypairs));
+      let intersection = Array.from(new Set(list.filter(v => keypairsSet.has(v))));
+      if(intersection.length > 0){
+        console.log("++++++++++++++++++++++++++++++ intersection",intersection)
+        return cb(null,true);
+      }
+      else{
+        return cb(null,false);
+      }
+    }
+    return cb("get list error");
+  })
+}
+
+Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
+  library.dbLite.query("select GROUP_CONCAT(accountId) from mem_accounts2delegates where dependentId = $publicKey", {
+    publicKey: publicKey
+  }, ['accountId'], function (err, rows) {
+    if (err) {
+      library.logger.error(err);
+      return cb("Database error");
+    }
+
+    var addresses = rows[0].accountId.split(',');
+
+    modules.accounts.getAccounts({
+      address: {$in: addresses},
+      sort: 'balance'
+    }, ['address', 'balance', 'publicKey', 'username'], function (err, rows) {
+      if (err) {
+        library.logger.error(err);
+        return cb("Database error");
+      }
+      var lastBlock = modules.blocks.getLastBlock();
+      var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
+      rows.forEach(function (row) {
+        row.weight = row.balance / totalSupply * 100;
+      });
+      return cb(null, {accounts: rows});
+    });
+  });
 }
 
 // Events
@@ -989,32 +1122,34 @@ shared.getVoters = function (req, cb) {
       return cb(err[0].message);
     }
 
-    library.dbLite.query("select GROUP_CONCAT(accountId) from mem_accounts2delegates where dependentId = $publicKey", {
-      publicKey: query.publicKey
-    }, ['accountId'], function (err, rows) {
-      if (err) {
-        library.logger.error(err);
-        return cb("Database error");
-      }
+    self.getDelegateVoters(query.publicKey,cb);
 
-      var addresses = rows[0].accountId.split(',');
+    // library.dbLite.query("select GROUP_CONCAT(accountId) from mem_accounts2delegates where dependentId = $publicKey", {
+    //   publicKey: query.publicKey
+    // }, ['accountId'], function (err, rows) {
+    //   if (err) {
+    //     library.logger.error(err);
+    //     return cb("Database error");
+    //   }
 
-      modules.accounts.getAccounts({
-        address: {$in: addresses},
-        sort: 'balance'
-      }, ['address', 'balance', 'publicKey', 'username'], function (err, rows) {
-        if (err) {
-          library.logger.error(err);
-          return cb("Database error");
-        }
-        var lastBlock = modules.blocks.getLastBlock();
-        var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
-        rows.forEach(function (row) {
-          row.weight = row.balance / totalSupply * 100;
-        });
-        return cb(null, {accounts: rows});
-      });
-    });
+    //   var addresses = rows[0].accountId.split(',');
+
+    //   modules.accounts.getAccounts({
+    //     address: {$in: addresses},
+    //     sort: 'balance'
+    //   }, ['address', 'balance', 'publicKey', 'username'], function (err, rows) {
+    //     if (err) {
+    //       library.logger.error(err);
+    //       return cb("Database error");
+    //     }
+    //     var lastBlock = modules.blocks.getLastBlock();
+    //     var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
+    //     rows.forEach(function (row) {
+    //       row.weight = row.balance / totalSupply * 100;
+    //     });
+    //     return cb(null, {accounts: rows});
+    //   });
+    // });
   });
 }
 
