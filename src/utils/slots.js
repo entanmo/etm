@@ -21,7 +21,8 @@
  */
 
 function beginEpochTime() {
-  var d = new Date(Date.UTC(2016, 5, 27, 20, 0, 0, 0));
+  // var d = new Date(Date.UTC(2016, 5, 27, 20, 0, 0, 0));
+  var d = new Date(Date.UTC(2018, 7, 24, 2, 0, 0, 0));//月份从0开始，小时相隔8
 
   return d;
 }
@@ -81,5 +82,9 @@ module.exports = {
 
   roundTime: function (date) {
     Math.floor(date.getTime() / 1000) * 1000
-  }
+  },
+
+  getHeightPerDay: function () {
+    return Math.floor(24 * 60 * 60 / this.interval);
+  },
 }
