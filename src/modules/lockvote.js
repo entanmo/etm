@@ -1,6 +1,7 @@
 "use strict";
 
 var crypto = require('crypto');
+var async = require("async");
 var ed = require('../utils/ed.js');
 var Router = require('../utils/router.js');
 var TransactionTypes = require('../utils/transaction-types.js');
