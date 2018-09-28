@@ -54,8 +54,8 @@ function Vote() {
       return setImmediate(cb, "No votes sent");
     }
 
-    if (trs.asset.vote.votes && trs.asset.vote.votes.length > 33) {
-      return setImmediate(cb, "Voting limit exceeded. Maximum is 33 votes per transaction");
+    if (trs.asset.vote.votes && trs.asset.vote.votes.length > 2) {
+      return setImmediate(cb, "Voting limit exceeded. Maximum is 1 votes per transaction");
     }
 
     modules.delegates.checkDelegates(trs.senderPublicKey, trs.asset.vote.votes, function (err) {

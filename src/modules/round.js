@@ -269,27 +269,55 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
         library.model.updateAssetBalance(BONUS_CURRENCY, bonus, dappId, cb)
       },
       function (cb) {
-        self.getVotes(round, function (err, votes) {
+        modules.accounts.getAccounts({
+          isDelegate: 1,
+          sort: {
+            "vote": -1,
+            "publicKey": 1
+          }
+        }, ["address"], function (err, delegates) {
           if (err) {
             return cb(err);
           }
-          async.eachSeries(votes, function (vote, cb) {
-            var address = null
-            if (global.featureSwitch.fixVoteNewAddressIssue) {
-              address = modules.accounts.generateAddressByPublicKey2(vote.delegate)
-            } else {
-              address = modules.accounts.generateAddressByPublicKey(vote.delegate)
-            }
-            library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
-              address: address,
-              amount: vote.amount
-            }, cb);
-          }, function (err) {
-            self.flush(round, function (err2) {
-              cb(err || err2);
+
+          async.eachSeries(delegates, function (delegate, cb) {
+            modules.lockvote.calcLockVotes(delegate.address, block.height, function (err, totalVotes) {
+
+              let votes = Math.pow(totalVotes, 3/4);
+              library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
+                address: delegate.address,
+                amount: votes
+              }, cb);
+            }, function (err) {
+              self.flush(round, function (err2) {
+                cb(err || err2);
+              });
             });
-          })
+          });
         });
+
+
+        // self.getVotes(round, function (err, votes) {
+        //   if (err) {
+        //     return cb(err);
+        //   }
+        //   async.eachSeries(votes, function (vote, cb) {
+        //     var address = null
+        //     if (global.featureSwitch.fixVoteNewAddressIssue) {
+        //       address = modules.accounts.generateAddressByPublicKey2(vote.delegate)
+        //     } else {
+        //       address = modules.accounts.generateAddressByPublicKey(vote.delegate)
+        //     }
+        //     library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
+        //       address: address,
+        //       amount: vote.amount
+        //     }, cb);
+        //   }, function (err) {
+        //     self.flush(round, function (err2) {
+        //       cb(err || err2);
+        //     });
+        //   })
+        // });
       }
     ], function (err) {
       delete __private.unFeesByRound[round];
@@ -430,28 +458,59 @@ Round.prototype.tick = function (block, cb) {
         library.model.updateAssetBalance(BONUS_CURRENCY, bonus, dappId, cb)
       },
       function (cb) {
-        self.getVotes(round, function (err, votes) {
+        modules.accounts.getAccounts({
+          isDelegate: 1,
+          sort: {
+            "vote": -1,
+            "publicKey": 1
+          }
+        }, ["address"], function (err, delegates) {
           if (err) {
             return cb(err);
           }
-          async.eachSeries(votes, function (vote, cb) {
-            var address = null
-            if (global.featureSwitch.fixVoteNewAddressIssue) {
-              address = modules.accounts.generateAddressByPublicKey2(vote.delegate)
-            } else {
-              address = modules.accounts.generateAddressByPublicKey(vote.delegate)
-            }
-            library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
-              address: address,
-              amount: vote.amount
-            }, cb);
-          }, function (err) {
-            library.bus.message('finishRound', round);
-            self.flush(round, function (err2) {
+
+          async.eachSeries(delegates, function (delegate, cb) {
+            modules.lockvote.calcLockVotes(delegate.address, block.height, function (err, totalVotes) {
+            
+              let votes = Math.pow(totalVotes, 3/4);
+              library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
+                address: delegate.address,
+                amount: votes
+              }, cb);
+            }, function (err) {
+              library.bus.message('finishRound', round);
+              self.flush(round, function (err2) {
               cb(err || err2);
             });
-          })
+            });
+          });
         });
+
+
+
+
+        // self.getVotes(round, function (err, votes) {
+        //   if (err) {
+        //     return cb(err);
+        //   }
+        //   async.eachSeries(votes, function (vote, cb) {
+        //     var address = null
+        //     if (global.featureSwitch.fixVoteNewAddressIssue) {
+        //       address = modules.accounts.generateAddressByPublicKey2(vote.delegate)
+        //     } else {
+        //       address = modules.accounts.generateAddressByPublicKey(vote.delegate)
+        //     }
+        //     library.dbLite.query('update mem_accounts set vote = vote + $amount where address = $address', {
+        //       address: address,
+        //       amount: vote.amount
+        //     }, cb);
+        //   }, function (err) {
+        //     library.bus.message('finishRound', round);
+        //     self.flush(round, function (err2) {
+        //       cb(err || err2);
+        //     });
+        //   })
+        // });
       },
       function (cb) {
         // Fix NaN asset balance issue caused by flowed amount validate function

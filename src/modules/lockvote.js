@@ -170,8 +170,6 @@ LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
 }
 
 LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
-    // const SCHEME = 1; // 总体进行pow(v, 3/4)
-    const SCHEME = 2; // 单项进行pow(v, 3/4)再求和
     __private.listLockVotes({address: address, state: 1}, (err, result) => {
         if (err) {
             return cb(err);
@@ -195,23 +193,13 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
 
             let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());
             factor = Math.min(32, Math.max(1, factor));
-            let numOfVote;
-            if (SCHEME == 1) {
-                numOfVote = factor * info.lockAmount;
-            } else {
-                numOfVote = Math.pow(factor * info.lockAmount, 3/4);
-            }
+            let numOfVote = factor * info.lockAmount;
             totalVotes += numOfVote;
             cb();
         }, (err) => {
             if (err) {
                 return cb(err);
             }
-
-            if (SCHEME == 1) {
-                totalVotes = Math.pow(totalVotes, 3/4);
-            }
-
             return cb(null, totalVotes);
         });
     });

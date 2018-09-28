@@ -686,6 +686,10 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
           removals += 1;
         }
 
+        if (additions > 1 || removals > 1) {
+          return cb("Invalid vote count > 1");
+        }
+
         var publicKey = action.slice(1);
 
         try {
