@@ -29,14 +29,14 @@ cd entanmo
 
    执行命令 `./entanmod [command]`
 
-> **命令介绍**
-`configure`: 初始化配置 SQLLite3
-`start`: 在前台启动节点系统，此时控制台(终端)会被节点系统进程独占
-`start_daemon`: 在后台启动节点系统，此时控制台(终端)不会被节点系统独占
-`stop`: 停止后台运行的节点系统
-`restart`: 前台重启节点系统
-`restart_daemon`: 后台重启节点系统
-`status`: 查看节点系统是否启动
+> **命令介绍**  
+`configure`: 初始化配置 SQLLite3  
+`start`: 在前台启动节点系统，此时控制台(终端)会被节点系统进程独占  
+`start_daemon`: 在后台启动节点系统，此时控制台(终端)不会被节点系统独占  
+`stop`: 停止后台运行的节点系统  
+`restart`: 前台重启节点系统  
+`restart_daemon`: 后台重启节点系统  
+`status`: 查看节点系统是否启动  
 
 首次运行请执行 `./entanmod configure`，而后执行`./entanmod start`
 
@@ -53,10 +53,10 @@ cd entanmo
 
    执行 `./entanmod.bat [command]`
 
-> **Command Introduction**
-`start`: 在前台启动节点系统，此时控制台(终端)会被节点系统进程独占
-`start_daemon`: 在后台启动节点系统，此时控制台(终端)不会被节点系统独占
-`stop`: 停止后台运行的节点系统
-`restart`: 前台重启节点系统
-`restart_daemon`: 后台重启节点系统
-`status`: 查看节点系统是否启动
+> **命令介绍**  
+`start`: 在前台启动节点系统，此时控制台(终端)会被节点系统进程独占  
+`start_daemon`: 在后台启动节点系统，此时控制台(终端)不会被节点系统独占  
+`stop`: 停止后台运行的节点系统  
+`restart`: 前台重启节点系统  
+`restart_daemon`: 后台重启节点系统  
+`status`: 查看节点系统是否启动  
