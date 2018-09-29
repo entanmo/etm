@@ -703,10 +703,10 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
               return cb(err);
             }
 
-            async.eachSeries(voters, function (voter, cb) {
+            async.eachSeries(voters.accounts, function (voter, cb) {
               modules.lockvote.updateLockVotes(voter.address, height, 0.5, function (err) {
+                
                 return cb(err);
-
               });
             }, function (err) {
               return cb(err);

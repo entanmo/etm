@@ -285,21 +285,22 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
 
             modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
               if(err){
-                cb(err);
+                return cb(err);
               }
 
               let totalVotes = 0;
               async.eachSeries(voters, function (voter, cb) {
                 modules.lockvote.calcLockVotes(voter.address, block.height, function (err, votes) {
                   if(err){
-                    cb(err);
+                    return cb(err);
                   }
 
                   totalVotes += votes;
+                  cb();
                 });
               },function(err){
                 if(err){
-                  cb(err);
+                  return cb(err);
                 }
 
                 let votes = Math.pow(totalVotes, 3 / 4);
@@ -496,7 +497,7 @@ Round.prototype.tick = function (block, cb) {
 
             modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
               if(err){
-                cb(err);
+                return cb(err);
               }
 
               let totalVotes = 0;
@@ -511,7 +512,7 @@ Round.prototype.tick = function (block, cb) {
                 });
               },function(err){
                 if(err){
-                  cb(err);
+                  return cb(err);
                 }
 
                 let votes = Math.floor(Math.pow(totalVotes, 3 / 4));
