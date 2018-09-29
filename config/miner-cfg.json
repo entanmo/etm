@@ -1,0 +1,7 @@
+{
+    "enableGPU": true,
+    "platformId": 1,
+    "localWorkSize": 128,
+    "globalWorkSizeMultiplier": 8192,
+    "numOfInstances": 10
+}
