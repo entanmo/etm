@@ -30,7 +30,7 @@ cd entanmo
    执行命令 `./entanmod [command]`
 
 > **命令介绍**  
-`configure`: 初始化配置 SQLLite3  
+`configure`: 初始化配置 SQLite3  
 `start`: 在前台启动节点系统，此时控制台(终端)会被节点系统进程独占  
 `start_daemon`: 在后台启动节点系统，此时控制台(终端)不会被节点系统独占  
 `stop`: 停止后台运行的节点系统  
