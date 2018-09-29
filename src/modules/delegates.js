@@ -428,7 +428,7 @@ __private.getKeysSortByVote = function (cb) {
   modules.accounts.getAccounts({
     isDelegate: 1,
     sort: {"vote": -1, "publicKey": 1},
-    limit: 1000 //slots.delegates * 2 - 1
+    // limit: slots.delegates
   }, ["publicKey","vote"], function (err, rows) {
     if (err) {
       cb(err)
@@ -1016,7 +1016,7 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
         return cb("Database error");
       }
       var lastBlock = modules.blocks.getLastBlock();
-      var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
+      var totalSupply = __private.blockStatus.calcSupply(lastBlock.height || 1);
       rows.forEach(function (row) {
         row.weight = row.balance / totalSupply * 100;
       });

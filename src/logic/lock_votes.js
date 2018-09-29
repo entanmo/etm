@@ -91,6 +91,15 @@ function LockVotes() {
   }
 
   this.dbSave = function (trs, cb) {
+    if (trs.blockId && trs.blockId == library.genesisblock.block.id) {
+      return library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
+        address: trs.senderId,
+        lockAmount: Number(trs.args[0]),
+        originHeight: 1,
+        currentHeight: 1,
+        transactionId: trs.id
+      }, cb);
+    }
     return setImmediate(cb);
   }
 
