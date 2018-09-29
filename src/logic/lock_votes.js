@@ -75,31 +75,20 @@ function LockVotes() {
   }
 
   this.dbRead = function (raw) {
-    if (typeof raw.lv_lockAmount !== "number" || typeof raw.lv_state !== "number" ||
-      typeof raw.lv_address !== "string" || typeof raw.lv_originHeight !== "number" ||
-      typeof raw.lv_currentHeight !== "number") {
+    if (!raw.lv_lockAmount || !raw.lv_state || !raw.lv_address || !raw.lv_originHeight || !raw.lv_currentHeight) {
       return null;
     } else {
       return {
         address: raw.lv_address,
-        originHeight: raw.lv_originHeight,
-        currentHeight: raw.lv_currentHeight,
-        lockAmount: raw.lv_lockAmount,
-        state: raw.lv_state
+        originHeight: parseInt(raw.lv_originHeight),
+        currentHeight: parseInt(raw.lv_currentHeight),
+        lockAmount: parseInt(raw.lv_lockAmount),
+        state: parseInt(raw.lv_state)
       };
     }
   }
 
   this.dbSave = function (trs, cb) {
-    if (trs.blockId && trs.blockId == library.genesisblock.block.id) {
-      return library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
-        address: trs.senderId,
-        lockAmount: Number(trs.args[0]),
-        originHeight: 1,
-        currentHeight: 1,
-        transactionId: trs.id
-      }, cb);
-    }
     return setImmediate(cb);
   }
 

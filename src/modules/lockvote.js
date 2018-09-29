@@ -184,11 +184,13 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
         async.eachSeries(result.trs, (value, cb) => {
             const info = value.asset;
             let currentHeight = info.currentHeight;
-            if (info.originHeight == info.currentHeight) {
-                currentHeight = info.currentHeight + slots.getHeightPerDay();
-            }
-            if (blockHeight < currentHeight) {
-                return cb();
+            if (info.originHeight !== 1) {
+                if (info.originHeight == info.currentHeight) {
+                    currentHeight = info.currentHeight + slots.getHeightPerDay();
+                }
+                if (blockHeight < currentHeight) {
+                    return cb();
+                }
             }
 
             let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());

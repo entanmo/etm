@@ -503,17 +503,18 @@ Round.prototype.tick = function (block, cb) {
               async.eachSeries(voters.accounts, function (voter, cb) {
                 modules.lockvote.calcLockVotes(voter.address, block.height, function (err, votes) {
                   if(err){
-                    cb(err);
+                    return cb(err);
                   }
 
                   totalVotes += votes;
+                  cb();
                 });
               },function(err){
                 if(err){
                   cb(err);
                 }
 
-                let votes = Math.pow(totalVotes, 3 / 4);
+                let votes = Math.floor(Math.pow(totalVotes, 3 / 4));
                 library.dbLite.query('update mem_accounts set vote = $amount where address = $address', {
                   address: delegate.address,
                   amount: votes

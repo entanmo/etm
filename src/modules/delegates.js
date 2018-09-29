@@ -704,7 +704,7 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
             }
 
             async.eachSeries(voters, function (voter, cb) {
-              modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, function (err) {
+              modules.lockvote.updateLockVotes(voter.address, height, 0.5, function (err) {
                 cb(err);
 
               });
