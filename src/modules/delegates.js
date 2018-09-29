@@ -700,21 +700,21 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
 
           modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
             if (err) {
-              cb(err);
+              return cb(err);
             }
 
             async.eachSeries(voters, function (voter, cb) {
               modules.lockvote.updateLockVotes(voter.address, height, 0.5, function (err) {
-                cb(err);
+                return cb(err);
 
               });
             }, function (err) {
-              cb(err);
+              return cb(err);
             });
           });
         }, function (err) {
           if (err) {
-            cb(err);
+            return cb(err);
           }
         });
       }
