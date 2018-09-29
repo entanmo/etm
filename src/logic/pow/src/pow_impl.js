@@ -24,7 +24,7 @@ function noop() {
 
 const path = require('path');
 const fs = require('fs');
-const MINER_CFG = path.resolve('miner-cfg.json');
+const MINER_CFG = path.resolve('./config/miner-cfg.json');
 
 class PowImpl {
     constructor() {
