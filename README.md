@@ -30,7 +30,7 @@ cd entanmo
    execute `./entanmod [command]`
 
 > **Command Introduction**  
-`configure`: Initialize SQLLite3  
+`configure`: Initialize SQLite3  
 `start`: Start the node system in the foreground, the console (terminal) will be monopolized by process  
 `start_daemon`: Start the node system in the background, the console (terminal) will not be monopolized by process  
 `stop`: Stop the node system running in the background  
