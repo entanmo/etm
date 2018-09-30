@@ -692,11 +692,13 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
 
     __private._getRandomDelegateList([],truncDelegateList,function(delegateList){
 
-      // 被选中受托人的投票者票系数减半（只做一次）
+      // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
       let round = modules.round.calc(height);
-      if (global.round !== round) {
-        global.round = round
+      if (global.round !== round && height !== 1 && (height-1)  % slots.delegates === 0) {
+        global.round = round;
         async.eachSeries(delegateList, function (delegate, cb) {
+
+          modules.bench.tx("[round]=> round:"+round+", delegate:"+delegate.publicKey+", vote:"+delegate.vote+", height:"+height);
 
           modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
             if (err) {
