@@ -698,8 +698,6 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
         global.round = round;
         async.eachSeries(delegateList, function (delegate, cb) {
 
-          modules.bench.tx("[round]=> round:"+round+", delegate:"+delegate.publicKey+", vote:"+delegate.vote+", height:"+height);
-
           modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
             if (err) {
               return cb(err);
