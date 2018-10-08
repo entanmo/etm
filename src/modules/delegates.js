@@ -760,49 +760,63 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
           return cb("Invalid math operator");
         }
 
-        if (math == '+') {
-          additions += 1;
-        } else if (math == '-') {
-          removals += 1;
-
-          // 撤销投票是投票系数减半
-          let bHeight = modules.block.getLastBlock().height + 1;
-          modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
-            cb(err);
-
-          });
-        }
-
-        if (additions > 1 || removals > 1) {
-          return cb("Invalid vote count > 1");
-        }
-
-        var publicKey = action.slice(1);
-
-        try {
-          new Buffer(publicKey, "hex");
-        } catch (e) {
-          return cb("Invalid public key");
-        }
-
-        if (math == "+" && (account.delegates !== null && account.delegates.indexOf(publicKey) != -1)) {
-          return cb("Failed to add vote, account has already voted for this delegate");
-        }
-        if (math == "-" && (account.delegates === null || account.delegates.indexOf(publicKey) === -1)) {
-          return cb("Failed to remove vote, account has not voted for this delegate");
-        }
-
-        modules.accounts.getAccount({publicKey: publicKey, isDelegate: 1}, function (err, account) {
+        async.waterfall([
+          function(next){
+            if (math == '+') {
+              additions += 1;
+              next();
+            } else if (math == '-') {
+              removals += 1;
+    
+              // 撤销投票时投票系数减半
+              let bHeight = modules.block.getLastBlock().height + 1;
+              modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
+                if (err) {
+                  return next(err);
+                }
+                next();
+              });
+            }
+          },
+          function(next){
+            if (additions > 1 || removals > 1) {
+              return next("Invalid vote count > 1");
+            }
+    
+            var publicKey = action.slice(1);
+    
+            try {
+              new Buffer(publicKey, "hex");
+            } catch (e) {
+              return next("Invalid public key");
+            }
+    
+            if (math == "+" && (account.delegates !== null && account.delegates.indexOf(publicKey) != -1)) {
+              return next("Failed to add vote, account has already voted for this delegate");
+            }
+            if (math == "-" && (account.delegates === null || account.delegates.indexOf(publicKey) === -1)) {
+              return next("Failed to remove vote, account has not voted for this delegate");
+            }
+    
+            modules.accounts.getAccount({publicKey: publicKey, isDelegate: 1}, function (err, account) {
+              if (err) {
+                return next(err);
+              }
+    
+              if (!account) {
+                return next("Delegate not found");
+              }
+    
+              next();
+            });
+          }
+        ],function(err){
           if (err) {
             return cb(err);
           }
-
-          if (!account) {
-            return cb("Delegate not found");
-          }
-
           cb();
         });
+
       }, function(err) {
         if (err) {
           return cb(err);
