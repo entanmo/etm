@@ -93,7 +93,7 @@ cd entanmo
     }
   },
   "forging": {
-    "secret": [ ""//双引号内填入个人 secret
+    "secret": [ ""// 双引号内填入个人 secret
     ],
     "access": {
       "whiteList": [
