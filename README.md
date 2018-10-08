@@ -66,7 +66,7 @@ Run for the first time, please execute `./entanmod configure`，than`./entanmod 
 
 After the system is deployed, you need to modify the related configuration to ensure that the system runs normally. Find the `config.json` file in the `entanmo\config` directory and change the `secret` field to the us-specific dedicated `secret`.
 
-```js
+```JSON
 {
   "port": 4096,
   "address": "0.0.0.0",
@@ -92,7 +92,7 @@ After the system is deployed, you need to modify the related configuration to en
     }
   },
   "forging": {
-    "secret": [ ""//Fill in the personal secret in double quotes
+    "secret": [ ""// Fill in the personal secret in double quotes
     ],
     "access": {
       "whiteList": [
