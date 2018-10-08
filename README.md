@@ -119,3 +119,7 @@ After the system is deployed, you need to modify the related configuration to en
   }
 }
 ```
+
+## View mine revenue
+
+You can use the online wallet to view your personal earnings: go to http://wallet.entanmo.com and log in to your wallet using the previous beta `secret` to see the mine revenue.
