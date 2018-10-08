@@ -53,7 +53,7 @@ cd entanmo
 
 2. 启动节点
 
-   执行 `./entanmod.bat [command]`
+   执行 `entanmod.bat [command]`
 
 > **命令介绍**  
 `start`: 在前台启动节点系统，此时控制台(终端)会被节点系统进程独占  
