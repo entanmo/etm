@@ -92,7 +92,7 @@ After the system is deployed, you need to modify the related configuration to en
     }
   },
   "forging": {
-    "secret": [ “”//Fill in the personal secret in double quotes
+    "secret": [ ""//Fill in the personal secret in double quotes
     ],
     "access": {
       "whiteList": [
