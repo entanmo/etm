@@ -62,3 +62,61 @@ cd entanmo
 `restart`: 前台重启节点系统  
 `restart_daemon`: 后台重启节点系统  
 `status`: 查看节点系统是否启动  
+
+## 进一步配置
+
+部署好系统后，需要修改相关配置，以保证系统正常运行。在 `entanmo\config` 目录下找到 `config.json` 文件，将 `secret` 字段，修改为我们提供的内测专用 `secret`。
+
+```json
+{
+  "port": 4096,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "e81b8a0c",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "52.187.232.98", 
+        "port":4096
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout":500
+    }
+  },
+  "forging": {
+    "secret": [ “”//双引号内填入个人 secret
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}
+```
