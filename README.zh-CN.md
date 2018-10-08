@@ -67,9 +67,11 @@ cd entanmo
 
 部署好系统后，需要修改相关配置，以保证系统正常运行。在 `entanmo\config` 目录下找到 `config.json` 文件，将 `secret` 字段，修改为我们提供的内测专用 `secret`。
 
+> 对于多台矿机使用同一个公网 IP 的情况，可以通过端口映射实现，修改 `config.json` 第一行 `port` 即可。
+
 ```JSON
 {
-  "port": 4096,
+  "port": 4096, //端口号
   "address": "0.0.0.0",
   "publicIp": "",
   "logLevel": "debug",
