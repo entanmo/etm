@@ -61,3 +61,61 @@ Run for the first time, please execute `./entanmod configure`，than`./entanmod 
 `restart`: Restart node system  
 `restart_daemon`: Background restart node system  
 `status`: Check if the node system is started  
+
+## Configuration
+
+After the system is deployed, you need to modify the related configuration to ensure that the system runs normally. Find the `config.json` file in the `entanmo\config` directory and change the `secret` field to the us-specific dedicated `secret`.
+
+```json
+{
+  "port": 4096,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "e81b8a0c",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "52.187.232.98", 
+        "port":4096
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout":500
+    }
+  },
+  "forging": {
+    "secret": [ “”//Fill in the personal secret in double quotes
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}
+```
