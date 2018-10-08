@@ -66,9 +66,11 @@ Run for the first time, please execute `./entanmod configure`，than`./entanmod 
 
 After the system is deployed, you need to modify the related configuration to ensure that the system runs normally. Find the `config.json` file in the `entanmo\config` directory and change the `secret` field to the us-specific dedicated `secret`.
 
+> For multiple mining machines using the same public IP address,  it can be implemented by port mapping. Modify the first line of  `config.json`.
+
 ```JSON
 {
-  "port": 4096,
+  "port": 4096, // The port number
   "address": "0.0.0.0",
   "publicIp": "",
   "logLevel": "debug",
