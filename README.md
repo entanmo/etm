@@ -52,7 +52,7 @@ Run for the first time, please execute `./entanmod configure`，than`./entanmod 
 
 2. Start the node
 
-   execute `./entanmod.bat [command]`
+   execute `entanmod.bat [command]`
 
 > **Command Introduction**  
 `start`: Start the node system in the foreground, the console (terminal) will be monopolized by process  
