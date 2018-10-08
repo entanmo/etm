@@ -67,7 +67,7 @@ cd entanmo
 
 部署好系统后，需要修改相关配置，以保证系统正常运行。在 `entanmo\config` 目录下找到 `config.json` 文件，将 `secret` 字段，修改为我们提供的内测专用 `secret`。
 
-```json
+```
 {
   "port": 4096,
   "address": "0.0.0.0",
