@@ -276,7 +276,7 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
             "vote": -1,
             "publicKey": 1
           }
-        }, ["address"], function (err, delegates) {
+        }, ["publicKey","address"], function (err, delegates) {
           if (err) {
             return cb(err);
           }
@@ -311,8 +311,6 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
               });
             });
           },function (err) {
-                  
-            library.bus.message('finishRound', round);
             self.flush(round, function (err2) {
               cb(err || err2);
             });
