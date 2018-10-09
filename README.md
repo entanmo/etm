@@ -20,6 +20,8 @@ Its name emerged from Entente, Transaction and Mobius. The core En-Tan-Mo team c
 1. Download installation package
 
    Download and unzip the package and go to the appropriate directory
+   
+   > Note: there should be no special symbols or spaces in the path.
 
 ```
 wget http://www.entanmo.com/download/entanmo-ubuntu.tar.gz
@@ -49,6 +51,8 @@ Run for the first time, please execute `./entanmod configure`，than`./entanmod 
    Download installation package: http://www.entanmo.com/download/entanmo-windows.zip
 
    Unzip the package and go to the appropriate directory
+   
+   > Note: there should be no special symbols or spaces in the path.
 
 2. Start the node
 
@@ -63,6 +67,8 @@ Run for the first time, please execute `./entanmod configure`，than`./entanmod 
 `status`: Check if the node system is started  
 
 ## Configuration
+
+### Custom mining machine
 
 After the system is deployed, you need to modify the related configuration to ensure that the system runs normally. Find the `config.json` file in the `entanmo\config` directory and change the `secret` field to the us-specific dedicated `secret`.
 
@@ -119,6 +125,20 @@ After the system is deployed, you need to modify the related configuration to en
     "masterpassword": "ytfACAMegjrK",
     "params": {}
   }
+}
+```
+
+### Designated working graphics card
+
+For devices with integrated graphics cards or multiple graphics cards, you need to modify `entanmo\config\miner-cfg.json`，change the value of `platformId` to `1`，to specify **independent graphics cards** as working graphics cards, so that the device does not suffer from low-performance graphics cards.
+
+```json
+{
+    "enableGPU": true,
+    "platformId": 1,
+    "localWorkSize": 128,
+    "globalWorkSizeMultiplier": 8192,
+    "numOfInstances": 10
 }
 ```
 
