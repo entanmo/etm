@@ -20,6 +20,8 @@ En-Tan-Mo， 灵感来源于 Entente（联盟）、Transaction（交易）和 Mo
 1. 下载安装包
 
    下载并解压安装包，进入相应目录。
+   
+   > 注意：路径里不要有中文、特殊符号或者空格。
 
 ```
 wget http://www.entanmo.com/download/entanmo-ubuntu.tar.gz
@@ -50,6 +52,8 @@ cd entanmo
    下载安装包: http://www.entanmo.com/download/entanmo-windows.zip
 
    解压安装包并进入相应目录。
+   
+   > 注意：路径里不要有中文、特殊符号或者空格。
 
 2. 启动节点
 
@@ -64,6 +68,8 @@ cd entanmo
 `status`: 查看节点系统是否启动  
 
 ## 进一步配置
+
+### 自定义矿机
 
 部署好系统后，需要修改相关配置，以保证系统正常运行。在 `entanmo\config` 目录下找到 `config.json` 文件，将 `secret` 字段，修改为我们提供的内测专用 `secret`。
 
@@ -120,6 +126,20 @@ cd entanmo
     "masterpassword": "ytfACAMegjrK",
     "params": {}
   }
+}
+```
+
+### 指定工作显卡
+
+对于有集显，或者有多种显卡的设备，需要修改 `entanmo\config\miner-cfg.json`，将 `platformId` 的值修改为 `1`，以指定**独立显卡**作为工作显卡，以免设备使用低性能显卡工作造成损失。
+
+```json
+{
+    "enableGPU": true,
+    "platformId": 1,
+    "localWorkSize": 128,
+    "globalWorkSizeMultiplier": 8192,
+    "numOfInstances": 10
 }
 ```
 
