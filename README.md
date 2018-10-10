@@ -15,6 +15,15 @@ Its name emerged from Entente, Transaction and Mobius. The core En-Tan-Mo team c
 
 - Home Page: https://www.entanmo.com
 
+## Machine Requirements
+
+CPU: Pentium and above
+Memory: the minimum is 4G
+Disk: the minimum is 50G
+Operating system: Linux, the desktop version of Ubuntu18.04 is recommended
+Network: fiber optics of 20M and above
+Requirement for graphics card: The computing power of POW should be above 160MHash/s or be equivalent to 6*RX570 and above.
+
 ## Install En-Tan-Mo Main-net on Ubuntu
 
 1. Download installation package
