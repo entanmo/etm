@@ -18,10 +18,15 @@ En-Tan-Mo， 灵感来源于 Entente（联盟）、Transaction（交易）和 Mo
 ## 硬件要求
 
 CPU：奔腾双核及以上
+
 内存：最低4G
+
 磁盘：最低50G
+
 操作系统：Linux，推荐 Ubuntu18.04 桌面版
+
 网络：20M 光纤及以上
+
 显卡要求：POW 算力在 160MHash/s 或者与 6*RX570 相当算力或以上
 
 ## 在 Ubuntu 上安装 En-Tan-Mo Mainnet 节点
