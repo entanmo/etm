@@ -436,8 +436,9 @@ __private.getKeysSortByVote = function (cb) {
     if (!rows || !rows.length) {
       return cb('No active delegates found')
     }
-    cb(null, rows.map(function (el) {
+    cb(null, rows.map(function (el,index) {
       // return el.publicKey
+      el.index = index;
       return el
     }))
   });
@@ -577,7 +578,7 @@ __private._getRandomDelegateList = function (randomDelegateList, truncDelegateLi
     if (countVotes > randomNum) {
       randomIndex = k;
       var randomDelegate = truncDelegateList[k];
-      randomDelegate.index = k;
+      randomDelegate.index = truncDelegateList[k].index;
       randomDelegateList.push(randomDelegate);
       break;
     }
@@ -718,24 +719,11 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
           }
         });
       }
-
+      
       cb(null, delegateList.map(function (el) {
         return el.publicKey
       }));
     })
-
-    // var round = modules.round.calc(height);
-    // var list = [];
-    // if (round % 2 == 0) {
-    //   list = truncDelegateList.slice(0, 21)
-    // } else {
-    //   list = truncDelegateList.slice(10, 31)
-    // }
-    // // console.log("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++AAAAAA",list)
-    // // console.log("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++BBBBBB",truncDelegateList)
-    // cb(null, list.map(function (el) {
-    //       return el.publicKey
-    //     }));
   });
 
 }
