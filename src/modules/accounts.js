@@ -380,7 +380,7 @@ Accounts.prototype.getAccounts = function (filter, fields, cb) {
 }
 
 Accounts.prototype.setAccountAndGet = function (data, cb) {
-  library.logger.debug('setAccountAndGet data is:',data)
+  //library.logger.debug('setAccountAndGet data is:',data)
   var address = data.address || null;
   if (address === null) {
     if (data.publicKey) {
@@ -397,14 +397,49 @@ Accounts.prototype.setAccountAndGet = function (data, cb) {
   if (!address) {
     return cb("Invalid public key");
   }
+  //  library.base.account.get({ address: address }, function (err,rows) {
+  //     if (err) {
+  //       return cb(err);
+  //     }
+  //     console.log("^^^^^^^^^^^"+JSON.stringify(rows))
+  //     if(rows == null){
+  //       library.base.account.set(address, data, function (err) {
+  //         if (err) {
+  //           return cb(err);
+  //         }
+  //         library.base.account.get({ address: address }, cb);
+  //       });
+  //     }else{
+  //       cb(null,rows);
+  //     }
+  //   });
   library.base.account.set(address, data, function (err) {
     if (err) {
       return cb(err);
     }
-    library.base.account.get({ address: address }, cb);
+     library.base.account.get({ address: address }, cb);
   });
 }
-
+Accounts.prototype.getAccountOnly = function (data, cb) {
+  //library.logger.debug('setAccountAndGet data is:',data)
+  var address = data.address || null;
+  if (address === null) {
+    if (data.publicKey) {
+      address = self.generateAddressByPublicKey(data.publicKey);
+      if (!data.isGenesis && !library.balanceCache.getNativeBalance(address)) {
+        address = addressHelper.generateBase58CheckAddress(data.publicKey);
+      }
+      delete data.isGenesis;
+    } else {
+      library.logger.debug('setAccountAndGet error and data is:',data)
+      return cb("Missing address or public key in setAccountAndGet");
+    }
+  }
+  if (!address) {
+    return cb("Invalid public key");
+  }
+  library.base.account.get({ address: address }, cb);
+}
 Accounts.prototype.mergeAccountAndGet = function (data, cb) {
   var address = data.address || null;
   if (address === null) {
@@ -423,7 +458,10 @@ Accounts.prototype.mergeAccountAndGet = function (data, cb) {
 Accounts.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);
 }
-
+Accounts.prototype.cleanup = function (cb) {
+  library.base.account.cache.reset();
+  cb();
+}
 // Events
 Accounts.prototype.onBind = function (scope) {
   modules = scope;

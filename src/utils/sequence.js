@@ -32,9 +32,10 @@ function Sequence(config) {
     if (_default.onWarning && self.sequence.length >= _default.warningLimit) {
       _default.onWarning(self.sequence.length, _default.warningLimit);
     }
-    self.__tick(function () {
-      setTimeout(nextSequenceTick, 3);
-    });
+    // self.__tick(function () {
+    //   setTimeout(nextSequenceTick, 0);
+    // });
+    self.__tick(nextSequenceTick);
   });
 }
 

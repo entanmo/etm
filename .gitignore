@@ -1,0 +1,5 @@
+.vscode
+logs
+node_modules
+*.db
+*.log

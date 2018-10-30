@@ -19,12 +19,14 @@ var jsonSql = require('../utils/json-sql')();
 jsonSql.setDialect("sqlite")
 var constants = require('../utils/constants.js');
 var genesisBlock = null;
-
+var LRU = require("lru-cache");
+var cache = new LRU({ max: 50000,maxAge: 1000 * 60 * 60 * 168});
 var __private = {};
 
 // Constructor
 function Account(scope, cb) {
   this.scope = scope;
+  this.cache = cache;
   genesisBlock = this.scope.genesisblock.block;
 
   this.table = "mem_accounts";
@@ -602,9 +604,19 @@ Account.prototype.get = function (filter, fields, cb) {
       return field.alias || field.field;
     });
   }
-
+  var address =filter["address"];
+  if(address && cache.has(address)){
+     // console.log('cache get '+JSON.stringify(cache.get(address)));
+      cb(null,cache.get(address))
+      return
+  }
   this.getAll(filter, fields, function (err, data) {
     library.logger.trace('enter Account.prototype.get.... callback' + err, data)
+   var d = data && data.length ? data[0] : null
+    if(d){
+    //  console.log('cache account'+JSON.stringify(d));
+     cache.set(address,d)
+    }
     cb(err, data && data.length ? data[0] : null)
   })
 }
@@ -627,7 +639,8 @@ Account.prototype.getAll = function (filter, fields, cb) {
       realConv[key] = this.conv[key];
     }
   }.bind(this));
-
+  //console.log('fields'+JSON.stringify(fields));
+ // console.log("filter"+JSON.stringify(filter));
   var limit, offset, sort;
 
   if (filter.limit > 0) {
@@ -653,7 +666,7 @@ Account.prototype.getAll = function (filter, fields, cb) {
     condition: filter,
     fields: realFields
   });
-
+  
   this.scope.dbLite.query(sql.query, sql.values, realConv, function (err, data) {
     if (err) {
       return cb(err);
@@ -673,7 +686,9 @@ Account.prototype.set = function (address, fields, cb) {
   fields.address = address;
   var account = fields;
   var sqles = []
-
+  if(address && cache.has(address)){
+    cache.del(address)
+	}
   var sql = jsonSql.build({
     type: 'insert',
     or: "ignore",
@@ -703,7 +718,27 @@ Account.prototype.set = function (address, fields, cb) {
     });
   }, cb);
 }
-
+Account.prototype.create = function (address, fields, cb) {
+  var self = this;
+  if (fields.publicKey !== undefined && !fields.publicKey){
+    console.log("!!!!!!!!!!!!!!!!!!!!!!!", address, diff)
+  }
+  //TODO 验证地址和publickey?
+  fields.address = address;
+  var account = fields;
+  var sql = jsonSql.build({
+    type: 'insert',
+    or: "ignore",
+    table: this.table,
+    values: this.toDB(account)
+  });
+  self.scope.dbLite.query(sql.query, sql.values, function (err, data) {
+    if (err) {
+      console.error('account set sql error:', err, sql);
+    }
+    cb(err, data);
+  });
+}
 Account.prototype.merge = function (address, diff, cb) {
   var update = {}, remove = {}, insert = {}, insert_object = {}, remove_object = {}, round = [];
 
@@ -884,7 +919,7 @@ Account.prototype.merge = function (address, diff, cb) {
   //     self.get({address: address}, cb);
   //   }
   // }
-
+  console.log('!!!!!!! merge sqls: ' + JSON.stringify(sqles) );
   async.series([
     function (next) {
       async.eachSeries(sqles, function (sql, next) {

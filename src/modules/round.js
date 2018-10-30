@@ -355,9 +355,9 @@ Round.prototype.tick = function (block, cb) {
     if (err) {
       library.logger.error("Round tick failed: " + err);
     } else {
-      library.logger.debug("Round tick completed", {
-        block: block
-      });
+     // library.logger.debug("Round tick completed", {
+    //    block: block
+     // });
     }
     cb && setImmediate(cb, err);
   }

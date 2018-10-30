@@ -121,7 +121,7 @@ __private.blockCache = {};
 __private.proposeCache = {};
 __private.lastPropose = null;
 
-const FULL_BLOCK_QUERY = "SELECT " +
+/*const FULL_BLOCK_QUERY = "SELECT " +
   "a.address,"+
   "b.id, b.version, b.timestamp, b.height, b.previousBlock, b.numberOfTransactions, b.totalAmount, b.totalFee, b.reward, b.payloadLength, lower(hex(b.payloadHash)), lower(hex(b.generatorPublicKey)), lower(hex(b.blockSignature)), " +
   "t.id, t.type, t.timestamp, lower(hex(t.senderPublicKey)), t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), t.args, t.message, " +
@@ -156,8 +156,45 @@ const FULL_BLOCK_QUERY = "SELECT " +
   "left outer join flags on flags.transactionId=t.id " +
   "left outer join issues on issues.transactionId=t.id " +
   "left outer join transfers on transfers.transactionId=t.id " +
-  "left outer join acls on acls.transactionId=t.id ";
-
+  "left outer join acls on acls.transactionId=t.id ";*/
+  const FULL_BLOCK_QUERY = 
+  `SELECT a.address, b.id as b_id ,b.version, b.timestamp as b_timestamp , b.height
+	, b.previousBlock, b.numberOfTransactions, b.totalAmount, b.totalFee, b.reward
+	, b.payloadLength, lower(hex(b.payloadHash))
+	, lower(hex(b.generatorPublicKey))
+	, lower(hex(b.blockSignature)), t.id as t_id
+	, t.type as t_type, t.timestamp as t_timestamp,lower(hex(t.senderPublicKey))
+	, t.senderId, t.recipientId, t.amount as t_amount, t.fee
+	, lower(hex(t.signature))
+	, lower(hex(t.signSignature)), t.args
+	, t.message, lower(hex(s.publicKey)), d.username
+	, v.votes, m.min, m.lifetime, m.keysgroup, dapp.name as dapp_name
+	, dapp.description, dapp.tags, dapp.type as dapp_type, dapp.link, dapp.category
+	, dapp.icon, dapp.delegates, dapp.unlockDelegates, it.dappId as it_dappId, it.currency as it_currency
+	, it.amount as it_amount, ot.dappId as dappId, ot.outTransactionId, ot.currency as ot_currency, ot.amount as ot_amount
+	, lower(hex(t.requesterPublicKey)), t.signatures
+	, lower(hex(st.content)), issuers.name as issuers_name
+	, issuers.desc as issuers_desc , assets.name as assets_name, assets.desc as assets_desc, assets.maximum, assets.precision
+	, assets.strategy, assets.allowWriteoff, assets.allowWhitelist, assets.allowBlacklist, flags.currency as flags_currency
+	, flags.flag  as flags_flag, flags.flagType, issues.currency as issuers_currency, issues.amount as issuers_amount, transfers.currency as transfers_currency
+	, transfers.amount as transfers_amount, acls.currency as acls_currency, acls.flag as acls_flag, acls.operator, acls.list
+FROM blocks b
+	LEFT JOIN mem_accounts a ON a.publicKey = b.generatorPublicKey
+	LEFT JOIN trs t ON t.blockId = b.id
+	LEFT JOIN delegates d ON d.transactionId = t.id
+	LEFT JOIN votes v ON v.transactionId = t.id
+	LEFT JOIN signatures s ON s.transactionId = t.id
+	LEFT JOIN multisignatures m ON m.transactionId = t.id
+	LEFT JOIN dapps dapp ON dapp.transactionId = t.id
+	LEFT JOIN intransfer it ON it.transactionId = t.id
+	LEFT JOIN outtransfer ot ON ot.transactionId = t.id
+	LEFT JOIN storages st ON st.transactionId = t.id
+	LEFT JOIN issuers ON issuers.transactionId = t.id
+	LEFT JOIN assets ON assets.transactionId = t.id
+	LEFT JOIN flags ON flags.transactionId = t.id
+	LEFT JOIN issues ON issues.transactionId = t.id
+	LEFT JOIN transfers ON transfers.transactionId = t.id
+	LEFT JOIN acls ON acls.transactionId = t.id `
 // Constructor
 function Blocks(cb, scope) {
   library = scope;
@@ -468,7 +505,7 @@ __private.getIdSequence = function (height, cb) {
 }
 
 __private.getIdSequence2 = function (height, cb) {
-  library.dbLite.query('SELECT s.height, group_concat(s.id) from ' +
+  library.dbLite.query('SELECT min(s.height) as height, group_concat(s.id) from ' +
     '(SELECT id, height from blocks order by height desc limit 5) s',
     { 'height': height },
     ['firstHeight', 'ids'],
@@ -937,6 +974,7 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
       async.waterfall([
         function (next) {
           modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey, isGenesis: block.height == 1 }, next);
+         // library.base.account.get({ address: transaction.senderId}, next)
         },
         function (sender, next) {
           // if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
@@ -1024,6 +1062,7 @@ Blocks.prototype.processBlock = function (block, votes, broadcast, save, verifyT
     return setImmediate(cb, "Failed to normalize block: " + e.toString());
   }
   block.transactions = library.base.block.sortTransactions(block);
+  library.logger.debug("sortTransactions block ok");
   self.verifyBlock(block, votes, function (err) {
     if (err) {
       return setImmediate(cb, "Failed to verify block: " + err);
@@ -1047,6 +1086,7 @@ Blocks.prototype.processBlock = function (block, votes, broadcast, save, verifyT
           async.waterfall([
             function (next) {
               modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, next)
+              //library.base.account.getAccountOnly({ publicKey: transaction.senderPublicKey}, next)
             },
             function (sender, next) {
               try {
@@ -1235,7 +1275,7 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
   if (library.base.consensus.hasPendingBlock(timestamp)) {
     return setImmediate(cb);
   }
-  library.logger.info("generateBlock enter");
+  //console.log("generateBlock enter transactions.length :"+transactions.length)
   async.eachSeries(transactions, function (transaction, next) {
     modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
       if (err || !sender) {

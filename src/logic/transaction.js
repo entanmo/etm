@@ -54,7 +54,7 @@ Transaction.prototype.create = function (data) {
     throw Error("Can't find keypair");
   }
 
-  library.logger.debug('=============transaction.create', data.sender)
+ // library.logger.debug('=============transaction.create', data.sender)
   var trs = {
     type: data.type,
     amount: 0,
@@ -541,7 +541,7 @@ Transaction.prototype.applyUnconfirmed = function (trs, sender, requester, cb) {
   if (typeof requester === 'function') {
     cb = requester;
   }
-
+  console.log("applyUnconfirmed:"+JSON.stringify(trs))
   if (!__private.types[trs.type]) {
     return setImmediate(cb, "Unknown transaction type " + trs.type);
   }

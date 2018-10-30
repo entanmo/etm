@@ -296,7 +296,7 @@ module.exports = function setup(options, done) {
           https_io: https_io
         });
       }],
-  
+     
       dbSequence: ["logger", function (scope, cb) {
         var sequence = new Sequence({
           name: "db",
@@ -364,7 +364,7 @@ module.exports = function setup(options, done) {
           var parts = req.url.split('/');
           var ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   
-          scope.logger.debug(req.method + " " + req.url + " from " + ip);
+         // scope.logger.debug(req.method + " " + req.url + " from " + ip);
   
           /* Instruct browser to deny display of <frame>, <iframe> regardless of origin.
            *
@@ -457,12 +457,14 @@ module.exports = function setup(options, done) {
         }
         cb(null, new Bus)
       },
-  
+      // dbLite: function (cb) {
+      //   var dbLite = require('./utils/dblite-helper.js');
+      //    dbLite.connect(dbFile, cb);
+      // },
       dbLite: function (cb) {
-        var dbLite = require('./utils/dblite-helper.js');
+        var dbLite = require('./utils/dblite-helper2.js');
         dbLite.connect(dbFile, cb);
       },
-  
       oneoff: function (cb) {
         cb(null, new Map)
       },
