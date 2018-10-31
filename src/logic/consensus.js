@@ -29,11 +29,11 @@ function Consensus(scope, cb) {
   this.pendingBlock = null;
   this.pendingVotes = null;
   this.votesKeySet = {};
-  cb && setImmediate(cb, null, this);
-  // PoW = require('./pow');
-  // PoW.onReady(() => {
-  //   cb && setImmediate(cb, null, this);
-  // });
+  //cb && setImmediate(cb, null, this);
+  PoW = require('./pow');
+  PoW.onReady(() => {
+    cb && setImmediate(cb, null, this);
+  });
 }
 
 Consensus.prototype.createVotes = function (keypairs, block) {

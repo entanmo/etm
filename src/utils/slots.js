@@ -42,7 +42,7 @@ module.exports = {
 
   delegates: 101,    // 代理数量（不为101时需要同步修改gegesisBlock.json）
 
-  leading: 5,        // 前导位数
+  leading: 1,        // 前导位数
 
   powTimeOut: 2,   // pow超时时间（单位s）
 

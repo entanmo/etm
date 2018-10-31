@@ -1206,10 +1206,8 @@ Blocks.prototype.loadBlocksFromPeer = function (peer, lastCommonBlockId, cb) {
             }
           })
         }
-
-        blocks = blocks.map(library.dbLite.row2parsed, library.dbLite.parseFields(__private.blocksDataFields));
+        blocks = blocks.map(library.dbLite.row2parsed, __private.blocksDataFields);//library.dbLite.parseFields()
         blocks = __private.readDbRows(blocks);
-
         if (blocks.length == 0) {
           loaded = true;
           next();

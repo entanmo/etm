@@ -573,9 +573,11 @@ __private._getRandomDelegateList = function (randomDelegateList, truncDelegateLi
 
   let hash = crypto.createHash('sha256').update("entanmo").digest('hex');
   var randomNum = chaos(hash, truncDelegateList.length, totalVotes);
+   
+
   for (var k = 0; k < truncDelegateList.length; k++) {
     countVotes += truncDelegateList[k].vote;
-    if (countVotes > randomNum) {
+    if (countVotes >= randomNum) {
       randomIndex = k;
       var randomDelegate = truncDelegateList[k];
       randomDelegate.index = truncDelegateList[k].index;
@@ -585,6 +587,7 @@ __private._getRandomDelegateList = function (randomDelegateList, truncDelegateLi
   }
 
   if (randomDelegateList.length < slots.delegates) {
+   
     truncDelegateList.splice(randomIndex, 1);
     __private._getRandomDelegateList(randomDelegateList, truncDelegateList, cb);
   }

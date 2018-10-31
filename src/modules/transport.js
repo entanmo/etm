@@ -414,8 +414,8 @@ __private.attachApi = function () {
   router.post("/transactions", function (req, res) {
     var lastBlock = modules.blocks.getLastBlock();
     var lastSlot = slots.getSlotNumber(lastBlock.timestamp);
-    if (slots.getNextSlot() - lastSlot >= 12) {
-      library.logger.error("OS INFO", shell.getInfo())
+    if (slots.getNextSlot() - lastSlot >= 40) {
+     // library.logger.error("OS INFO", shell.getInfo())
       library.logger.error("Blockchain is not ready", {getNextSlot:slots.getNextSlot(),lastSlot:lastSlot,lastBlockHeight:lastBlock.height})
       return res.status(200).json({ success: false, error: "Blockchain is not ready" });
     }
