@@ -919,7 +919,7 @@ Account.prototype.merge = function (address, diff, cb) {
   //     self.get({address: address}, cb);
   //   }
   // }
-  console.log('!!!!!!! merge sqls: ' + JSON.stringify(sqles) );
+  //console.log('!!!!!!! merge sqls: ' + JSON.stringify(sqles) );
   async.series([
     function (next) {
       async.eachSeries(sqles, function (sql, next) {

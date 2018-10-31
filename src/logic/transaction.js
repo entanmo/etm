@@ -541,7 +541,7 @@ Transaction.prototype.applyUnconfirmed = function (trs, sender, requester, cb) {
   if (typeof requester === 'function') {
     cb = requester;
   }
-  console.log("applyUnconfirmed:"+JSON.stringify(trs))
+  //console.log("applyUnconfirmed:"+JSON.stringify(trs))
   if (!__private.types[trs.type]) {
     return setImmediate(cb, "Unknown transaction type " + trs.type);
   }
