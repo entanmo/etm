@@ -154,7 +154,7 @@ module.exports = function init(options) {
 
 
     return {
-        dbFile: program.blockchain || path.join(baseDir, 'blockchain.db'),
+        dbFile: program.blockchain || path.join(baseDir, 'blockchain.1.db'),
         appConfig: appConfig,
         genesisblock: genesisblock,
         logger: logger,

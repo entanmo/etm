@@ -577,7 +577,7 @@ __private._getRandomDelegateList = function (randomDelegateList, truncDelegateLi
 
   for (var k = 0; k < truncDelegateList.length; k++) {
     countVotes += truncDelegateList[k].vote;
-    if (countVotes >= randomNum) {
+    if (countVotes > randomNum) {
       randomIndex = k;
       var randomDelegate = truncDelegateList[k];
       randomDelegate.index = truncDelegateList[k].index;

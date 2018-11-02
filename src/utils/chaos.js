@@ -100,7 +100,7 @@ function chaos(hash, height, limit) {
     var x_chnl_out = x_final[chnl_val - 1];
     x_chnl_out = x_chnl_out * 10000;
     val_out = getResVal(x_chnl_out, limit);
-    return val_out;
+    return val_out - 1;
 }
 
 /* myNewChaosMap */
