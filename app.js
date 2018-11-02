@@ -47,6 +47,7 @@ function verifyGenesisBlock(scope, block) {
   }
 }
 
+
 function main() {
   process.stdin.resume();
 
