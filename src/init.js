@@ -123,7 +123,7 @@ module.exports = function init(options) {
     }
 
     var logger = new Logger({
-        filename: path.join(baseDir, 'logs', 'debug.log'),
+        filename: path.join(baseDir, 'logs', 'etm.log'),
         echo: program.deamon ? null : appConfig.logLevel,
         errorLevel: appConfig.logLevel
     });
@@ -154,7 +154,7 @@ module.exports = function init(options) {
 
 
     return {
-        dbFile: program.blockchain || path.join(baseDir, 'blockchain.1.db'),
+        dbFile: program.blockchain || path.join(baseDir, 'blockchain.db'),
         appConfig: appConfig,
         genesisblock: genesisblock,
         logger: logger,

@@ -384,7 +384,7 @@ Transaction.prototype.verify = function (trs, sender, requester, cb) { //inherit
 
   if (trs.signatures && trs.type !== 7) {
     for (var d = 0; d < trs.signatures.length; d++) {
-      verify = false;
+      var verify = false;
 
       for (var s = 0; s < multisignatures.length; s++) {
         if (trs.requesterPublicKey && multisignatures[s] == trs.requesterPublicKey) {
