@@ -977,7 +977,7 @@ shared.message = function (msg, cb) {
   msg.hash = __private.hashsum(msg.body, msg.timestamp);
 
   self.broadcast({ dappId: msg.dappId }, { api: '/dapp/message', data: msg, method: "POST" });
-
+  library.network.io.sockets.emit("dapps/" + msg.dappId, {});
   cb(null, {});
 }
 
