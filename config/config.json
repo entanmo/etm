@@ -14,7 +14,7 @@
     "blackList": [],
     "options": {
       "timeout": 4000,
-      "pingTimeout":500
+      "pingTimeout": 500
     }
   },
   "forging": {

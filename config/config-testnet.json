@@ -2,7 +2,7 @@
   "port": 4096,
   "address": "0.0.0.0",
   "publicIp": "",
-  "logLevel": "log",
+  "logLevel": "debug",
   "magic": "594fe0f3",
   "api": {
     "access": {
@@ -10,20 +10,15 @@
     }
   },
   "peers": {
-    "list": [
-      {"ip": "45.32.19.241", "port": 4096},
-      {"ip": "45.32.62.184", "port": 4096},
-      {"ip": "45.32.22.78", "port": 4096},
-      {"ip": "45.32.248.33", "port": 4096}
-    ],
+    "list": [],
     "blackList": [],
     "options": {
-      "timeout": 4000
+      "timeout": 4000,
+      "pingTimeout": 500
     }
   },
   "forging": {
-    "secret": [
-    ],
+    "secret": [],
     "access": {
       "whiteList": [
         "127.0.0.1"
