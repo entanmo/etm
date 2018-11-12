@@ -66,7 +66,10 @@ function main() {
     .option('--no-upnp', "Disable unpn feature")
     .option('--no-acquireip', "Disable acquire ip feature")
     .option('--no-checkpriip', "Disable check private ip type")
+    .option("--reportKafka", "Flag - enable to report performance information to kafka")
     .parse(process.argv);
+
+  global.reportKafka = program.reportKafka;
 
   const options = {
     program: program,

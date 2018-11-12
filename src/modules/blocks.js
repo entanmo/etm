@@ -29,6 +29,7 @@ var slots = require('../utils/slots.js');
 var TransactionTypes = require('../utils/transaction-types.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var scheme = require('../scheme/blocks');
+const reportor = require("../utils/kafka-reportor");
 
 require('array.prototype.findindex'); // Old node fix
 
@@ -1053,6 +1054,26 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
 }
 
 Blocks.prototype.processBlock = function (block, votes, broadcast, save, verifyTrs, cb) {
+  const origCallback = cb;
+  const processUptime = reportor.uptime;
+  cb = function (err, ...args) {
+    const reportMsg = {
+      subaction: "process",
+      id: block.id,
+      height: block.height,
+      timestamp: block.timestamp,
+      generator: block.generatorPublicKey,
+      numberOfTransactions: block.numberOfTransactions,
+      duration: reportor.uptime - processUptime
+    }
+    if (err) {
+      reportMsg.error = `${err}`;
+    }
+    reportor.report("blocks", reportMsg);
+
+    origCallback(err, ...args);
+  }
+
   if (!__private.loaded) {
     return setImmediate(cb, "Blockchain is loading");
   }
@@ -1274,6 +1295,7 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
     return setImmediate(cb);
   }
   //console.log("generateBlock enter transactions.length :"+transactions.length)
+  const generateUptime = reportor.uptime;
   async.eachSeries(transactions, function (transaction, next) {
     modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
       if (err || !sender) {
@@ -1305,6 +1327,14 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
         transactions: ready
       });
     } catch (e) {
+      reportor.report("blocks", {
+        subaction: "generate",
+        height: __private.lastBlock.height + 1,
+        generator: keypair.publicKey.toString('hex'),
+        numberOfTransactions: ready.length,
+        duration: reportor.uptime - generateUptime,
+        error: e.message
+      });
       return setImmediate(cb, e);
     }
 
@@ -1357,14 +1387,49 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
             }
 
             library.base.consensus.setPendingBlock(block);
-            library.base.consensus.addPendingVotes(localVotes);
+            const pendingVotes = library.base.consensus.addPendingVotes(localVotes);
             __private.proposeCache[propose.hash] = true;
+            reportor.report("propose", {
+              subaction: "create",
+              id: propose.id,
+              height: propose.height,
+              timestamp: propose.timestamp,
+              destAddress: propose.address,
+              additional: localVotes.signatures.length,
+              total: pendingVotes.signatures.length
+            });
             library.bus.message("newPropose", propose, true);
             return next();
           });
         }
       },
-    ], cb);
+      function (next) {
+        reportor.report("blocks", {
+          subaction: "generate",
+          id: block.id,
+          height: block.height,
+          timestamp: block.timestamp,
+          generator: block.generatorPublicKey,
+          numberOfTransactions: block.numberOfTransactions,
+          duration: reportor.uptime - generateUptime
+        });
+        next();
+      }
+    ], /* cb */ (err, ...args) => {
+      if (err) {
+        reportor.report("blocks", {
+          subaction: "generate",
+          id: block.id,
+          height: block.height,
+          timestamp: block.timestamp,
+          generator: block.generatorPublicKey,
+          numberOfTransactions: block.numberOfTransactions,
+          duration: reportor.uptime - generateUptime,
+          error: err.message
+        });
+      }
+      cb(err, ...args);
+    });
   });
 }
 
@@ -1384,6 +1449,15 @@ Blocks.prototype.onReceiveBlock = function (block, votes) {
   __private.blockCache[block.id] = true;
 
   library.sequence.add(function receiveBlock(cb) {
+    reportor.report("blocks", {
+      subaction: "receive",
+      id: block.id,
+      height: block.height,
+      timestamp: block.timestamp,
+      generator: block.generatorPublicKey,
+      numberOfTransactions: block.numberOfTransactions,
+      timestamp: reportor.timestamp
+    });
     if (block.previousBlock == __private.lastBlock.id && __private.lastBlock.height + 1 == block.height) {
       library.logger.info('Received new block id: ' + block.id + ' height: ' + block.height + ' round: ' + modules.round.calc(modules.blocks.getLastBlock().height) + ' slot: ' + slots.getSlotNumber(block.timestamp) + ' reward: ' + modules.blocks.getLastBlock().reward)
       self.processBlock(block, votes, true, true, true, cb);
@@ -1415,6 +1489,13 @@ Blocks.prototype.onReceivePropose = function (propose) {
   __private.proposeCache[propose.hash] = true;
 
   library.sequence.add(function receivePropose(cb) {
+    reportor.report("propose", {
+      subaction: "receivepropose",
+      id: propose.id,
+      height: propose.height,
+      timestamp: propose.timestamp,
+      destAddress: propose.address
+    });
     if (__private.lastPropose && __private.lastPropose.height == propose.height &&
       __private.lastPropose.generatorPublicKey == propose.generatorPublicKey &&
       __private.lastPropose.id != propose.id) {
@@ -1467,6 +1548,14 @@ Blocks.prototype.onReceivePropose = function (propose) {
         if (activeKeypairs && activeKeypairs.length > 0) {
           var votes = library.base.consensus.createVotes(activeKeypairs, propose);
           library.logger.debug("send votes height " + votes.height + " id " + votes.id + " sigatures " + votes.signatures.length);
+          reportor.report("propose", {
+            subaction: "signatures",
+            id: propose.id,
+            height: propose.height,
+            timestamp: propose.timestamp,
+            destAddress: propose.address,
+            numberOfSignatures: votes.signatures.length
+          });
           modules.transport.sendVotes(votes, propose.address);
           __private.lastVoteTime = Date.now();
           __private.lastPropose = propose;
@@ -1489,6 +1578,14 @@ Blocks.prototype.onReceiveVotes = function (votes) {
   }
   library.sequence.add(function receiveVotes(cb) {
     var totalVotes = library.base.consensus.addPendingVotes(votes);
+    reportor.report("propose", {
+      subaction: "receivevotes",
+      id: votes.id,
+      height: votes.height,
+      timestamp: votes.timestamp,
+      additional: votes.signatures.length,
+      total: totalVotes.signatures.length
+    });
     if (totalVotes && totalVotes.signatures) {
       library.logger.debug("receive new votes, total votes number " + totalVotes.signatures.length);
     }

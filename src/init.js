@@ -31,7 +31,7 @@ module.exports = function init(options) {
         return ;
     }
     
-    var appConfigFile = path.join(baseDir, 'config', 'config.json');
+    var appConfigFile = path.join(baseDir, 'config', 'config-personal.json');
     if (program.config) {
         appConfigFile = path.resolve(process.cwd(), program.config);
     }
@@ -64,7 +64,7 @@ module.exports = function init(options) {
 
     global.Config = appConfig;
 
-    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock.json');
+    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock-personal.json');
     if (program.genesisblock) {
         genesisblockFile = path.resolve(process.cwd(), program.genesisblock);
     }
@@ -129,7 +129,7 @@ module.exports = function init(options) {
 
     var logger = new Logger({
         filename: path.join(baseDir, 'logs', 'etm.log'),
-        echo: program.deamon ? null : appConfig.logLevel,
+        echo: program.daemon ? null : appConfig.logLevel,
         errorLevel: appConfig.logLevel
     });
 

@@ -25,6 +25,7 @@ var TransactionTypes = require('../utils/transaction-types.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js');
 var scheme = require('../scheme/transactions');
+const reportor = require("../utils/kafka-reportor");
 
 const LockVotes = require("../logic/lock_votes");
 const UnlockVotes = require("../logic/unlock_votes");
@@ -967,6 +968,8 @@ shared.addTransactions = function (req, cb) {
   // var t2 = t1;
   // library.logger.debug(`traceT recieveTransaction ${body}at ${ t1 }`);
   // t1 = process.uptime()*1000;
+
+  const addUptime = reportor.uptime;
   library.scheme.validate(body, /*{
     type: "object",
     properties: {
@@ -1140,7 +1143,14 @@ shared.addTransactions = function (req, cb) {
       // t2 = process.uptime()*1000;
       // var interval = t2 - t1;
       // library.logger.debug(`traceT TransactionALLTime ${interval}`);
-
+      reportor.report("transactions", {
+        subaction: "add",
+        trType: TransactionTypes.SEND,
+        id: transaction[0].id,
+        timestamp: transaction[0].timestamp,
+        senderPublicKey: transaction[0].senderPublicKey,
+        duration: reportor.uptime - addUptime
+      });
       cb(null, { transactionId: transaction[0].id });
     });
   });

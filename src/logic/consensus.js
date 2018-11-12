@@ -21,6 +21,8 @@ var ed = require('../utils/ed.js');
 var ip = require('ip');
 var bignum = require('../utils/bignumber');
 var slots = require('../utils/slots.js');
+
+const reportor = require("../utils/kafka-reportor");
 // const PoW = require('./pow');
 let PoW;
 
@@ -164,16 +166,46 @@ Consensus.prototype.pow = function (propose, cb) {
   var hash = this.getProposeHash(propose).toString('hex');
   this.getAddressIndex(propose, (err, target) => {
     if (err) {
+      reportor.report("PoW", {
+        subaction: "index",
+        id: propose.id,
+        height: propose.height,
+        timestamp: propose.timestamp,
+        hash: hash,
+        error: `get target index error(${err})`
+      });
       return cb(err);
     }
     
+    const powUptime = reportor.uptime;
     const timer = Date.now();
     function onError(uuid, data) {
+      reportor.report("PoW", {
+        subaction: "calc",
+        id: propose.id,
+        height: propose.height,
+        timestamp: propose.timestamp,
+        hash: hash,
+        target: target,
+        duration: reportor.uptime - powUptime,
+        error: data && data.reason
+      });
       global.library.logger.log(`pow - error(${data.reason})`)
-      cb(data.reason);
+      cb(data && data.reason);
     }
 
     function onPoW(uuid, data) {
+      reportor.report("PoW", {
+        subaction: "calc",
+        id: propose.id,
+        height: propose.height,
+        timestamp: propose.timestamp,
+        hash: hash,
+        target: target,
+        pow: data.hash,
+        nonce: data.nonce,
+        duration: reportor.uptime - powUptime
+      });
       const duration = Date.now() - timer;
       global.library.logger.log(`pow - success hash(${data.hash}), nonce(${data.nonce}), duration(${duration / 1000.0}sec)`);
       cb(null, {
@@ -183,6 +215,16 @@ Consensus.prototype.pow = function (propose, cb) {
     }
 
     function onTimeout(uuid, data) {
+      reportor.report("PoW", {
+        subaction: "calc",
+        id: propose.id,
+        height: propose.height,
+        timestamp: propose.timestamp,
+        hash: hash,
+        target: target,
+        duration: reportor.uptime - powUptime,
+        timeout: data.desc
+      });
       global.library.logger.log(`pow - timeout ${data.desc}`);
       cb(new Error('Error: Timeout'));
     }

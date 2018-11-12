@@ -29,6 +29,8 @@ var shell = require('../utils/shell.js');
 var scheme = require('../scheme/transport');
 var ByteBuffer = require("bytebuffer");
 
+const reportor = require("../utils/kafka-reportor");
+
 // Private fields
 var modules, library, self, __private = {}, shared = {};
 
@@ -449,6 +451,7 @@ __private.attachApi = function () {
       return res.status(200).json({ success: false, error: "Already processed transaction" + transaction.id });
     }
 
+    const receiveUptime = reportor.uptime;
     library.balancesSequence.add(function (cb) {
       if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
         return cb('Already exists');
@@ -456,6 +459,18 @@ __private.attachApi = function () {
       library.logger.log('Received transaction ' + transaction.id + ' from peer ' + peerStr);
       modules.transactions.receiveTransactions([transaction], cb);
     }, function (err, transactions) {
+      let reportMsg = {
+        subaction: "receive",
+        trType: transactions[0].type,
+        id:transactions[0].id,
+        timestamp: transactions[0].timestamp,
+        senderPublicKey: transactions[0].senderPublicKey,
+        duration: reportor.uptime - receiveUptime
+      };
+      if (err) {
+        reportMsg.error = err.message;
+      }
+      reportor.report("transactions", reportMsg);
       if (err) {
         library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
         __private.invalidTrsCache.set(transaction.id, true)
