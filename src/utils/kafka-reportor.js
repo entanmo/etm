@@ -54,6 +54,9 @@ class KafkaReportor extends EventEmitter {
 
         // listen logged event on kafkaStreamTransport
         this._kafkaStream.on("logged", this._onLoggedEvent.bind(this));
+
+        // listen nodejs runtime exceptions include (error, uncaughtException, unhandledRejection)
+        this._onSystemEvents();
     }
 
     /**
@@ -164,6 +167,52 @@ class KafkaReportor extends EventEmitter {
      */
     _onLoggedEvent(payload) {
         this.emit("logged", payload);
+    }
+
+    /**
+     * Report nodejs system exception events includes 'error', 'uncaughtException', 'unhandledRejection'
+     * 
+     */
+    _onSystemEvents() {
+        process.on("error", err => {
+            this.report("nodejs", {
+                subaction: "error",
+                data: {
+                    message: err.message,
+                    stack: err.stack
+                }
+            });
+        });
+
+        process.on("uncaughtException", err => {
+            this.report("nodejs", {
+                subaction: "uncaughtException",
+                data: {
+                    message: err.message,
+                    stack: err.stack
+                }
+            });
+        });
+
+        process.on("unhandledRejection", (reason, p) => {
+            void (p);
+            if (reason instanceof Error) {
+                this.report("nodejs", {
+                    subaction: "unhandledRejection",
+                    data: {
+                        message: reason.message,
+                        stack: reason.stack
+                    }
+                });
+            } else {
+                this.report("nodejs", {
+                    subaction: "unhandledRejection",
+                    data: {
+                        message: reason == null ? "unknown unhandledRejection" : reason.toString()
+                    }
+                });
+            }
+        });
     }
 }
 

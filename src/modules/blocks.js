@@ -258,12 +258,26 @@ __private.saveGenesisBlock = function (cb) {
             if (rollbackErr) {
               library.logger.error("Failed to rollback savegenesisblock: " + rollBackErr);
             }
+            reportor.report("nodejs", {
+              subaction: "exit",
+              data: {
+                method: "saveGenesisBlock",
+                reason: "Failed to rollback savegenesisblock: " + (rollbackErr ? rollbackErr.toString() : "")
+              }
+            });
             process.exit(1);
           });
         } else {
           library.dbLite.query("RELEASE SAVEPOINT savegenesisblock", function (releaseErr) {
             if (releaseErr) {
               library.logger.error("Failed to commit genesis block: " + releaseErr);
+              reportor.report("nodejs", {
+                subaction: "exit",
+                data: {
+                  method: "saveGenesisBlock",
+                  reason: "Failed to commit genesis block: " + releaseErr
+                }
+              });
               process.exit(1);
             } else {
               cb();
@@ -901,6 +915,13 @@ Blocks.prototype.verifyBlockVotes = function (block, votes, cb) {
   modules.delegates.generateDelegateList(block.height, function (err, delegatesList) {
     if (err) {
       library.logger.error("Failed to get delegate list while verifying block votes");
+      reportor.report("nodejs", {
+        subaction: "exit",
+        data: {
+          method: "verifyBlockVotes",
+          reason: "Failed to get delegate list while verifying block votes"
+        }
+      });
       process.exit(-1);
       return;
     }
@@ -934,6 +955,13 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
         library.dbLite.query('ROLLBACK TO SAVEPOINT applyblock', function (rollbackErr) {
           if (rollbackErr) {
             library.logger.error('Failed to rollback to savepoint applyblock: ' + rollbackErr)
+            reportor.report("nodejs", {
+              subaction: "exit",
+              data: {
+                method: "applyBlock",
+                reason: "Failed to rollback to savepoint applyblock: " + rollbackErr
+              }
+            });
             process.exit(1)
             return
           }
@@ -945,6 +973,13 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
           __private.isActive = false;
           if (releaseErr) {
             library.logger.error('Failed to commit savepoint applyblock: ' + releaseErr)
+            reportor.report("nodejs", {
+              subaction: "exit",
+              data: {
+                method: "applyBlock",
+                reason: "Failed to commit savepoint applyblock: " + releaseErr
+              }
+            });
             process.exit(1)
             return
           } else {
@@ -1017,6 +1052,13 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
         __private.saveBlock(block, function (err) {
           if (err) {
             library.logger.error("Failed to save block: " + err);
+            reportor.report("nodejs", {
+              subaction: "exit",
+              data: {
+                method: "applyBlock",
+                reason: "Failed to save block: " + err
+              }
+            });
             process.exit(1);
             return;
           }
@@ -1034,6 +1076,13 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
     modules.transactions.undoUnconfirmedList(function (err) {
       if (err) {
         library.logger.error('Failed to undo uncomfirmed transactions', err);
+        reportor.report("nodejs", {
+          subaction: "exit",
+          data: {
+            method: "applyBlock",
+            reason: "Failed to undo unconfirmed transactions " + err
+          }
+        });
         return process.exit(0);
       }
       library.oneoff.clear()

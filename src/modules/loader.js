@@ -21,6 +21,7 @@ var Router = require('../utils/router.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var slots = require('../utils/slots.js');
 var scheme = require('../scheme/loader');
+const reportor = require("../utils/kafka-reportor");
 
 require('colors');
 
@@ -114,6 +115,13 @@ __private.findUpdate = function (lastBlock, peer, cb) {
     modules.transactions.undoUnconfirmedList(function (err) {
       if (err) {
         library.logger.error('Failed to undo uncomfirmed transactions', err);
+        reportor.report("nodejs", {
+          subaction: "exit",
+          data: {
+            method: "findUpdate",
+            reason: "Failed to undo unconfirmed transactions " + err.toString(),
+          }
+        });
         return process.exit(0);
       }
 
@@ -157,6 +165,13 @@ __private.findUpdate = function (lastBlock, peer, cb) {
         ], function (err) {
           if (err) {
             library.logger.error("Failed to rollback blocks before " + commonBlock.height, err);
+            reportor.report("nodejs", {
+              subaction: "exit",
+              data: {
+                method: "findUpdate",
+                reason: "Failed to rollback blocks before " + commonBlock.height + ", err: " + err.toString()
+              }
+            });
             process.exit(1);
             return;
           }
@@ -528,6 +543,13 @@ Loader.prototype.onBind = function (scope) {
   __private.loadBlockChain(function (err) {
     if (err) {
       library.logger.error('Failed to load blockchain', err)
+      reportor.report("nodejs", {
+        subaction: "exit",
+        data: {
+          method: "onBind",
+          reason: "Failed to load blockchain " + err.toString()
+        }
+      });
       return process.exit(1)
     }
     library.bus.message('blockchainReady');

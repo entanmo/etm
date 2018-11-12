@@ -31,7 +31,7 @@ module.exports = function init(options) {
         return ;
     }
     
-    var appConfigFile = path.join(baseDir, 'config', 'config-personal.json');
+    var appConfigFile = path.join(baseDir, 'config', 'config.json');
     if (program.config) {
         appConfigFile = path.resolve(process.cwd(), program.config);
     }
@@ -64,7 +64,7 @@ module.exports = function init(options) {
 
     global.Config = appConfig;
 
-    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock-personal.json');
+    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock.json');
     if (program.genesisblock) {
         genesisblockFile = path.resolve(process.cwd(), program.genesisblock);
     }

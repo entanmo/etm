@@ -19,6 +19,7 @@ var slots = require('../utils/slots.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var constants = require('../utils/constants.js');
 var ethos = require('../utils/ethos-mine.js');
+const reportor = require("../utils/kafka-reportor");
 
 // Private fields
 var modules, library, self, __private = {}, shared = {};
@@ -179,6 +180,17 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
       prevRound: prevRound,
       block: block,
       previousBlock: previousBlock
+    });
+    reportor.report("nodejs", {
+      subaction: "exit",
+      data: {
+        method: "backwardTick",
+        reason: "unexpected roll back cross round",
+        round: round,
+        prevRound: prevRound,
+        block: block,
+        previousBlock: previousBlock
+      }
     });
     process.exit(1);
     // FIXME process the cross round rollback
