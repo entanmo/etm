@@ -102,10 +102,11 @@ class dblite {
             let sta=  this.db.prepare(sql)
             if(sta.returnsData){
                 ret.result = sta.all(params || [])
+                if(fields){
                 ret.result= Array.isArray(fields) ?
                         ret.result.map(this.row2object, fields) :
                         ret.result.map(this.row2parsed, fields)    
-
+                }
             }else{
                 const r = sta.run(params || []);
                 ret.result = {
