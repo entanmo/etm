@@ -1484,7 +1484,7 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
               timestamp: propose.timestamp,
               destAddress: propose.address,
               additional: localVotes.signatures.length,
-              total: pendingVotes.signatures.length
+              total: pendingVotes ? pendingVotes.signatures.length : 0
             });
             library.bus.message("newPropose", propose, true);
             return next();
