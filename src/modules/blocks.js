@@ -1672,7 +1672,7 @@ Blocks.prototype.onReceiveVotes = function (votes) {
       height: votes.height,
       timestamp: votes.timestamp,
       additional: votes.signatures.length,
-      total: totalVotes.signatures.length
+      total: totalVotes ? totalVotes.signatures.length : 0
     });
     if (totalVotes && totalVotes.signatures) {
       library.logger.debug("receive new votes, total votes number " + totalVotes.signatures.length);
