@@ -639,8 +639,7 @@ Account.prototype.getAll = function (filter, fields, cb) {
       realConv[key] = this.conv[key];
     }
   }.bind(this));
-  //console.log('fields'+JSON.stringify(fields));
- // console.log("filter"+JSON.stringify(filter));
+
   var limit, offset, sort;
 
   if (filter.limit > 0) {
@@ -741,6 +740,7 @@ Account.prototype.create = function (address, fields, cb) {
 }
 Account.prototype.merge = function (address, diff, cb) {
   var update = {}, remove = {}, insert = {}, insert_object = {}, remove_object = {}, round = [];
+  //console.log('!!!!!!! merge diff : ' + "--- "+ JSON.stringify(diff));
 
   var self = this;
 
@@ -919,7 +919,7 @@ Account.prototype.merge = function (address, diff, cb) {
   //     self.get({address: address}, cb);
   //   }
   // }
-  //console.log('!!!!!!! merge sqls: ' + JSON.stringify(sqles) );
+
   async.series([
     function (next) {
       async.eachSeries(sqles, function (sql, next) {

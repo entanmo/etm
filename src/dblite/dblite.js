@@ -14,11 +14,7 @@
 
 'use strict';
 const Database = require('better-sqlite3');
-const util = require('util');
-const dbutil = require('./dbutil');
 const LRU = require("lru-cache");
-const SELECT = /^(?:select|SELECT|pragma|PRAGMA) /;
-const ONLYSELECT = /^(?:select|SELECT) /;
 const HAS_PARAMS = /(?:\?|(?:(?:\:|\@|\$)[a-zA-Z_0-9$]+))/;
 const mp = new LRU(50000);
 class dblite {
@@ -28,35 +24,13 @@ class dblite {
      this.log = console.log.bind(console)
      this.cache =  new LRU(50000);
     }
-    open(dbstr, cb) {
-        let ret = {
-            err: null,
-            result: !0
-        };
-        try {
-            this.db = new Database(dbstr), this.log.traceEnabled && this.log.trace(`SUCCESS open ( db = ${dbstr} )`)
-        } catch (e) {
-            if (ret = {
-                    err: e,
-                    result: !1
-                }, this.log.errorEnaled && this.log.error(`FAILD open ( db = ${dbstr} )`, e), !cb)
-                throw e
-        }
-        return cb && cb(ret.err, ret.result), ret.result //?? cb
-    }
-    get isConnected() {
-        return this.db.open
-    }
-    async asynOpen(dbstr) {
-        return util.promisify(this.open).call(this, dbstr)
-    }
     close(cb) {
         let t = {
             err: null,
             result: !0
         };
         try {
-            this.db && this.isConnected ? (this.db.close(), this.log.traceEnabled && this.log.trace("SUCCESS close")) : this.log.infoEnabled && this.log.info("closed already")
+           if( this.db ){this.db.close()}
           //  console.log("==============================="+mp.itemCount)
             // mp.forEach(function (val, key, cache) {
             //     console.log("="+key)
@@ -66,35 +40,11 @@ class dblite {
             if (t = {
                     err: i,
                     result: !1
-                }, this.log.errorEnaled && this.log.error("FAILD close", i), !e) throw i
+                }) throw i
         }
         return cb && cb(t.err, t.result), t.result
     }
-    asynClose() {
-        return util.promisify(this.close).call(this)
-    }
-    execute(e, t, i) {
-        let s = {
-            err: null,
-            result: {
-                lastInsertRowId: "0",
-                rowsEffected: 0
-            }
-        };
-        try {
-           // console.log(e);
-          // var row = this.db.prepare('select sum(payloadLength) from blocks').all();
-         //   console.log(row);
-            const r = this.db.prepare(e).run(t || []);
-            s.result = {
-                lastInsertRowId: r.lastInsertROWID.toString(),
-                rowsEffected: r.changes//this.log.traceEnabled && this.log.errorEnaled &&
-            },  this.log.traceEnabled && this.log.trace(`SUCCESS execute sql = ${e} param = ${JSON.stringify(t)}, effected = ${s.result.rowsEffected}`)
-        } catch (r) {
-            if (s.err = r,  this.log.errorEnaled && this.log.error(`FAILD execute sql = ${e} param = ${JSON.stringify(t)}`, r), !i) throw r
-        }
-        return i && i(s.err, s.result), s.result
-    }
+
     /**@param sql 
      * @param params 
      * @param fields 
@@ -106,85 +56,57 @@ class dblite {
         let cb= null;
         sql = arguments[0]
         if(arguments.length>=2){
-            cb = arguments[arguments.length-1];
+            if(typeof arguments[arguments.length-1] == 'function'){
+                cb = arguments[arguments.length-1];
+            }
         }
         let ret = {
             err: null,
             result: new Array
         };
-        // for(var i=0;i<arguments.length-1;i++){
-        //     console.log("arguments---"+JSON.stringify(arguments[i]))
-        // }
         switch(arguments.length){
             case 1:
             case 2:
-                // if(sql.toLowerCase().trim().startsWith('select')){
-                //     let sta=  this.db.prepare(sql)
-                //     ret.result = sta.all(params || [])
-                //     console.log("alert---!!!!!!!!!!!!!!!--- select no fields======"+sql)
-                // }else{
-                //    // this.db.exec(sql)
-                //   //  console.log("exec         ---sql---"+sql)
-
-                // }
+                if(HAS_PARAMS.test(sql)){
+                    params = arguments[1];
+                }
                 let sta=  this.db.prepare(sql)
                 if(sta.returnsData){
-                   // console.log("exec         ---all---"+sql)
                     ret.result = sta.all(params || [])
                 }else{
-                    //console.log("exec         ---run---"+sql)
                     const r = sta.run(params || []);
                     ret.result = {
                         lastInsertRowId: r.lastInsertROWID.toString(),
                         rowsEffected: r.changes
                      }
                 }
-                cb && cb(ret.err, ret.result)//, ret.result
+                cb && cb(ret.err, ret.result)
                 return this
             case 3:
                 if(HAS_PARAMS.test(sql)){
                     params = arguments[1];
-                   // console.log("exec sql with ---params---"+sql + JSON.stringify(params))
                 }else{
                     fields = arguments[1];
-                   // console.log("exec sql with--- fields---"+sql + '---fields ---'+ JSON.stringify(fields))
                 }
             break
             case 4:
                 params = arguments[1];
                 fields = arguments[2];
-               // console.log("exec sql with--- all---"+sql + '--params --'+  JSON.stringify( params) +'---fields ---'+ JSON.stringify(fields))
             break;
         }
-       // var agrs =  Array.prototype.slice.call(arguments,1);
 		var p_callback  = cb;
 		var query = sql
         var str =	query + JSON.stringify(params);
-		// if(ONLYSELECT.test(query) && typeof p_callback == 'function'){
-		// 		if(mp.has(str)){
-        //             ret.result =  mp.get(str)
-        //             return cb && cb(ret.err, ret.result), ret.result
-		// 		}
-		//  }
+
         try {
             let sta=  this.db.prepare(sql)
             if(sta.returnsData){
                 ret.result = sta.all(params || [])
-               // console.log(ret.result.map(this.row2string))
                 ret.result= Array.isArray(fields) ?
                         ret.result.map(this.row2object, fields) :
                         ret.result.map(this.row2parsed, fields)    
-                   
-                // if(!mp.has(str)&& ret.result != null){
-                //     mp.set(str,1)
-                // }else{
-                //     mp.set(str,mp.get(str)+1)
-                // }
-                // if(!mp.has(str)&& ret.result != null){
-                //     mp.set(str,ret.result)
-                // }
+
             }else{
-                //console.log("exec         ---sql---"+sql)
                 const r = sta.run(params || []);
                 ret.result = {
                     lastInsertRowId: r.lastInsertROWID.toString(),
@@ -202,16 +124,17 @@ class dblite {
                 , !cb)
                     throw e
         }
-         // console.log("result ---"+JSON.stringify(ret.result))
          cb && cb(ret.err, ret.result)
-         return this //, ret.result
+         return this 
     }
     plain() {
         let sql = null,params = null,fields = null
         let cb= null;
         sql = arguments[0]
         if(arguments.length>=2){
-            cb = arguments[arguments.length-1];
+            if(typeof arguments[arguments.length-1] == 'function'){
+                cb = arguments[arguments.length-1];
+            }
         }
         let ret = {
             err: null,
@@ -220,6 +143,9 @@ class dblite {
         switch(arguments.length){
             case 1:
             case 2:
+                if(HAS_PARAMS.test(sql)){
+                    params = arguments[1];
+                }
                 let sta=  this.db.prepare(sql)
                 if(sta.returnsData){
                     ret.result = sta.all(params || [])
@@ -269,32 +195,7 @@ class dblite {
          cb && cb(ret.err, ret.result)
          return this 
     }
-    executeBatch(e, t, i) {
-        let s, r = {
-            err: null,
-            result: new Array
-        };
-        try {
-            e.forEach(e => {
-                s = e;
-                let i = this.execute(e.query, e.parameters);
-                t && t(i, e), r.result.push(i)
-            })
-        } catch (e) {
-            if (r.err = e, this.log.errorEnaled && this.log.error(`FAILD executeBatch, sql = ${s.query} param = ${JSON.stringify(s.parameters)}`, e), !i) throw e
-        }
-        return i && i(r.err, r.result), r.result
-    }
-    async asynExecute(e, t) {
-        return s.promisify(this.execute).call(this, e, t)
-    }
-    async asynQuery(e, t) {
-        return s.promisify(this.query).call(this, e, t)
-    }
-    asyncExecuteBatch(e, t) {
-        return s.promisify(this.executeBatch).call(this, e, t)
-    }
-
+   
     row2string(row) {
          for (var
                   out = [],
@@ -307,17 +208,14 @@ class dblite {
          return out;
      }
     row2object(row) {
-        // console.log("row2object ===="+row)
          for (var
                   out = {},
                   length = this.length,
                   values = Object.values(row),
                   i = 0; i < length; i++
          ) {
-             //var val = values[i][1];
              out[this[i]] = values[i];
          }
-        // console.log("row2object out ===="+out)
          return out;
      }
       row2parsed(row) {
@@ -326,13 +224,9 @@ class dblite {
                  fields = Object.keys(this),
                  values = Object.values(row),
                  length = fields.length
-          // console.log("row2parsed.fields.length  ===="+fields.length  +"row2parsed.values.length ===="+values.length);
-          // console.log("row2parsed.fields ===="+JSON.stringify(fields))
-         //  console.log("row2parsed.row.values ===="+JSON.stringify(values))
            for( var i = 0; i < length; i++) {
              var parsers =  this[fields[i]];
-            // console.log("row2parsed.parsers ===="+parsers)
-            // console.log("row2parsed.val ===="+JSON.stringify(values[i]))
+
              var val = values[i]
              if (parsers === Buffer) {
                  out[fields[i]] = parsers(val, 'hex');
@@ -352,7 +246,6 @@ class dblite {
                  out[fields[i]] = parsers(val);
              }
          }
-        // console.log("row2parsed out ===="+JSON.stringify(out))
          return out;
      }
 }

@@ -380,7 +380,7 @@ Accounts.prototype.getAccounts = function (filter, fields, cb) {
 }
 
 Accounts.prototype.setAccountAndGet = function (data, cb) {
-  //library.logger.debug('setAccountAndGet data is:',data)
+  //library.logger.debug('setAccountAndGet data is:',JSON.stringify(data))
   var address = data.address || null;
   if (address === null) {
     if (data.publicKey) {
@@ -397,22 +397,6 @@ Accounts.prototype.setAccountAndGet = function (data, cb) {
   if (!address) {
     return cb("Invalid public key");
   }
-  //  library.base.account.get({ address: address }, function (err,rows) {
-  //     if (err) {
-  //       return cb(err);
-  //     }
-  //     console.log("^^^^^^^^^^^"+JSON.stringify(rows))
-  //     if(rows == null){
-  //       library.base.account.set(address, data, function (err) {
-  //         if (err) {
-  //           return cb(err);
-  //         }
-  //         library.base.account.get({ address: address }, cb);
-  //       });
-  //     }else{
-  //       cb(null,rows);
-  //     }
-  //   });
   library.base.account.set(address, data, function (err) {
     if (err) {
       return cb(err);
@@ -420,8 +404,52 @@ Accounts.prototype.setAccountAndGet = function (data, cb) {
      library.base.account.get({ address: address }, cb);
   });
 }
-Accounts.prototype.getAccountOnly = function (data, cb) {
-  //library.logger.debug('setAccountAndGet data is:',data)
+Accounts.prototype.loadSenderOrUpdate = function (param, cb) {
+  if(!param.publicKey ){
+    return cb("Failed to loadSenderOrUpdate ,there is no publickey")
+   }
+  modules.accounts.loadAccount(param,function(err,data){
+    if(err){
+      cb(err)
+    }else{
+      if(data){
+        if(data.publicKey ){
+        // console.log(JSON.stringify(data.address))
+        cb(err,data)
+        }else{
+          data["publicKey"] = param.publicKey
+          library.base.account.set(data.address, { publicKey: param.publicKey }, function (err) {
+            if (err) {
+              return  setImmediate(cb, "Failed to set account publickey: " + err);
+            }
+            cb(err,data)
+          });
+        }
+      }else{
+        cb("loadAccount : can not found Account",data)
+      }
+    }
+    }
+ )
+}
+Accounts.prototype.loadOrCreate = function (param, cb) {
+  if(!param.address ){
+    return cb("Failed to loadOrCreate ,there is no address")
+   }
+  modules.accounts.loadAccount(param,function(err,data){
+    if(err){
+      cb(err)
+    }else{
+      if(data){
+        cb(null,data)
+      }else{
+        library.base.account.create(param.address,param,cb);
+      }
+    }
+    }
+ )
+}
+Accounts.prototype.loadAccount = function (data, cb) {
   var address = data.address || null;
   if (address === null) {
     if (data.publicKey) {
@@ -431,8 +459,8 @@ Accounts.prototype.getAccountOnly = function (data, cb) {
       }
       delete data.isGenesis;
     } else {
-      library.logger.debug('setAccountAndGet error and data is:',data)
-      return cb("Missing address or public key in setAccountAndGet");
+      library.logger.debug('LoadAccount error and data is:',data)
+      return cb("Missing address or public key in LoadAccount");
     }
   }
   if (!address) {
@@ -441,6 +469,7 @@ Accounts.prototype.getAccountOnly = function (data, cb) {
   library.base.account.get({ address: address }, cb);
 }
 Accounts.prototype.mergeAccountAndGet = function (data, cb) {
+  //console.log("mergeAccountAndGet obj : ----"+JSON.stringify(data))
   var address = data.address || null;
   if (address === null) {
     if (data.publicKey) {

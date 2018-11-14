@@ -1009,8 +1009,11 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
     async.eachSeries(sortedTrs, function (transaction, nextTr) {
       async.waterfall([
         function (next) {
-          modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey, isGenesis: block.height == 1 }, next);
-         // library.base.account.get({ address: transaction.senderId}, next)
+          if(block.height == 1){
+            modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey, isGenesis: block.height == 1 }, next);
+          }else{
+            modules.accounts.loadSenderOrUpdate({ publicKey: transaction.senderPublicKey, isGenesis: block.height == 1 }, next);
+          }
         },
         function (sender, next) {
           // if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
@@ -1152,39 +1155,64 @@ Blocks.prototype.processBlock = function (block, votes, broadcast, save, verifyT
           return setImmediate(cb, "Can't verify slot: " + err);
         }
         library.logger.debug("verify block slot ok");
+
+        async.waterfall([
+          function(next) {
+            const idList = block.transactions.map(t => t.id)
+            library.dbLite.query("select id from trs where id in ($id)",
+            {
+              id: idList.toString()
+            },
+            function (err, rows) {
+              if (err) {
+                next("Failed to query transaction from db: " + err);
+              } else if (rows.length > 0) {
+                rows.forEach(t=>{
+                  modules.transactions.removeUnconfirmedTransaction(t.id);
+                })
+                next("Transactions already exists: " + rows.length);
+              }
+              next(null, "");
+            }
+          );
+        }
+      ], function (err, result) {
+        if (err) {
+          return setImmediate(cb, "Failed to verify transaction: " + err);
+        }
+
         async.eachSeries(block.transactions, function (transaction, next) {
           async.waterfall([
             function (next) {
-              modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, next)
-              //library.base.account.getAccountOnly({ publicKey: transaction.senderPublicKey}, next)
+              modules.accounts.loadSenderOrUpdate({ publicKey: transaction.senderPublicKey }, next)
             },
-            function (sender, next) {
-              try {
-                transaction.id = library.base.transaction.getId(transaction);
-              } catch (e) {
-                return next(e.toString());
-              }
-              transaction.blockId = block.id;
-
-              // library.dbLite.query("SELECT id FROM trs WHERE id=$id; SELECT id FROM trs WHERE (senderId=$address and timestamp=$timestamp) limit 1;",
-              library.dbLite.query("SELECT id FROM trs WHERE id=$id",
-                {
-                  id: transaction.id,
-                  // address: sender.address,
-                  // timestamp: transaction.timestamp
-                },
-                function (err, rows) {
-                  if (err) {
-                    next("Failed to query transaction from db: " + err);
-                  } else if (rows.length > 0) {
-                    modules.transactions.removeUnconfirmedTransaction(transaction.id);
-                    next("Transaction already exists: " + transaction.id);
-                  } else {
-                    next(null, sender);
-                  }
-                }
-              );
-            },
+            // function (sender, next) {
+            //   try {
+            //     transaction.id = library.base.transaction.getId(transaction);
+            //   } catch (e) {
+            //     return next(e.toString());
+            //   }
+            //   transaction.blockId = block.id;
+              
+            //   // library.dbLite.query("SELECT id FROM trs WHERE id=$id; SELECT id FROM trs WHERE (senderId=$address and timestamp=$timestamp) limit 1;",
+            //   library.dbLite.query("SELECT id FROM trs WHERE id=$id",
+            //     {
+            //       id: transaction.id,
+            //       // address: sender.address,
+            //       // timestamp: transaction.timestamp
+            //     },
+            //     function (err, rows) {
+            //       if (err) {
+            //         next("Failed to query transaction from db: " + err);
+            //       } else if (rows.length > 0) {
+            //         modules.transactions.removeUnconfirmedTransaction(transaction.id);
+            //         next("Transaction already exists: " + transaction.id);
+            //       } else {
+            //         next(null, sender);
+            //       }
+            //     }
+            //   );
+            // },
             function (sender, next) {
               if (verifyTrs) {
                 library.base.transaction.verify(transaction, sender, next);
@@ -1200,6 +1228,7 @@ Blocks.prototype.processBlock = function (block, votes, broadcast, save, verifyT
           library.logger.debug("verify block transactions ok");
           self.applyBlock(block, votes, broadcast, save, cb);
         });
+      });
       });
     });
   });
@@ -1346,25 +1375,27 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
   //console.log("generateBlock enter transactions.length :"+transactions.length)
   const generateUptime = reportor.uptime;
   async.eachSeries(transactions, function (transaction, next) {
-    modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
-      if (err || !sender) {
-        return next("Invalid sender");
-      }
+    // modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
+    //   if (err || !sender) {
+    //     return next("Invalid sender");
+    //   }
 
-      if (library.base.transaction.ready(transaction, sender)) {
-        library.base.transaction.verify(transaction, sender, function (err) {
-          if (err) {
-            library.logger.error("Failed to verify transaction " + transaction.id, err);
-            modules.transactions.removeUnconfirmedTransaction(transaction.id);
-          } else {
-            ready.push(transaction);
-          }
-          next();
-        });
-      } else {
-        next();
-      }
-    });
+    //   if (library.base.transaction.ready(transaction, sender)) {
+    //     library.base.transaction.verify(transaction, sender, function (err) {
+    //       if (err) {
+    //         library.logger.error("Failed to verify transaction " + transaction.id, err);
+    //         modules.transactions.removeUnconfirmedTransaction(transaction.id);
+    //       } else {
+    //         ready.push(transaction);
+    //       }
+    //       next();
+    //     });
+    //   } else {
+    //     next();
+    //   }
+    // });
+    ready.push(transaction);
+    next();
   }, function () {
     library.logger.debug("All unconfirmed transactions ready");
     var block;
@@ -1390,13 +1421,21 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
     library.logger.info("Generate new block at height " + (__private.lastBlock.height + 1));
     async.waterfall([
       function (next) {
-        self.verifyBlock(block, null, function (err) {
-          if (err) {
-            next("Can't verify generated block: " + err);
-          } else {
-            next();
-          }
-        });
+        // self.verifyBlock(block, null, function (err) {
+        //   if (err) {
+        //     next("Can't verify generated block: " + err);
+        //   } else {
+        //     next();
+        //   }
+        // });
+        try {
+          block.id = library.base.block.getId(block);
+        } catch (e) {
+          next("Can't verify generated block: " + e.toString());
+        }
+      
+        block.height = __private.lastBlock.height + 1;
+        next();
       },
       function (next) {
         modules.delegates.getActiveDelegateKeypairs(block.height, function (err, activeKeypairs) {

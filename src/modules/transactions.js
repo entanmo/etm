@@ -82,11 +82,10 @@ function Transfer() {
   }
 
   this.apply = function (trs, block, sender, cb) {
-     modules.accounts.setAccountAndGet({ address: trs.recipientId }, function (err, recipient) {
-    // library.base.account.get({ address: trs.recipientId }, function (err, recipient) {
-      if (err) {
-        return cb(err);
-      }
+    modules.accounts.loadOrCreate({ address: trs.recipientId }, function (err, recipient) {
+     if (err) {
+       return cb(err);
+     }
 
       modules.accounts.mergeAccountAndGet({
         address: trs.recipientId,
@@ -102,7 +101,6 @@ function Transfer() {
 
   this.undo = function (trs, block, sender, cb) {
     modules.accounts.setAccountAndGet({ address: trs.recipientId }, function (err, recipient) {
-    //  library.base.account.get({ address: trs.recipientId }, function (err, recipient) {  
       if (err) {
         return cb(err);
       }
@@ -624,8 +622,7 @@ Transactions.prototype.processUnconfirmedTransaction = function (transaction, br
   }
 
   //library.logger.debug('------------before setAccountAndGet', JSON.stringify(transaction))
-  modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, function (err, sender) {
-   // library.base.account.get({ address: transaction.recipientId },function (err, sender) {
+  modules.accounts.loadSenderOrUpdate({ publicKey: transaction.senderPublicKey }, function (err, sender) {
     function done(err) {
       if (err) {
         return cb(err);
@@ -678,8 +675,7 @@ Transactions.prototype.processUnconfirmedTransaction = function (transaction, br
 Transactions.prototype.applyUnconfirmedList = function (ids, cb) {
   async.eachSeries(ids, function (id, cb) {
     var transaction = self.getUnconfirmedTransaction(id);
-   // modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, function (err, sender) {
-    library.base.account.get({ address: transaction.recipientId },function (err, sender) {
+    modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, function (err, sender) {
    if (err) {
         self.removeUnconfirmedTransaction(id);
         return setImmediate(cb);
@@ -964,11 +960,6 @@ shared.getUnconfirmedTransactions = function (req, cb) {
 
 shared.addTransactions = function (req, cb) {
   var body = req.body;
-  // var t1 = new Date().toISOString().replace(/T/, ' ').replace(/Z/, ' ');
-  // var t2 = t1;
-  // library.logger.debug(`traceT recieveTransaction ${body}at ${ t1 }`);
-  // t1 = process.uptime()*1000;
-
   const addUptime = reportor.uptime;
   library.scheme.validate(body, /*{
     type: "object",
@@ -1127,9 +1118,7 @@ shared.addTransactions = function (req, cb) {
             } catch (e) {
               return cb(e.toString());
             }
-            // var t0 = new Date().toISOString().replace(/T/, ' ').replace(/Z/, ' ');
-            // library.logger.debug(`traceT doTransaction ${transaction.recipientId} ${transaction.amount} at ${ t0 }`);
-           
+
             modules.transactions.receiveTransactions([transaction], cb);
           });
         }
@@ -1138,11 +1127,6 @@ shared.addTransactions = function (req, cb) {
       if (err) {
         return cb(err.toString());
       }
-      // var t02 = new Date().toISOString().replace(/T/, ' ').replace(/Z/, ' ');
-      // library.logger.debug(`traceT doneTransaction ${transaction[0].recipientId} ${transaction[0].amount} at ${ t02 }`);
-      // t2 = process.uptime()*1000;
-      // var interval = t2 - t1;
-      // library.logger.debug(`traceT TransactionALLTime ${interval}`);
       reportor.report("transactions", {
         subaction: "add",
         trType: TransactionTypes.SEND,
