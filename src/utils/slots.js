@@ -22,7 +22,7 @@
 
 function beginEpochTime() {
   // var d = new Date(Date.UTC(2016, 5, 27, 20, 0, 0, 0));
-  var d = new Date(Date.UTC(2018, 7, 24, 2, 0, 0, 0));//月份从0开始，小时相隔8
+  var d = new Date(Date.UTC(2018, 9, 12, 12, 0, 0, 0));//月份从0开始，小时相隔8
 
   return d;
 }
@@ -42,7 +42,7 @@ module.exports = {
 
   delegates: 101,    // 代理数量（不为101时需要同步修改gegesisBlock.json）
 
-  leading: 5,        // 前导位数
+  leading: 7,        // 前导位数
 
   powTimeOut: 2,   // pow超时时间（单位s）
 
