@@ -459,11 +459,6 @@ __private.attachApi = function () {
       library.logger.log('Received transaction ' + transaction.id + ' from peer ' + peerStr);
       modules.transactions.receiveTransactions([transaction], cb);
     }, function (err, transactions) {
-      
-      if (err) {
-        reportMsg.error = err.message;
-      }
-     
       if (err) {
         library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
         __private.invalidTrsCache.set(transaction.id, true)
@@ -477,6 +472,9 @@ __private.attachApi = function () {
           senderPublicKey: transactions[0].senderPublicKey,
           duration: reportor.uptime - receiveUptime
         };
+        if (err) {
+          reportMsg.error = err.message;
+        }
         reportor.report("transactions", reportMsg);
         res.status(200).json({
           success: true,
