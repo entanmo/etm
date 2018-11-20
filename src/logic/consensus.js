@@ -14,6 +14,7 @@
 
 'use strict';
 
+const path = require("path");
 var assert = require("assert");
 var crypto = require("crypto");
 var ByteBuffer = require("bytebuffer");
@@ -23,19 +24,17 @@ var bignum = require('../utils/bignumber');
 var slots = require('../utils/slots.js');
 
 const reportor = require("../utils/kafka-reportor");
-// const PoW = require('./pow');
-let PoW;
+
+const Miner = require("entanmo-miner");
 
 function Consensus(scope, cb) {
   this.scope = scope;
   this.pendingBlock = null;
   this.pendingVotes = null;
   this.votesKeySet = {};
-  //cb && setImmediate(cb, null, this);
-  PoW = require('./pow');
-  PoW.onReady(() => {
-    cb && setImmediate(cb, null, this);
-  });
+
+  this.minerInst = new Miner(path.resolve(__dirname, "../../config/miner-cfg.json"));
+  cb && setImmediate(cb, null, this);
 }
 
 Consensus.prototype.createVotes = function (keypairs, block) {
@@ -163,6 +162,7 @@ Consensus.prototype.createPropose = function (keypair, block, address, cb) {
 }
 
 Consensus.prototype.pow = function (propose, cb) {
+  const self = this;
   var hash = this.getProposeHash(propose).toString('hex');
   this.getAddressIndex(propose, (err, target) => {
     if (err) {
@@ -176,25 +176,30 @@ Consensus.prototype.pow = function (propose, cb) {
       });
       return cb(err);
     }
-    
-    const powUptime = reportor.uptime;
-    const timer = Date.now();
-    function onError(uuid, data) {
-      reportor.report("PoW", {
-        subaction: "calc",
-        id: propose.id,
-        height: propose.height,
-        timestamp: propose.timestamp,
-        hash: hash,
-        target: target,
-        duration: reportor.uptime - powUptime,
-        error: data && data.reason
-      });
-      global.library.logger.log(`pow - error(${data.reason})`)
-      cb(data && data.reason);
-    }
 
-    function onPoW(uuid, data) {
+    const powUptime = reportor.uptime;
+    self.minerInst.mint({
+      src: hash,
+      difficulty: target,
+      timeout: slots.powTimeOut * 1000
+    }, (err, result) => {
+      if (err) {
+        // pow failure that error or timeout
+        reportor.report("PoW", {
+          subaction: "calc",
+          id: propose.id,
+          height: propose.height,
+          timestamp: propose.timestamp,
+          hash: hash,
+          target: target,
+          duration: reportor.uptime - powUptime,
+          error: err.message
+        });
+        global.library.logger.log(`PoW failure: ${err.message}`);
+        return cb(err.message);
+      }
+
+      // pow success
       reportor.report("PoW", {
         subaction: "calc",
         id: propose.id,
@@ -202,37 +207,15 @@ Consensus.prototype.pow = function (propose, cb) {
         timestamp: propose.timestamp,
         hash: hash,
         target: target,
-        pow: data.hash,
-        nonce: data.nonce,
+        pow: result.hash,
+        nonce: result.nonce,
         duration: reportor.uptime - powUptime
       });
-      const duration = Date.now() - timer;
-      global.library.logger.log(`pow - success hash(${data.hash}), nonce(${data.nonce}), duration(${duration / 1000.0}sec)`);
+      global.library.logger.log(`PoW success: hash(${result.hash}), nonce(${result.nonce}), duration(${reportor.uptime - powUptime} milliseconds)`);
       cb(null, {
-        hash: data.hash,
-        nonce: data.nonce
+        hash: result.hash,
+        nonce: result.nonce
       });
-    }
-
-    function onTimeout(uuid, data) {
-      reportor.report("PoW", {
-        subaction: "calc",
-        id: propose.id,
-        height: propose.height,
-        timestamp: propose.timestamp,
-        hash: hash,
-        target: target,
-        duration: reportor.uptime - powUptime,
-        timeout: data.desc
-      });
-      global.library.logger.log(`pow - timeout ${data.desc}`);
-      cb(new Error('Error: Timeout'));
-    }
-
-    PoW.pow(hash, target, slots.powTimeOut * 1000, {
-      onError: onError,
-      onPoW: onPoW,
-      onTimeout: onTimeout
     });
   });
 }

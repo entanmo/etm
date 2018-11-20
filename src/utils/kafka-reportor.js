@@ -8,6 +8,8 @@ const {
 } = require("winston");
 const KafkaStreamTransport = require("winston-kafka-stream");
 
+const slots = require("./slots");
+
 /**
  * a KafkaClient reportor that report log message to KafkaServer
  * 
@@ -77,6 +79,8 @@ class KafkaReportor extends EventEmitter {
                 action: action,
                 source: this.source,
                 timestamp: this.timestamp,
+                time: slots.getTime(),
+                slotNumber: slots.getSlotNumber(),
                 magic: this.magic,
                 message: message
             })
