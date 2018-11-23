@@ -111,6 +111,10 @@ class KafkaReportor extends EventEmitter {
      * @returns {string} The format source[host:port]
      */
     get source() {
+        if (global.library == null) {
+            return "unknown";
+        }
+        
         const publicIp = library.config.publicIp ? library.config.publicIp : "unknown";
         const port = library.config.port;
         return `${publicIp}:${port}`;

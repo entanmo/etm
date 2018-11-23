@@ -139,73 +139,72 @@ function now() {
 }
 
 /**
- * 可用的NTP服务列表
- */
-const remoteNtps = [
-    {
-        host: "us.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "cn.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "edu.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "tw.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "hk.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "sgp.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "kr.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "jp.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "de.ntp.org.cn",
-        port: 123
-    },
-    {
-        host: "ina.ntp.org.cn",
-        port: 123
-    }
-];
-// 内部使用的索引值
-let currentIndex = 0;
-
-/**
- * 循环获取NTP服务配置信息
+ * NTP 服务配置生成器
+ * 
  * @param {object} options - The options
  * @param {boolean} options.resolveReference - The resolve reference flag
- * @param {number} options.timeout - Timeout of the sync operation
- * @param {number} options.clockSyncRefresh - Interval of two sync operation 
- * @param {function} options.onError - callback for error
+ * @param {number} options.timeout - The sync timeout
+ * @param {number} options.clockSyncRefresh - The interval of sync ntp operation
+ * @param {function} options.onError - The callback invoked when error happened
  * 
- * @returns {object} The NTP operation options
+ * @returns {Generator} ntp server option generator
  */
-function getNextOptions(options) {
-    const index = currentIndex++ % remoteNtps.length;
-    return {
-        host: remoteNtps[index].host,
-        port: remoteNtps[index].port,
-        resolveReference: options.resolveReference,
-        timeout: options.timeout,
-        clockSyncRefresh: options.clockSyncRefresh,
-        onError: options.onError
-    };
+function *ntpServerOptionsGenerator(options) {
+    const ntpServers = [
+        {
+            host: "us.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "cn.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "edu.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "tw.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "hk.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "sgp.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "kr.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "jp.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "de.ntp.org.cn",
+            port: 123
+        },
+        {
+            host: "ina.ntp.org.cn",
+            port: 123
+        }
+    ];
+    let lastIndex = 0;
+    
+    while (true) {
+        const selIndex = lastIndex++ % ntpServers.length;
+        yield {
+            host: ntpServers[selIndex].host,
+            port: ntpServers[selIndex].port,
+            resolveReference: options.resolveReference,
+            timeout: options.timeout,
+            clockSyncRefresh: options.clockSyncRefresh,
+            onError: options.onError
+        };
+    }
 }
 
 /**
@@ -233,13 +232,15 @@ class SyncTime {
         this.defaultOpts.clockSyncRefresh = options.clockSyncRefresh || 24 * 60 * 60 * 1000;
         this.defaultOpts.onError = this._onError.bind(this);
 
-        this.lastOptions = getNextOptions(this.defaultOpts);
+        this.genNtpServer = ntpServerOptionsGenerator(this.defaultOpts);
+
+        this.lastOptions = this.genNtpServer.next().value;
 
         const self = this;
 
         const loopStart = function () {
             setImmediate(function nextSntpStart() {
-                self.lastOptions = getNextOptions(self.defaultOpts);
+                self.lastOptions = self.genNtpServer.next().value;
                 internals.now.syncing = true;
                 offset(self.lastOptions)
                     .then(result => {
