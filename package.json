@@ -44,6 +44,7 @@
     "request": "^2.85.0",
     "rimraf": "^2.6.2",
     "shelljs": "^0.8.1",
+    "sntp": "^3.0.2",
     "socket.io": "^2.1.0",
     "sodium-native": "^2.2.2",
     "strftime": "^0.10.0",

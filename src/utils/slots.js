@@ -29,7 +29,9 @@ function beginEpochTime() {
 
 function getEpochTime(time) {
   if (time === undefined) {
-    time = (new Date()).getTime();
+    // time = (new Date()).getTime();
+    const milliseconds = global.library.synctime.now();
+    time = (new Date(milliseconds)).getTime();
   }
   var d = beginEpochTime();
   var t = d.getTime();

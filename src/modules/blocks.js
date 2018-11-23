@@ -1598,7 +1598,9 @@ Blocks.prototype.onReceivePropose = function (propose) {
       }
       return setImmediate(cb);
     }
-    if (__private.lastVoteTime && Date.now() - __private.lastVoteTime < 5 * 1000) {
+
+    // if (__private.lastVoteTime && Date.now() - __private.lastVoteTime < 5 * 1000) {
+    if (__private.lastVoteTime && library.synctime.now() - __private.lastVoteTime < 5 * 1000) {
       library.logger.debug("ignore the frequently propose");
       return setImmediate(cb);
     }
@@ -1645,7 +1647,8 @@ Blocks.prototype.onReceivePropose = function (propose) {
             numberOfSignatures: votes.signatures.length
           });
           modules.transport.sendVotes(votes, propose.address);
-          __private.lastVoteTime = Date.now();
+          // __private.lastVoteTime = Date.now();
+          __private.lastVoteTime = library.synctime.now();
           __private.lastPropose = propose;
         }
         setImmediate(next);

@@ -25,6 +25,7 @@ var ip = require('ip');
 var Sequence = require('./utils/sequence.js');
 var slots = require('./utils/slots.js');
 var natUpnp = require('nat-upnp');
+const SyncTime = require("./utils/sync-time");
 
 function getPublicIp() {
     var publicIp = null;
@@ -169,6 +170,14 @@ module.exports = function setup(options, done) {
       logger: function (cb) {
         cb(null, options.logger);
       },
+
+      synctime: function (cb) {
+        const synctimeInst = new SyncTime({
+          setTimeout: 1000,
+          clockSyncRefresh: 10 * 60 * 1000
+        }, cb);
+        void (synctimeInst);
+      },  
   
       genesisblock: function (cb) {
         cb(null, {
@@ -515,7 +524,7 @@ module.exports = function setup(options, done) {
         }, cb);
       }],
   
-      modules: ['network', 'connect', 'config', 'logger', 'bus', 'sequence', 'dbSequence', 'balancesSequence', 'dbLite', 'base', 'oneoff', 'balanceCache', 'model', function (scope, cb) {
+      modules: ['network', 'connect', 'config', 'logger', "synctime", 'bus', 'sequence', 'dbSequence', 'balancesSequence', 'dbLite', 'base', 'oneoff', 'balanceCache', 'model', function (scope, cb) {
         global.library = scope
         var tasks = {};
         /*
