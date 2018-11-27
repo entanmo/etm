@@ -28,6 +28,7 @@ var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js')
 var scheme = require('../scheme/delegates');
 var chaos = require('../utils/chaos.js');
+const _ = require("lodash");
 
 require('array.prototype.find'); // Old node fix
 
@@ -1008,6 +1009,10 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
     if (err) {
       library.logger.error(err);
       return cb("Database error");
+    }
+    
+    if (!_.isArray(rows) || rows.length <= 0 ||  rows[0].accountId == null) {
+      return cb(null, {accounts: []});
     }
 
     var addresses = rows[0].accountId.split(',');
