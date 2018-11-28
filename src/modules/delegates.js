@@ -761,13 +761,14 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
               removals += 1;
     
               // 撤销投票时投票系数减半
-              // let bHeight = modules.block.getLastBlock().height + 1;
+              // let bHeight = modules.blocks.getLastBlock().height + 1;
               // modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
               //   if (err) {
               //     return next(err);
               //   }
               //   next();
               // });
+              next();
             }
           },
           function(next){
@@ -844,12 +845,9 @@ Delegates.prototype.updateDelegateVotes = function (publicKey, votes, cb) {
 
         if(math == '-'){
           // 撤销投票时投票系数减半
-          let bHeight = modules.block.getLastBlock().height + 1;
+          let bHeight = modules.blocks.getLastBlock().height + 1;
           modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
-            if (err) {
-              return next(err);
-            }
-            next();
+            return cb(err);
           });
         }
       }, function(err) {
