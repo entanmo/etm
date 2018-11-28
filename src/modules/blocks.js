@@ -1004,6 +1004,16 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
       if (a.type == 1) {
         return 1;
       }
+      if (a.type == 0) {
+        return -1;
+      }
+      
+      if (a.type == 101 && b.type == 3) {
+        return -1;
+      }
+      if (a.type == 3 && b.type == 101) {
+        return 1;
+      }
       return 0;
     });
     async.eachSeries(sortedTrs, function (transaction, nextTr) {

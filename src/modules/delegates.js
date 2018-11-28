@@ -850,6 +850,9 @@ Delegates.prototype.updateDelegateVotes = function (publicKey, votes, cb) {
             return cb(err);
           });
         }
+        else{
+          cb();
+        }
       }, function(err) {
         return cb(err);
       })
