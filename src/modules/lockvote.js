@@ -257,7 +257,7 @@ shared.putLockVote = function (req, cb) {
                 uniqueItems: true
             }
         },
-        required: ["secret", "amount"]
+        required: ["secret", "args"]
     }, function (err) {
         if (err) {
             return cb(err[0].message);

@@ -301,7 +301,7 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
               }
 
               let totalVotes = 0;
-              async.eachSeries(voters, function (voter, cb) {
+              async.eachSeries(voters.accounts, function (voter, cb) {
                 modules.lockvote.calcLockVotes(voter.address, block.height, function (err, votes) {
                   if(err){
                     return cb(err);
