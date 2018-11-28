@@ -78,11 +78,17 @@ function Vote() {
   }
 
   this.apply = function (trs, block, sender, cb) {
-    library.base.account.merge(sender.address, {
-      delegates: trs.asset.vote.votes,
-      blockId: block.id,
-      round: modules.round.calc(block.height)
-    }, cb);
+    modules.delegates.updateDelegateVotes(trs.senderPublicKey, trs.asset.vote.votes, function (err) {
+      if(err){
+        return cb(err);
+      }
+
+      library.base.account.merge(sender.address, {
+        delegates: trs.asset.vote.votes,
+        blockId: block.id,
+        round: modules.round.calc(block.height)
+      }, cb);
+    });
   }
 
   this.undo = function (trs, block, sender, cb) {

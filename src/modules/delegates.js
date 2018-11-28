@@ -761,13 +761,13 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
               removals += 1;
     
               // 撤销投票时投票系数减半
-              let bHeight = modules.block.getLastBlock().height + 1;
-              modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
-                if (err) {
-                  return next(err);
-                }
-                next();
-              });
+              // let bHeight = modules.block.getLastBlock().height + 1;
+              // modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
+              //   if (err) {
+              //     return next(err);
+              //   }
+              //   next();
+              // });
             }
           },
           function(next){
@@ -814,12 +814,46 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
           return cb(err);
         }
         var total_votes = (existing_votes + additions) - removals;
-        if (total_votes > slots.delegates) {
-           var exceeded = total_votes - slots.delegates;
-           return cb("Maximum number of "+slots.delegates+" votes exceeded (" + exceeded + " too many).");
+        if (total_votes > 1) {
+           return cb("Number of votes  (" + total_votes + " > 1).");
          } else {
            return cb();
          }
+      })
+    });
+  } else {
+    setImmediate(cb, "Please provide an array of votes");
+  }
+}
+
+Delegates.prototype.updateDelegateVotes = function (publicKey, votes, cb) {
+  if (util.isArray(votes)) {
+    modules.accounts.getAccount({publicKey: publicKey}, function (err, account) {
+      if (err) {
+        return cb(err);
+      }
+      if (!account) {
+        return cb("Account not found");
+      }
+      async.eachSeries(votes, function (action, cb) {
+        var math = action[0];
+
+        if (math !== '+' && math !== '-') {
+          return cb("Invalid math operator");
+        }
+
+        if(math == '-'){
+          // 撤销投票时投票系数减半
+          let bHeight = modules.block.getLastBlock().height + 1;
+          modules.lockvote.updateLockVotes(account.address, bHeight, 0.5, function (err) {
+            if (err) {
+              return next(err);
+            }
+            next();
+          });
+        }
+      }, function(err) {
+        return cb(err);
       })
     });
   } else {
