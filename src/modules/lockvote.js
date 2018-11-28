@@ -118,7 +118,7 @@ __private.listLockVotes = function (query, cb) {
         ],
         function (err, rows) {
             if (err || !rows.length) {
-                return cb(err || "Can't find transactions with " + query.address);
+                return cb(err || "Can't find lockvote transactions with " + query.address);
             }
 
             let trs = [];
