@@ -742,6 +742,10 @@ Account.prototype.merge = function (address, diff, cb) {
   var update = {}, remove = {}, insert = {}, insert_object = {}, remove_object = {}, round = [];
   //console.log('!!!!!!! merge diff : ' + "--- "+ JSON.stringify(diff));
 
+  if (address && cache.has(address)) {
+    cache.del(address);
+  }
+
   var self = this;
 
   if (diff.publicKey !== undefined && !diff.publicKey) {
