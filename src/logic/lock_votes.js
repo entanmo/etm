@@ -55,9 +55,14 @@ function LockVotes() {
       blockId: block.id,
       round: modules.round.calc(block.height)
     }, function (err, sender) {
+      void (sender);
+
+      if (err) {
+        return cb(err);
+      }
+      return cb();
+
       /*
-      lock_votes(address VARCHAR(50) NOT NULL, lockAmount BIGINT NOT NULL, originHeight BIGINT NOT NULL, currentHeight BIGINT NOT NULL, transactionId VARCHAR(64), state INT NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
-      */
       return library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
         address: sender.address,
         lockAmount: lockAmount,
@@ -65,6 +70,7 @@ function LockVotes() {
         currentHeight: block.height,
         transactionId: trs.id
       }, cb);
+      */
     });
   }
 
@@ -104,7 +110,32 @@ function LockVotes() {
   }
 
   this.dbSave = function (trs, cb) {
-    return setImmediate(cb);
+    const lockAmount = Number(trs.args[0]);
+    if (library.genesisblock.block.id == trs.blockId) {
+      const block = library.genesisblock.block;
+      library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
+        address: trs.senderId,
+        lockAmount: lockAmount,
+        originHeight: block.height,
+        currentHeight: block.height,
+        transactionId: trs.id
+      }, cb);
+    } else {
+      global.modules.blocks.getBlock({id: trs.blockId}, (err, result) => {
+        if (err) {
+          return cb(err);
+        }
+
+        const block = result.block;
+        library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
+          address: trs.senderId,
+          lockAmount: lockAmount,
+          originHeight: block.height,
+          currentHeight: block.height,
+          transactionId: trs.id
+        }, cb);
+      });
+    }
   }
 
   this.ready = function (trs, sender) {

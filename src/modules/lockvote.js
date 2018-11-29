@@ -22,6 +22,7 @@ var TransactionTypes = require('../utils/transaction-types.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js');
 var slots = require("../utils/slots");
+const _ = require("lodash");
 
 const LockVotes = require("../logic/lock_votes");
 const UnlockVotes = require("../logic/unlock_votes");
@@ -50,8 +51,8 @@ __private.attachApi = function () {
 
     router.map(shared, {
         "get /get": "getLockVote",
-        "get /:id": "getLockVote",
         "get /all": "getAllLockVotes",
+        "get /:id": "getLockVote",      // this route must be the last get method
         "put /": "putLockVote",
         "put /remove": "deleteLockVote"
     });
@@ -84,8 +85,12 @@ __private.getLockVote = function (id, cb) {
             'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', 'lv_state', 'confirmations'
         ],
         function (err, rows) {
-            if (err || !rows.length) {
-                return cb(err || "Can't find transaction: " + id);
+            if (err) {
+                return cb(err);
+            }
+
+            if (rows.length <= 0) {
+                return cb(null, null);
             }
 
             var transacton = library.base.transaction.dbRead(rows[0]);
@@ -117,8 +122,12 @@ __private.listLockVotes = function (query, cb) {
             'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', 'lv_state', 'confirmations'
         ],
         function (err, rows) {
-            if (err || !rows.length) {
-                return cb(err || "Can't find lockvote transactions with " + query.address);
+            if (err) {
+                return cb(err);
+            }
+
+            if (rows.length <= 0) {
+                return cb(null, { trs: [], count: 0});
             }
 
             let trs = [];
@@ -260,7 +269,7 @@ shared.putLockVote = function (req, cb) {
         required: ["secret", "args"]
     }, function (err) {
         if (err) {
-            return cb(err[0].message);
+            return cb(err.toString());
         }
 
         var hash = crypto.createHash("sha256").update(body.secret, "utf8").digest();
@@ -394,7 +403,7 @@ shared.getLockVote = function (req, cb) {
         required: ["id"]
     }, function (err) {
         if (err) {
-            return cb(err[0].toString());
+            return cb(err.toString());
         }
 
         self.getLockVote(query.id, cb);
@@ -418,30 +427,34 @@ shared.getAllLockVotes = function (req, cb) {
         required: ["address"]
     }, function (err) {
         if (err) {
-            return cb(err[0].toString());
+            return cb(err.toString());
         }
 
         if (!addressHelper.isBase58CheckAddress(query.address)) {
             return cb("Invalid address");
         }
 
-        let state = body.state || 0
-        if (state !== 0 && state !== 1) {
-            return cb("Invalid state, Must be[0, 1]");
+        let state = null;
+        if (query.state != null) {
+            state = Number.parseInt(query.state);
+            if (!_.isSafeInteger(state)) {
+                return cb("Unsupported state format");
+            }
+            if (state !== 0 && state !== 1) {
+                return cb("Invalid state, Must be[0, 1]");
+            }
         }
 
-        const condSql = "";
-        if (state == 0) {
-            condSql = " and lv.state = 0";
-        } else if (state == 1) {
-            condSql = " and lv.state = 1";
-        }
         modules.accounts.getAccount({ address: query.address }, function (err, account) {
             if (err) {
                 return cb(err.toString());
             }
 
-            self.listLockVotes(query, cb);
+            if (!account) {
+                return cb("Account not found");
+            }
+
+            self.listLockVotes({ address: account.address, state: state }, cb);
         });
     });
 }

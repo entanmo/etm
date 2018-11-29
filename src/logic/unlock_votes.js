@@ -72,6 +72,11 @@ function UnlockVotes() {
         if (err) {
           return cb(err);
         }
+
+        if (trs == null) {
+          return cb(new Error("no transaction of LOCK with id:", id));
+        }
+        lockAmount += trs.lockAmount;
         
         library.dbLite.query("UPDATE lock_votes SET state = 0 WHERE transactionId = $transactionId", {
           transactionId: id
@@ -80,6 +85,7 @@ function UnlockVotes() {
             return cb(err);
           }
           lockAmount += trs.asset.lockAmount;
+          cb();
         });
       });
 
@@ -104,15 +110,13 @@ function UnlockVotes() {
         if (err) {
           return cb(err);
         }
-        
-        library.dbLite.query("UPDATE lock_votes SET state = 1 WHERE transactionId = $transactionId", {
-          transactionId: id
-        }, (err) => {
-          if (err) {
-            return cb(err);
-          }
-          lockAmount += trs.asset.lockAmount;
-        });
+
+        if (trs == null) {
+          return cb(new Error("no transaction of LOCK with id:", id));
+        }
+
+        lockAmount += trs.lockAmount;
+        return cb();
       });
     }, function (err) {
       if (err) {
@@ -140,11 +144,36 @@ function UnlockVotes() {
   }
 
   this.dbRead = function (raw) {
-    return null;
+    // TODO
   }
 
   this.dbSave = function (trs, cb) {
-    return null;
+    let ids = trs.args;
+    async.eachSeries(ids, function (id, cb) {
+      modules.lockvote.getLockVote(id, function (err, trs) {
+        if (err) {
+          return cb(err);
+        }
+
+        if (trs == null) {
+          return cb(new Error("no transaction of LOCK with id:", id));
+        }
+        library.dbLite.query("UPDATE lock_votes SET state = 0 WHERE transactionId = $transactionId", {
+          transactionId: id
+        }, (err) => {
+          if (err) {
+            return cb(err);
+          }
+          cb();
+        });
+      });
+
+    }, function (err) {
+      if (err) {
+        return cb(err);
+      }
+      cb();
+    });
   }
 
   this.ready = function (trs, sender) {
