@@ -28,11 +28,15 @@ function LockVotes() {
 
   this.verify = function (trs, sender, cb) {
     let lockAmount = Number(trs.args[0]);
+    const amount = lockAmount + trs.fee;
     if(!Number.isSafeInteger(lockAmount) || lockAmount < constants.fixedPoint){
-      return cb('Invalid lock amount!');
+      return setImmediate(cb, 'Invalid lock amount!');
+    }
+    if(sender.balance < amount){
+      return setImmediate(cb, 'Not enough balance');
     }
 
-    cb(null, trs);
+    setImmediate(cb, null, trs);
   }
 
   this.process = function (trs, sender, cb) {
@@ -46,8 +50,9 @@ function LockVotes() {
   this.apply = function (trs, block, sender, cb) {
     const lockAmount = Number(trs.args[0]);
     const amount = lockAmount + trs.fee;
+
     if(sender.balance < amount){
-      return cb('Not enough balance');
+      return setImmediate(cb, 'Not enough balance');
     }
 
     library.base.account.merge(sender.address, {
@@ -96,7 +101,7 @@ function LockVotes() {
   }
 
   this.dbRead = function (raw) {
-    if (!raw.lv_lockAmount || !raw.lv_state || !raw.lv_address || !raw.lv_originHeight || !raw.lv_currentHeight) {
+    if (!raw.lv_lockAmount || (raw.lv_state !== 0 && raw.lv_state !== 1) || !raw.lv_address || !raw.lv_originHeight || !raw.lv_currentHeight) {
       return null;
     } else {
       return {

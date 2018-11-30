@@ -54,7 +54,7 @@ __private.attachApi = function () {
         "get /all": "getAllLockVotes",
         "get /:id": "getLockVote",      // this route must be the last get method
         "put /": "putLockVote",
-        "put /remove": "deleteLockVote"
+        "put /remove": "removeLockVote"
     });
 
     router.use(function (req, res, next) {
@@ -142,6 +142,30 @@ __private.listLockVotes = function (query, cb) {
         });
 }
 
+__private.calcVoteFactor = function (lockVoteInfo, blockHeight) {
+    if (lockVoteInfo.state == 0) {
+        return 0;
+    }
+
+    const originHeight = lockVoteInfo.originHeight;
+    let currentHeight = lockVoteInfo.currentHeight;
+    if (originHeight != 1) {
+        if (originHeight == currentHeight) {
+            currentHeight = currentHeight + slots.getHeightPerDay();
+        }
+        if (blockHeight < currentHeight) {
+            return 0;
+        }
+    }
+
+    let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());
+    return Math.min(32, Math.max(1, factor));
+}
+
+__private.calcNumOfVotes = function (lockVoteInfo, blockHeight) {
+    return lockVoteInfo.lockAmount * __private.calcVoteFactor(lockVoteInfo, blockHeight);
+}
+
 // Public methods
 
 LockVote.prototype.sandboxApi = function (call, args, cb) {
@@ -205,6 +229,7 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
         let totalVotes = 0;
 
         async.eachSeries(result.trs, (value, cb) => {
+            /*
             const info = value.asset;
             let currentHeight = info.currentHeight;
             if (info.originHeight !== 1) {
@@ -219,6 +244,8 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
             let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());
             factor = Math.min(32, Math.max(1, factor));
             let numOfVote = factor * info.lockAmount;
+            */
+            const numOfVote = __private.calcNumOfVotes(value.asset, blockHeight);
             totalVotes += numOfVote;
             cb();
         }, (err) => {
@@ -406,7 +433,35 @@ shared.getLockVote = function (req, cb) {
             return cb(err.toString());
         }
 
-        self.getLockVote(query.id, cb);
+        self.getLockVote(query.id, (err, result) => {
+            if (err) {
+                return cb(err);
+            }
+
+            if (result == null) {
+                return cb(null, null);
+            }
+
+            const blockHeight = modules.blocks.getLastBlock().height;
+            const factor = __private.calcVoteFactor(result.asset, blockHeight);
+            const numOfVotes = __private.calcNumOfVotes(result.asset, blockHeight);
+
+            return cb(null, {
+                id: result.id,
+                blockId: result.blockId,
+                timestamp: result.timestamp,
+                senderId: result.senderId,
+                asset: {
+                    state: result.asset.state,
+                    lockAmount: result.asset.lockAmount,
+                    currentHeight: result.asset.currentHeight,
+                    originHeight: result.asset.originHeight,
+                    address: result.asset.address,
+                    factor: factor,
+                    numOfVotes: numOfVotes
+                }
+            });
+        });
     });
 }
 
@@ -421,6 +476,18 @@ shared.getAllLockVotes = function (req, cb) {
                 maxLength: 50
             },
             state: {
+                type: "integer"
+            },
+            offset: {
+                type: "integer"
+            },
+            limit: {
+                type: "integer"
+            },
+            orderByHeight: {
+                type: "integer"
+            },
+            orderByAmount: {
                 type: "integer"
             }
         },
@@ -445,6 +512,49 @@ shared.getAllLockVotes = function (req, cb) {
             }
         }
 
+        let offset = _.toSafeInteger(query.offset);
+        if (offset < 0) offset = 0;
+
+        let limit = _.toSafeInteger(query.limit);
+        if (limit <= 0 || limit > 100) limit = 100;
+
+        const sortHeightDesc = (a, b) => {
+            return b.asset.originHeight - a.asset.originHeight;
+        };
+        const sortHeightAsce = (a, b) => {
+            return a.asset.originHeight - b.asset.originHeight;
+        };
+        const sortAmountDesc = (a, b) => {
+            return b.asset.lockAmount - a.asset.lockAmount;
+        };
+        const sortAmountAsce = (a, b) => {
+            return a.asset.lockAmount - b.asset.lockAmount;
+        }
+        const sortNone = (a, b) => {
+            return 0;
+        };
+
+        let orderByHeight = _.toSafeInteger(query.orderByHeight);
+        if (orderByHeight < -1 || orderByHeight > 1) {
+            orderByHeight = 0;
+        }
+        let heightSorter = sortNone;
+        if (orderByHeight == 1) {
+            heightSorter = sortHeightAsce;
+        } else if (orderByHeight == -1) {
+            heightSorter = sortHeightDesc;
+        }
+        let orderByAmount = _.toSafeInteger(query.orderByAmount);
+        if (orderByAmount < -1 || orderByAmount > 1) {
+            orderByHeight = 0;
+        }
+        let amountSorter = sortNone;
+        if (orderByAmount == 1) {
+            amountSorter = sortAmountAsce;
+        } else if (orderByAmount == -1) {
+            amountSorter = sortAmountDesc;
+        }
+
         modules.accounts.getAccount({ address: query.address }, function (err, account) {
             if (err) {
                 return cb(err.toString());
@@ -454,7 +564,47 @@ shared.getAllLockVotes = function (req, cb) {
                 return cb("Account not found");
             }
 
-            self.listLockVotes({ address: account.address, state: state }, cb);
+            self.listLockVotes({ address: account.address, state: state }, (err, result) => {
+                if (err) {
+                    return cb(err);
+                }
+                if (result.count <= 0) {
+                    return cb(null, result);
+                }
+
+                const blockHeight = modules.blocks.getLastBlock().height;
+                const resultTrs = result.trs.map(tr => {
+                    const factor = __private.calcVoteFactor(tr.asset, blockHeight);
+                    const numOfVotes = __private.calcNumOfVotes(tr.asset, blockHeight);
+                    return {
+                        id: tr.id,
+                        blockId: tr.blockId,
+                        timestamp: tr.timestamp,
+                        senderId: tr.senderId,
+                        asset: {
+                            state: tr.asset.state,
+                            lockAmount: tr.asset.lockAmount,
+                            currentHeight: tr.asset.currentHeight,
+                            originHeight: tr.asset.originHeight,
+                            address: tr.asset.address,
+                            factor: factor,
+                            numOfVotes: numOfVotes
+                        }
+                    };
+                });
+
+                resultTrs.sort((a, b) => {
+                    let result = heightSorter(a, b);
+                    if (result == 0) {
+                        result = amountSorter(a, b);
+                    }
+                    return result;
+                });
+
+                const trs = resultTrs.slice(offset, offset + limit);
+                return cb(null, { trs: trs, count: result.count })
+
+            });
         });
     });
 }

@@ -14,6 +14,8 @@
 
 "use strict";
 
+const async = require("async");
+
 function UnlockVotes() {
   this.create = function (data, trs) {
     trs.args = data.args;
