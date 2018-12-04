@@ -127,7 +127,8 @@ const config = {
     'transport': './modules/transport.js',
     'loader': './modules/loader.js',
     'system': './modules/system.js',
-    'peer': './modules/peer.js',
+    'peer': './modules/peer2.js',
+   // 'peer2': './modules/peer2.js',
     'delegates': './modules/delegates.js',
     'round': './modules/round.js',
     'multisignatures': './modules/multisignatures.js',
@@ -135,7 +136,7 @@ const config = {
     'dapps': './modules/dapps.js',
     'sql': './modules/sql.js',
     'blocks': './modules/blocks.js',
-    'p2phelper': './modules/p2phelper.js',
+    //'p2phelper': './modules/p2phelper.js',
     'lockvote': './modules/lockvote.js',
   },
 

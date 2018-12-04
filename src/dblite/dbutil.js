@@ -5,7 +5,7 @@ module.exports = {
     console.log( array); 
     var tables =[]
     array.forEach(element => {
-      dropOtherChar(tables.push(element.split(' ')[0]))
+      this.dropOtherChar(tables.push(element.split(' ')[0]))
     });
     tables.shift()
     return tables
@@ -16,9 +16,10 @@ module.exports = {
     {
     case 'delete':
     case 'insert':
-    return [dropOtherChar(array[2])]
+    return [this.dropOtherChar(array[2])]
     case 'update':
-    return [dropOtherChar(array[1])]
+    return [this.dropOtherChar(array[1])]
+    default: return null
     }
   },
   dropOtherChar:function (s){

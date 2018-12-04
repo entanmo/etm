@@ -17,6 +17,7 @@
 var fs = require('fs');
 var protocolBuffers = require('protocol-buffers');
 var extend = require('extend');
+const _ = require('lodash')
 var TransactionTypes = require('./transaction-types.js');
 
 function Protobuf(schema) {
@@ -24,12 +25,18 @@ function Protobuf(schema) {
 }
 
 Protobuf.prototype.encodeBlock = function (block) {
-  var obj = extend(true, {}, block);
-  obj.payloadHash = new Buffer(obj.payloadHash, 'hex');
-  obj.generatorPublicKey = new Buffer(obj.generatorPublicKey, 'hex');
-  if (obj.blockSignature) {
-    obj.blockSignature = new Buffer(obj.blockSignature, 'hex');
-  }
+  // var obj = extend(true, {}, block);
+  // obj.payloadHash = new Buffer(obj.payloadHash, 'hex');
+  // obj.generatorPublicKey = new Buffer(obj.generatorPublicKey, 'hex');
+  // if (obj.blockSignature) {
+  //   obj.blockSignature = new Buffer(obj.blockSignature, 'hex');
+  // }
+  const obj = _.cloneDeep(block)
+    obj.payloadHash = Buffer.from(obj.payloadHash, 'hex')
+    obj.generatorPublicKey = Buffer.from(obj.generatorPublicKey, 'hex')
+    if (obj.blockSignature) {
+      obj.blockSignature = Buffer.from(obj.blockSignature, 'hex')
+    }
   for (var i = 0; i < obj.transactions.length; ++i) {
     this.transactionStringToBytes(obj.transactions[i]);
   }
@@ -37,11 +44,19 @@ Protobuf.prototype.encodeBlock = function (block) {
 }
 
 Protobuf.prototype.decodeBlock = function (data) {
-  var obj = this.schema.Block.decode(data);
-  obj.payloadHash = obj.payloadHash.toString('hex');
-  obj.generatorPublicKey = obj.generatorPublicKey.toString('hex');
+ // console.log("Protobuf.prototype.decodeBlock "+JSON.stringify(data))
+  // var obj = this.schema.Block.decode(data);
+  // obj.payloadHash = obj.payloadHash.toString('hex');
+  // obj.generatorPublicKey = obj.generatorPublicKey.toString('hex');
+  // if (obj.blockSignature) {
+  //   obj.blockSignature = obj.blockSignature.toString('hex');
+  // }
+
+  const obj = this.schema.Block.decode(data)
+  obj.payloadHash = obj.payloadHash.toString('hex')
+  obj.generatorPublicKey = obj.generatorPublicKey.toString('hex')
   if (obj.blockSignature) {
-    obj.blockSignature = obj.blockSignature.toString('hex');
+    obj.blockSignature = obj.blockSignature.toString('hex')
   }
   for (var i = 0; i < obj.transactions.length; ++i) {
     this.transactionBytesToString(obj.transactions[i]);
@@ -50,7 +65,8 @@ Protobuf.prototype.decodeBlock = function (data) {
 }
 
 Protobuf.prototype.encodeBlockPropose = function (propose) {
-  var obj = extend(true, {}, propose);
+//  var obj = extend(true, {}, propose);
+  const obj = _.cloneDeep(propose)
   obj.generatorPublicKey = new Buffer(obj.generatorPublicKey, 'hex');
   obj.hash = new Buffer(obj.hash, 'hex');
   obj.signature = new Buffer(obj.signature, 'hex');

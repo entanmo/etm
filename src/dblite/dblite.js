@@ -15,6 +15,7 @@
 'use strict';
 const Database = require('better-sqlite3');
 const LRU = require("lru-cache");
+const dbutil = require("./dbutil.js");
 const HAS_PARAMS = /(?:\?|(?:(?:\:|\@|\$)[a-zA-Z_0-9$]+))/;
 const mp = new LRU(50000);
 class dblite {
@@ -31,11 +32,11 @@ class dblite {
         };
         try {
            if( this.db ){this.db.close()}
-          //  console.log("==============================="+mp.itemCount)
-            // mp.forEach(function (val, key, cache) {
-            //     console.log("="+key)
-            //     console.log("="+JSON.stringify(val))
-            // })
+        //    console.log("==============================="+mp.itemCount)
+        //     mp.forEach(function (val, key, cache) {
+        //         console.log("="+key)
+        //         console.log("="+JSON.stringify(val))
+        //     })
         } catch (i) {
             if (t = {
                     err: i,
@@ -94,8 +95,8 @@ class dblite {
                 fields = arguments[2];
             break;
         }
-		var p_callback  = cb;
-		var query = sql
+        var query = sql
+        var p_callback  = cb;
         var str =	query + JSON.stringify(params);
 
         try {
@@ -107,18 +108,23 @@ class dblite {
                         ret.result.map(this.row2object, fields) :
                         ret.result.map(this.row2parsed, fields)    
                 }
+             
             }else{
                 const r = sta.run(params || []);
                 ret.result = {
                     lastInsertRowId: r.lastInsertROWID.toString(),
                     rowsEffected: r.changes
                  }
-                // if(!mp.has(str)&& ret.result != null){
-                //     mp.set(str,1)
-                // }else{
-                //     mp.set(str,mp.get(str)+1)
-                // }
-            }
+             //    var tables=dbutil.getModifyTable(str)
+            //  if(str.startsWith("update")){
+                  
+            //      if(!mp.has(str)&& ret.result != null){
+            //         mp.set(str,1)
+            //     }else{
+            //         mp.set(str,mp.get(str)+1)
+            //     }
+            // }
+             }
             } catch (e) {
             if (ret.err = e, 
                 console.log(sql+" sql error" + e)
