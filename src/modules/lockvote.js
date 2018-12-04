@@ -166,6 +166,10 @@ __private.calcNumOfVotes = function (lockVoteInfo, blockHeight) {
     return lockVoteInfo.lockAmount * __private.calcVoteFactor(lockVoteInfo, blockHeight);
 }
 
+__private.calcNumOfVotesWithFactor = function (lockVoteInfo, factor) {
+    return lockVoteInfo.lockAmount * factor;
+}
+
 // Public methods
 
 LockVote.prototype.sandboxApi = function (call, args, cb) {
@@ -296,7 +300,7 @@ shared.putLockVote = function (req, cb) {
         required: ["secret", "args"]
     }, function (err) {
         if (err) {
-            return cb(err.toString());
+            return cb(err[0].toString());
         }
 
         var hash = crypto.createHash("sha256").update(body.secret, "utf8").digest();
@@ -430,7 +434,7 @@ shared.getLockVote = function (req, cb) {
         required: ["id"]
     }, function (err) {
         if (err) {
-            return cb(err.toString());
+            return cb(err[0].toString());
         }
 
         self.getLockVote(query.id, (err, result) => {
@@ -444,7 +448,8 @@ shared.getLockVote = function (req, cb) {
 
             const blockHeight = modules.blocks.getLastBlock().height;
             const factor = __private.calcVoteFactor(result.asset, blockHeight);
-            const numOfVotes = __private.calcNumOfVotes(result.asset, blockHeight);
+            // const numOfVotes = __private.calcNumOfVotes(result.asset, blockHeight);
+            const numOfVotes = __private.calcNumOfVotesWithFactor(result.asset, factor);
 
             return cb(null, {
                 id: result.id,
@@ -494,7 +499,7 @@ shared.getAllLockVotes = function (req, cb) {
         required: ["address"]
     }, function (err) {
         if (err) {
-            return cb(err.toString());
+            return cb(err[0].toString());
         }
 
         if (!addressHelper.isBase58CheckAddress(query.address)) {
@@ -575,7 +580,8 @@ shared.getAllLockVotes = function (req, cb) {
                 const blockHeight = modules.blocks.getLastBlock().height;
                 const resultTrs = result.trs.map(tr => {
                     const factor = __private.calcVoteFactor(tr.asset, blockHeight);
-                    const numOfVotes = __private.calcNumOfVotes(tr.asset, blockHeight);
+                    // const numOfVotes = __private.calcNumOfVotes(tr.asset, blockHeight);
+                    const numOfVotes = __private.calcNumOfVotesWithFactor(tr.asset, factor);
                     return {
                         id: tr.id,
                         blockId: tr.blockId,

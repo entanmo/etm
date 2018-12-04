@@ -208,7 +208,8 @@ __private.attachApi = function () {
     "get /delegates/fee": "getDelegatesFee",
     "put /delegates": "addDelegates",
     "get /": "getAccount",
-    "get /new": "newAccount"
+    "get /new": "newAccount",
+    "get /effectivity": "accountOnBlockchain"
   });
 
   if (process.env.DEBUG && process.env.DEBUG.toUpperCase() == "TRUE") {
@@ -961,6 +962,33 @@ shared.getAccount = function (req, cb) {
           timestamp: latestBlock.timestamp
         },
         version: modules.peer.getVersion()
+      });
+    });
+  });
+}
+
+shared.accountOnBlockchain = function (req, cb) {
+  var query = req.body;
+  library.scheme.validate(query, {
+    type: "object",
+    properties: {
+      address: {
+        type: "string",
+        minLength: 1
+      }
+    },
+    required: ["address"]
+  }, function (err) {
+    if (err) {
+      return cb(err[0].message);
+    }
+    self.getAccount({ address: query.address }, function (err, account) {
+      if (err) {
+        return cb(err.toString());
+      }
+
+      return cb(null, {
+        effectivity: !!account
       });
     });
   });
