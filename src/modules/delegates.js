@@ -428,16 +428,28 @@ __private.attachApi = function () {
 __private.getKeysSortByVote = function (cb) {
   modules.accounts.getAccounts({
     isDelegate: 1,
-    sort: {"vote": -1, "publicKey": 1},
+    vote: { $gt: 0 },
+    sort: {
+      "vote": -1,
+      "publicKey": 1
+    },
     // limit: slots.delegates
-  }, ["publicKey","vote"], function (err, rows) {
+  }, ["publicKey", "vote"], function (err, rows) {
     if (err) {
       cb(err)
     }
     if (!rows || !rows.length) {
       return cb('No active delegates found')
     }
-    cb(null, rows.map(function (el,index) {
+    if (rows.length < slots.delegates) {
+      let newRows = [];
+      for (let i = 0; i < slots.delegates; i++) {
+        newRows[i] = rows[i % rows.length];
+      }
+      rows = newRows;
+    }
+
+    cb(null, rows.map(function (el, index) {
       // return el.publicKey
       el.index = index;
       return el
@@ -586,6 +598,7 @@ __private._getRandomDelegateList = function (randomDelegateList, truncDelegateLi
       break;
     }
   }
+
 
   if (randomDelegateList.length < slots.delegates) {
    
