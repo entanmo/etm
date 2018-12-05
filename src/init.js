@@ -69,7 +69,7 @@ module.exports = function init(options) {
 
     global.Config = appConfig;
 
-    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock-personal.json');
+    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock.json');
     if (program.genesisblock) {
         genesisblockFile = path.resolve(process.cwd(), program.genesisblock);
     }
