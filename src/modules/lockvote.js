@@ -22,6 +22,7 @@ var TransactionTypes = require('../utils/transaction-types.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js');
 var slots = require("../utils/slots");
+const _ = require("lodash");
 
 const LockVotes = require("../logic/lock_votes");
 const UnlockVotes = require("../logic/unlock_votes");
@@ -50,10 +51,10 @@ __private.attachApi = function () {
 
     router.map(shared, {
         "get /get": "getLockVote",
-        "get /:id": "getLockVote",
         "get /all": "getAllLockVotes",
+        "get /:id": "getLockVote",      // this route must be the last get method
         "put /": "putLockVote",
-        "put /remove": "deleteLockVote"
+        "put /remove": "removeLockVote"
     });
 
     router.use(function (req, res, next) {
@@ -84,8 +85,12 @@ __private.getLockVote = function (id, cb) {
             'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', 'lv_state', 'confirmations'
         ],
         function (err, rows) {
-            if (err || !rows.length) {
-                return cb(err || "Can't find transaction: " + id);
+            if (err) {
+                return cb(err);
+            }
+
+            if (rows.length <= 0) {
+                return cb(null, null);
             }
 
             var transacton = library.base.transaction.dbRead(rows[0]);
@@ -117,8 +122,12 @@ __private.listLockVotes = function (query, cb) {
             'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', 'lv_state', 'confirmations'
         ],
         function (err, rows) {
-            if (err || !rows.length) {
-                return cb(err || "Can't find transactions with " + query.address);
+            if (err) {
+                return cb(err);
+            }
+
+            if (rows.length <= 0) {
+                return cb(null, { trs: [], count: 0});
             }
 
             let trs = [];
@@ -131,6 +140,34 @@ __private.listLockVotes = function (query, cb) {
 
             cb(null, { trs: trs, count: trs.length });
         });
+}
+
+__private.calcVoteFactor = function (lockVoteInfo, blockHeight) {
+    if (lockVoteInfo.state == 0) {
+        return 0;
+    }
+
+    const originHeight = lockVoteInfo.originHeight;
+    let currentHeight = lockVoteInfo.currentHeight;
+    if (originHeight != 1) {
+        if (originHeight == currentHeight) {
+            currentHeight = currentHeight + slots.getHeightPerDay();
+        }
+        if (blockHeight < currentHeight) {
+            return 0;
+        }
+    }
+
+    let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());
+    return Math.min(32, Math.max(1, factor));
+}
+
+__private.calcNumOfVotes = function (lockVoteInfo, blockHeight) {
+    return lockVoteInfo.lockAmount * __private.calcVoteFactor(lockVoteInfo, blockHeight);
+}
+
+__private.calcNumOfVotesWithFactor = function (lockVoteInfo, factor) {
+    return lockVoteInfo.lockAmount * factor;
 }
 
 // Public methods
@@ -196,6 +233,7 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
         let totalVotes = 0;
 
         async.eachSeries(result.trs, (value, cb) => {
+            /*
             const info = value.asset;
             let currentHeight = info.currentHeight;
             if (info.originHeight !== 1) {
@@ -210,6 +248,8 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
             let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());
             factor = Math.min(32, Math.max(1, factor));
             let numOfVote = factor * info.lockAmount;
+            */
+            const numOfVote = __private.calcNumOfVotes(value.asset, blockHeight);
             totalVotes += numOfVote;
             cb();
         }, (err) => {
@@ -260,7 +300,7 @@ shared.putLockVote = function (req, cb) {
         required: ["secret", "args"]
     }, function (err) {
         if (err) {
-            return cb(err[0].message);
+            return cb(err[0].toString());
         }
 
         var hash = crypto.createHash("sha256").update(body.secret, "utf8").digest();
@@ -397,7 +437,36 @@ shared.getLockVote = function (req, cb) {
             return cb(err[0].toString());
         }
 
-        self.getLockVote(query.id, cb);
+        self.getLockVote(query.id, (err, result) => {
+            if (err) {
+                return cb(err);
+            }
+
+            if (result == null) {
+                return cb(null, null);
+            }
+
+            const blockHeight = modules.blocks.getLastBlock().height;
+            const factor = __private.calcVoteFactor(result.asset, blockHeight);
+            // const numOfVotes = __private.calcNumOfVotes(result.asset, blockHeight);
+            const numOfVotes = __private.calcNumOfVotesWithFactor(result.asset, factor);
+
+            return cb(null, {
+                id: result.id,
+                blockId: result.blockId,
+                timestamp: result.timestamp,
+                senderId: result.senderId,
+                asset: {
+                    state: result.asset.state,
+                    lockAmount: result.asset.lockAmount,
+                    currentHeight: result.asset.currentHeight,
+                    originHeight: result.asset.originHeight,
+                    address: result.asset.address,
+                    factor: factor,
+                    numOfVotes: numOfVotes
+                }
+            });
+        });
     });
 }
 
@@ -413,6 +482,18 @@ shared.getAllLockVotes = function (req, cb) {
             },
             state: {
                 type: "integer"
+            },
+            offset: {
+                type: "integer"
+            },
+            limit: {
+                type: "integer"
+            },
+            orderByHeight: {
+                type: "integer"
+            },
+            orderByAmount: {
+                type: "integer"
             }
         },
         required: ["address"]
@@ -425,23 +506,111 @@ shared.getAllLockVotes = function (req, cb) {
             return cb("Invalid address");
         }
 
-        let state = body.state || 0
-        if (state !== 0 && state !== 1) {
-            return cb("Invalid state, Must be[0, 1]");
+        let state = null;
+        if (query.state != null) {
+            state = Number.parseInt(query.state);
+            if (!_.isSafeInteger(state)) {
+                return cb("Unsupported state format");
+            }
+            if (state !== 0 && state !== 1) {
+                return cb("Invalid state, Must be[0, 1]");
+            }
         }
 
-        const condSql = "";
-        if (state == 0) {
-            condSql = " and lv.state = 0";
-        } else if (state == 1) {
-            condSql = " and lv.state = 1";
+        let offset = _.toSafeInteger(query.offset);
+        if (offset < 0) offset = 0;
+
+        let limit = _.toSafeInteger(query.limit);
+        if (limit <= 0 || limit > 100) limit = 100;
+
+        const sortHeightDesc = (a, b) => {
+            return b.asset.originHeight - a.asset.originHeight;
+        };
+        const sortHeightAsce = (a, b) => {
+            return a.asset.originHeight - b.asset.originHeight;
+        };
+        const sortAmountDesc = (a, b) => {
+            return b.asset.lockAmount - a.asset.lockAmount;
+        };
+        const sortAmountAsce = (a, b) => {
+            return a.asset.lockAmount - b.asset.lockAmount;
         }
+        const sortNone = (a, b) => {
+            return 0;
+        };
+
+        let orderByHeight = _.toSafeInteger(query.orderByHeight);
+        if (orderByHeight < -1 || orderByHeight > 1) {
+            orderByHeight = 0;
+        }
+        let heightSorter = sortNone;
+        if (orderByHeight == 1) {
+            heightSorter = sortHeightAsce;
+        } else if (orderByHeight == -1) {
+            heightSorter = sortHeightDesc;
+        }
+        let orderByAmount = _.toSafeInteger(query.orderByAmount);
+        if (orderByAmount < -1 || orderByAmount > 1) {
+            orderByHeight = 0;
+        }
+        let amountSorter = sortNone;
+        if (orderByAmount == 1) {
+            amountSorter = sortAmountAsce;
+        } else if (orderByAmount == -1) {
+            amountSorter = sortAmountDesc;
+        }
+
         modules.accounts.getAccount({ address: query.address }, function (err, account) {
             if (err) {
                 return cb(err.toString());
             }
 
-            self.listLockVotes(query, cb);
+            if (!account) {
+                return cb("Account not found");
+            }
+
+            self.listLockVotes({ address: account.address, state: state }, (err, result) => {
+                if (err) {
+                    return cb(err);
+                }
+                if (result.count <= 0) {
+                    return cb(null, result);
+                }
+
+                const blockHeight = modules.blocks.getLastBlock().height;
+                const resultTrs = result.trs.map(tr => {
+                    const factor = __private.calcVoteFactor(tr.asset, blockHeight);
+                    // const numOfVotes = __private.calcNumOfVotes(tr.asset, blockHeight);
+                    const numOfVotes = __private.calcNumOfVotesWithFactor(tr.asset, factor);
+                    return {
+                        id: tr.id,
+                        blockId: tr.blockId,
+                        timestamp: tr.timestamp,
+                        senderId: tr.senderId,
+                        asset: {
+                            state: tr.asset.state,
+                            lockAmount: tr.asset.lockAmount,
+                            currentHeight: tr.asset.currentHeight,
+                            originHeight: tr.asset.originHeight,
+                            address: tr.asset.address,
+                            factor: factor,
+                            numOfVotes: numOfVotes
+                        }
+                    };
+                });
+
+                resultTrs.sort((a, b) => {
+                    let result = heightSorter(a, b);
+                    if (result == 0) {
+                        result = amountSorter(a, b);
+                    }
+                    return result;
+                });
+
+                const trs = resultTrs.slice(offset, offset + limit);
+                return cb(null, { trs: trs, count: result.count })
+
+            });
         });
     });
 }
