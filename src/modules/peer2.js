@@ -118,7 +118,9 @@ const priv = {
   findSeenNodesInDb: (callback) => {
     priv.nodesDb.find({ seen: { $exists: true } }).sort({ seen: -1 }).exec(callback)
   },
-
+  findAllNodesInDb: (callback) => {
+    priv.nodesDb.find().sort({ seen: -1 }).exec(callback)
+  },
   initNodesDb: (peerNodesDbPath, cb) => {
     if (!priv.nodesDb) {
       const db = new Database({ filename: peerNodesDbPath, autoload: true })
@@ -192,19 +194,19 @@ priv.attachApi = () => {
   })
 }
 Peer.prototype.listPeers = ( cb) => {
-  priv.findSeenNodesInDb((err, nodes) => {//
+  priv.findAllNodesInDb((err, nodes) => {//
     let peers = []
     if (err) {
       library.logger.error('Failed to find nodes in db', err)
     } else {
       peers = nodes
     }
-    var seeds= library.config.peers.list
-    peers = priv.getBootstrapNodes(
-      seeds,
-      peers,
-      MAX_BOOTSTRAP_PEERS
-    )
+    // var seeds= library.config.peers.list
+    // peers = priv.getBootstrapNodes(
+    //   seeds,
+    //   peers,
+    //   MAX_BOOTSTRAP_PEERS
+    // )
     cb(err,  peers)
   })
 }
