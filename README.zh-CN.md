@@ -143,20 +143,6 @@ cd entanmo
 }
 ```
 
-### 指定工作显卡
-
-对于有集显，或者有多种显卡的设备，需要修改 `entanmo\config\miner-cfg.json`，将 `platformId` 的值修改为 `1`，以指定**独立显卡**作为工作显卡，以免设备使用低性能显卡工作造成损失。
-
-```json
-{
-    "enableGPU": true,
-    "platformId": 1,
-    "localWorkSize": 128,
-    "globalWorkSizeMultiplier": 8192,
-    "numOfInstances": 10
-}
-```
-
 ## 查看矿机收益
 
 你可以使用在线钱包查看个人收益：进入 http://wallet.entanmo.com ，使用先前的内测 `secret` 登录钱包，即可以查看矿机收益。
