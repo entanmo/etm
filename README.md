@@ -142,20 +142,6 @@ After the system is deployed, you need to modify the related configuration to en
 }
 ```
 
-### Designated working graphics card
-
-For devices with integrated graphics cards or multiple graphics cards, you need to modify `entanmo\config\miner-cfg.json`，change the value of `platformId` to `1`，to specify **independent graphics cards** as working graphics cards, so that the device does not suffer from low-performance graphics cards.
-
-```json
-{
-    "enableGPU": true,
-    "platformId": 1,
-    "localWorkSize": 128,
-    "globalWorkSizeMultiplier": 8192,
-    "numOfInstances": 10
-}
-```
-
 ## View mine revenue
 
 You can use the online wallet to view your personal earnings: go to http://wallet.entanmo.com and log in to your wallet using the previous beta `secret` to see the mine revenue.
