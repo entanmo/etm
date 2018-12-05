@@ -32,5 +32,6 @@ module.exports = {
   confirmationLength: 77,
   fixedPoint : Math.pow(10, 8),
   totalAmount: 10000000000000000,
-  maxTxsPerBlock: 20000
+  maxTxsPerBlock: 1000,
+  maxTxsCache: 20000
 }

@@ -122,42 +122,6 @@ __private.blockCache = {};
 __private.proposeCache = {};
 __private.lastPropose = null;
 
-/*const FULL_BLOCK_QUERY = "SELECT " +
-  "a.address,"+
-  "b.id, b.version, b.timestamp, b.height, b.previousBlock, b.numberOfTransactions, b.totalAmount, b.totalFee, b.reward, b.payloadLength, lower(hex(b.payloadHash)), lower(hex(b.generatorPublicKey)), lower(hex(b.blockSignature)), " +
-  "t.id, t.type, t.timestamp, lower(hex(t.senderPublicKey)), t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), t.args, t.message, " +
-  "lower(hex(s.publicKey)), " +
-  "d.username, " +
-  "v.votes, " +
-  "m.min, m.lifetime, m.keysgroup, " +
-  "dapp.name, dapp.description, dapp.tags, dapp.type, dapp.link, dapp.category, dapp.icon, dapp.delegates, dapp.unlockDelegates, " +
-  "it.dappId, it.currency, it.amount, " +
-  "ot.dappId, ot.outTransactionId, ot.currency, ot.amount, " +
-  "lower(hex(t.requesterPublicKey)), t.signatures, " +
-  "lower(hex(st.content)), " +
-  "issuers.name, issuers.desc, " +
-  "assets.name, assets.desc, assets.maximum, assets.precision, assets.strategy, assets.allowWriteoff, assets.allowWhitelist, assets.allowBlacklist, " +
-  "flags.currency, flags.flag, flags.flagType, " +
-  "issues.currency, issues.amount, " +
-  "transfers.currency, transfers.amount, " +
-  "acls.currency, acls.flag, acls.operator, acls.list " +
-  "FROM blocks b " +
-  "left outer join mem_accounts as a on a.publicKey=b.generatorPublicKey " +
-  "left outer join trs as t on t.blockId=b.id " +
-  "left outer join delegates as d on d.transactionId=t.id " +
-  "left outer join votes as v on v.transactionId=t.id " +
-  "left outer join signatures as s on s.transactionId=t.id " +
-  "left outer join multisignatures as m on m.transactionId=t.id " +
-  "left outer join dapps as dapp on dapp.transactionId=t.id " +
-  "left outer join intransfer it on it.transactionId=t.id " +
-  "left outer join outtransfer ot on ot.transactionId=t.id " +
-  "left outer join storages st on st.transactionId=t.id " +
-  "left outer join issuers on issuers.transactionId=t.id " +
-  "left outer join assets on assets.transactionId=t.id " +
-  "left outer join flags on flags.transactionId=t.id " +
-  "left outer join issues on issues.transactionId=t.id " +
-  "left outer join transfers on transfers.transactionId=t.id " +
-  "left outer join acls on acls.transactionId=t.id ";*/
   const FULL_BLOCK_QUERY = 
   `SELECT a.address, b.id as b_id ,b.version, b.timestamp as b_timestamp , b.height
 	, b.previousBlock, b.numberOfTransactions, b.totalAmount, b.totalFee, b.reward
@@ -520,9 +484,11 @@ __private.getIdSequence = function (height, cb) {
 }
 
 __private.getIdSequence2 = function (height, cb) {
-  library.dbLite.query('SELECT min(s.height) as height, group_concat(s.id) from ' +
-    '(SELECT id, height from blocks order by height desc limit 5) s',
-    { 'height': height },
+  const maxHeight = Math.max(height, __private.lastBlock.height)
+  const minHeight = Math.max(0, maxHeight - 4)
+  library.dbLite.query(`SELECT min(s.height) as height, group_concat(s.id) from
+   (SELECT id, height from blocks where height>= $minHeight and height<= $maxHeight  order by height desc ) s`,
+    { 'minHeight': minHeight,'maxHeight':maxHeight },
     ['firstHeight', 'ids'],
     function (err, rows) {
       if (err || !rows.length) {
@@ -607,32 +573,32 @@ Blocks.prototype.getCommonBlock = function (peer, height, cb) {
         if (err) {
           return next(err)
         }
-        var max = lastBlockHeight;
-        lastBlockHeight = data.firstHeight;
-        modules.transport.getFromPeer(peer, {
-          api: "/blocks/common?ids=" + data.ids + '&max=' + max + '&min=' + lastBlockHeight,
-          method: "GET"
-        }, function (err, data) {
-          if (err || data.body.error) {
-            return next(err || data.body.error.toString());
+        var    params = {
+          max: lastBlockHeight,
+          min: data.firstHeight,
+          ids: data.ids,
+        }
+        modules.peer.request('commonBlock', params, peer, (err2, ret) => {
+          if (err2 ||ret.error) {
+            return next(err2 || ret.error.toString());
           }
 
-          if (!data.body.common) {
+          if (!ret.common) {
             return next();
           }
 
           library.dbLite.query("select previousBlock from blocks where id = $id " + " and height = $height", {
-            "id": data.body.common.id,
-            "height": data.body.common.height
+            "id": ret.common.id,
+            "height": ret.common.height
           }, {
               "previousBlock": String
-            }, function (err, rows) {
-              if (err || !rows.length) {
-                return next(err || "Can't compare blocks");
+            }, function (err3, rows) {
+              if (err3 || !rows.length) {
+                return next(err3 || "Can't compare blocks");
               }
 
-              if (data.body.common.previousBlock === rows[0].previousBlock) {
-                commonBlock = data.body.common;
+              if (ret.common.previousBlock === rows[0].previousBlock) {
+                commonBlock = ret.common;
               }
               next();
             });
@@ -1025,19 +991,19 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
             modules.accounts.loadSenderOrUpdate({ publicKey: transaction.senderPublicKey, isGenesis: block.height == 1 }, next);
           }
         },
-        function (sender, next) {
-          // if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
-          //   return next(null, sender);
-          // }
-          modules.transactions.applyUnconfirmed(transaction, sender, function (err) {
-            if (err && global.Config.netVersion === 'mainnet' &&
-              (block.height == 4659 || block.height == 7091 || block.height == 11920)) {
-              next(null, sender);
-            } else {
-              next(err, sender);
-            }
-          });
-        },
+        // function (sender, next) {
+        //   // if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
+        //   //   return next(null, sender);
+        //   // }
+        //   modules.transactions.applyUnconfirmed(transaction, sender, function (err) {
+        //     if (err && global.Config.netVersion === 'mainnet' &&
+        //       (block.height == 4659 || block.height == 7091 || block.height == 11920)) {
+        //       next(null, sender);
+        //     } else {
+        //       next(err, sender);
+        //     }
+        //   });
+        // },
         function (sender, next) {
           modules.transactions.apply(transaction, block, sender, next);
         }
@@ -1058,6 +1024,7 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
       });
     }, function (err) {
       if (err) {
+        library.logger.error("Failed to apply block", err);
         return done(err);
       }
       library.logger.debug("apply block ok");
@@ -1086,32 +1053,44 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
 
   library.balancesSequence.add(function (cb) {
     var unconfirmedTrs = modules.transactions.getUnconfirmedTransactionList(true);
-    modules.transactions.undoUnconfirmedList(function (err) {
+    doApplyBlock(function (err) {
       if (err) {
-        library.logger.error('Failed to undo uncomfirmed transactions', err);
-        reportor.report("nodejs", {
-          subaction: "exit",
-          data: {
-            method: "applyBlock",
-            reason: "Failed to undo unconfirmed transactions " + err
-          }
-        });
-        return process.exit(0);
-      }
-      library.oneoff.clear()
-      doApplyBlock(function (err) {
+        library.logger.error('Failed to apply block: ' + err)
+      }    
+      var redoTrs = unconfirmedTrs.filter((item) => !applyedTrsIdSet.has(item.id))
+      modules.transactions.receiveTransactions(redoTrs, function (err) {
         if (err) {
-          library.logger.error('Failed to apply block: ' + err)
+          library.logger.error('Failed to redo unconfirmed transactions', err);
         }
-        var redoTrs = unconfirmedTrs.filter((item) => !applyedTrsIdSet.has(item.id))
-        modules.transactions.receiveTransactions(redoTrs, function (err) {
-          if (err) {
-            library.logger.error('Failed to redo unconfirmed transactions', err);
-          }
-          cb()
-        });
-      })
-    });
+        cb()
+      });
+    })
+    // modules.transactions.undoUnconfirmedList(function (err) {
+    //   if (err) {
+    //     library.logger.error('Failed to undo uncomfirmed transactions', err);
+    //     reportor.report("nodejs", {
+    //       subaction: "exit",
+    //       data: {
+    //         method: "applyBlock",
+    //         reason: "Failed to undo unconfirmed transactions " + err
+    //       }
+    //     });
+    //     return process.exit(0);
+    //   }
+    //   library.oneoff.clear()
+    //   doApplyBlock(function (err) {
+    //     if (err) {
+    //       library.logger.error('Failed to apply block: ' + err)
+    //     }    
+    //     var redoTrs = unconfirmedTrs.filter((item) => !applyedTrsIdSet.has(item.id))
+    //     modules.transactions.receiveTransactions(redoTrs, function (err) {
+    //       if (err) {
+    //         library.logger.error('Failed to redo unconfirmed transactions', err);
+    //       }
+    //       cb()
+    //     });
+    //   })
+    // });
   }, callback);
 }
 
@@ -1271,19 +1250,22 @@ Blocks.prototype.loadBlocksFromPeer = function (peer, lastCommonBlockId, cb) {
     },
     function (next) {
       count++;
-      modules.transport.getFromPeer(peer, {
-        method: "GET",
-        api: '/blocks?lastBlockId=' + lastCommonBlockId + '&limit=200'
-      }, function (err, data) {
-        if (err || data.body.error) {
-          return next(err || data.body.error.toString());
+      //loadblocks
+      const limit = 200
+      const params = {
+        limit,
+        lastBlockId: lastCommonBlockId,
+      }
+      modules.peer.request('loadblocks', params, peer, (err, body) => {
+        if (err || body.error) {
+          return next(err || body.error.toString());
         }
 
-        var blocks = data.body.blocks;
+        var blocks = body.blocks;
 
-        if (typeof blocks === "string") {
-          blocks = library.dbLite.parseCSV(blocks);
-        }
+        // if (typeof blocks === "string") {
+        //   blocks = library.dbLite.parseCSV(blocks);
+        // }
 
         var report = library.scheme.validate(blocks, /*{
           type: "array"
@@ -1295,33 +1277,34 @@ Blocks.prototype.loadBlocksFromPeer = function (peer, lastCommonBlockId, cb) {
 
         // add two new field: trs.args and trs.message
         // This code is for compatible with old nodes
-        if (blocks[0] && blocks[0].length == 63) {
-          blocks.forEach(function (b) {
-            for (var i = 80; i >= 25; --i) {
-              b[i] = b[i - 2]
-            }
-            b[23] = ''
-            b[24] = ''
-            if (b[14] >= 8 && b[14] <= 14) {
-              for (var i = 80; i >= 48; --i) {
-                b[i] = b[i - 6]
-              }
-              b[42] = ''
-              b[43] = ''
-              b[44] = ''
-              b[45] = ''
-              b[46] = ''
-              b[47] = ''
-            }
-          })
-        }
+        // if (blocks[0] && blocks[0].length == 63) {
+        //   blocks.forEach(function (b) {
+        //     for (var i = 80; i >= 25; --i) {
+        //       b[i] = b[i - 2]
+        //     }
+        //     b[23] = ''
+        //     b[24] = ''
+        //     if (b[14] >= 8 && b[14] <= 14) {
+        //       for (var i = 80; i >= 48; --i) {
+        //         b[i] = b[i - 6]
+        //       }
+        //       b[42] = ''
+        //       b[43] = ''
+        //       b[44] = ''
+        //       b[45] = ''
+        //       b[46] = ''
+        //       b[47] = ''
+        //     }
+        //   })
+        // }
         blocks = blocks.map(library.dbLite.row2parsed, __private.blocksDataFields);//library.dbLite.parseFields()
         blocks = __private.readDbRows(blocks);
+        //console.log("load blocks ----------",JSON.stringify(blocks))
         if (blocks.length == 0) {
           loaded = true;
           next();
         } else {
-          var peerStr = data.peer ? ip.fromLong(data.peer.ip) + ":" + data.peer.port : 'unknown';
+          var peerStr = peer ? ip.fromLong(peer.ip) + ":" + peer.port : 'unknown';
           library.logger.log('Loading ' + blocks.length + ' blocks from', peerStr);
 
           async.eachSeries(blocks, function (block, cb) {
@@ -1330,7 +1313,7 @@ Blocks.prototype.loadBlocksFromPeer = function (peer, lastCommonBlockId, cb) {
             } catch (e) {
               library.logger.error('Failed to normalize block: ' + e, block)
               library.logger.error('Block ' + (block ? block.id : 'null') + ' is not valid, ban 60 min', peerStr);
-              modules.peer.state(peer.ip, peer.port, 0, 3600);
+              //modules.peer.state(peer.ip, peer.port, 0, 3600);
               return cb(e);
             }
             self.processBlock(block, null, false, true, true, function (err) {
@@ -1341,7 +1324,7 @@ Blocks.prototype.loadBlocksFromPeer = function (peer, lastCommonBlockId, cb) {
               } else {
                 library.logger.error('Failed to process block: ' + err, block)
                 library.logger.error('Block ' + (block ? block.id : 'null') + ' is not valid, ban 60 min', peerStr);
-                modules.peer.state(peer.ip, peer.port, 0, 3600);
+                //modules.peer.state(peer.ip, peer.port, 0, 3600);
               }
 
               return cb(err);
@@ -1384,6 +1367,7 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
   }
   //console.log("generateBlock enter transactions.length :"+transactions.length)
   const generateUptime = reportor.uptime;
+
   async.eachSeries(transactions, function (transaction, next) {
     // modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
     //   if (err || !sender) {

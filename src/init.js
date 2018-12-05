@@ -58,13 +58,18 @@ module.exports = function init(options) {
     appConfig.netVersion = process.env.NET_VERSION || 'localnet';
     appConfig.publicDir = path.join(baseDir, 'public', 'dist');
     appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps')
+    if(program.dataDir){
+        appConfig.dataDir =  path.join(baseDir, program.dataDir);
+    }else{
+        appConfig.dataDir =  path.join(baseDir, 'data');
+    }
     appConfig.upnp = program.upnp;
     appConfig.acquireip = program.acquireip;
     appConfig.checkpriip = program.checkpriip;
 
     global.Config = appConfig;
 
-    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock.json');
+    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock-personal.json');
     if (program.genesisblock) {
         genesisblockFile = path.resolve(process.cwd(), program.genesisblock);
     }

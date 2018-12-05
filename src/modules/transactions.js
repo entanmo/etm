@@ -745,7 +745,7 @@ Transactions.prototype.undoUnconfirmed = function (transaction, cb) {
 }
 
 Transactions.prototype.receiveTransactions = function (transactions, cb) {
-  if (__private.unconfirmedNumber > constants.maxTxsPerBlock) {
+  if (__private.unconfirmedNumber  + transactions.length > constants.maxTxsCache) {
     setImmediate(cb, "Too many transactions");
     return;
   }
@@ -755,18 +755,7 @@ Transactions.prototype.receiveTransactions = function (transactions, cb) {
     cb(err, transactions);
   });
 }
-Transactions.prototype.receiveBatchTransactions = function (transactions, cb) {
-  if (__private.unconfirmedNumber + transactions.length > constants.maxTxsPerBlock) {
-    setImmediate(cb, "Too many transactions");
-    return;
-  }
-  async.eachSeries(transactions, function (transaction, next) {
-    
-    self.processUnconfirmedTransaction(transaction, true, next);
-  }, function (err) {
-    cb(err, transactions);
-  });
-}
+
 
 Transactions.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);

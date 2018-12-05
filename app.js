@@ -63,6 +63,7 @@ function main() {
     .option('-e, --execute <path>', 'exe')
     .option('--dapps <dir>', 'DApps directory')
     .option('--base <dir>', 'Base directory')
+    .option('--dataDir <dir>', 'Data directory')
     .option('--no-upnp', "Disable unpn feature")
     .option('--no-acquireip', "Disable acquire ip feature")
     .option('--no-checkpriip', "Disable check private ip type")

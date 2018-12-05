@@ -32,9 +32,9 @@ function Consensus(scope, cb) {
   this.pendingBlock = null;
   this.pendingVotes = null;
   this.votesKeySet = {};
-
   this.minerInst = new Miner(path.resolve(__dirname, "../../config/miner-cfg.json"));
   cb && setImmediate(cb, null, this);
+
 }
 
 Consensus.prototype.createVotes = function (keypairs, block) {
