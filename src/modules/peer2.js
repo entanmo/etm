@@ -193,6 +193,7 @@ const priv = {
   broadcast: (message, peers) =>{
     priv.findSeenNodesInDb((err,nodes)=>{
       if(err) return
+      nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
       peers = priv.getRandomPeers(20, nodes)
       library.logger.debug(`broadcast message to  nodes`+ JSON.stringify(peers) )
       priv.dht.broadcast(message, peers)
@@ -249,8 +250,9 @@ Peer.prototype.listPeers = ( cb) => {
   // var peers =  priv.getRandomPeers(20, nodes)
   priv.findSeenNodesInDb((err,nodes)=>{
     if(!err){
-      peers = priv.getRandomPeers(20, nodes)
-      cb(null,  nodes)
+      nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
+      var peers = priv.getRandomPeers(20, nodes)
+      cb(null,  peers)
     }
   })
 
@@ -260,6 +262,14 @@ Peer.prototype.addPeer = ( host,port) => {
   let node ={host,  port }
   node.id = priv.getNodeIdentity(node)
   priv.dht.addNode(node)
+  if (library.config.publicIp) {
+      const message = {
+          body: {
+              ping:JSON.stringify(ip) 
+          }
+      }
+      modules.peer.publish('newPeer', message)
+  }
 
 }
 
