@@ -120,7 +120,7 @@ const priv = {
   },
   findSeenNodesInDb: (callback) => {
     priv.nodesDb.find({ /* seen: { $exists: true } */ })
-      .sort({ seen: -1 })
+     // .sort({ seen: -1 })
       .exec((err, nodes) => {
         if (err) return callback(err)
 
@@ -277,6 +277,7 @@ Peer.prototype.isReady = () => {return priv.ready}
 
 Peer.prototype.getRandomNode = (cb) => {
   let nodes = priv.getHealthNodes() 
+  //library.logger.debug("in RandomNode---getHealthNodes=="+JSON.stringify(nodes)+JSON.stringify(nodes.length))
   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
   var peers =  priv.getRandomPeers(1, nodes)
   cb(null,  peers)
