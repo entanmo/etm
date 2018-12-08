@@ -47,7 +47,7 @@ __private.attachApi = function () {
         "get /": "acquireIp"
     });
     */
-    router.get("/", shared.acquireIp.bind(shared));
+    router.post("/", shared.acquireIp.bind(shared));
 
     router.use(function(req, res) {
         res.status(500).send({success: false, error: "API endpoint not found"});
@@ -62,36 +62,41 @@ __private.attachApi = function () {
 }
 
 P2PHelper.prototype.broadcast = function (cb) {
-    modules.peer.list({limit: 20}, function (err, peers) {
+        
+    modules.peer.getRandomNode( function (err, peers) {
         if (!err) {
-            async.detectLimit(peers, 5, function (peer, cb) {
+           
+            async.detectLimit(peers, 1, function (peer, cb) {
+             
                 var url = "/api/p2phelper";
                 if (peer.address) {
                     url = "http://" + peer.address + url;
                 } else {
-                    url = "http://" + ip.fromLong(peer.ip) + ":" + peer.port + url;
+                    url = "http://" +peer.host + ":" +(parseInt(peer.port) -1) + url;// ip.fromLong(peer.ip)
                 }
-
+              
                 const req = {
                     url: url,
-                    method: "GET",
+                    method: "POST",
                     json: true,
                     timeout: library.config.peers.options.timeout,
                     forever: true
                 };
+                //console.log("acquireIp request: ", url);
                 request(req, function (err, resp, body) {
+                 //   console.log("response request: ", JSON.stringify(body));
                     if (err || resp.statusCode !== 200) {
                         return cb(null, false);
                     }
-
+                   // console.log("acquireIp get: ", body.ip);
                     if (body.ip && typeof body.ip === "string" && !ip.isPrivate(body.ip)) {
                         const currentIp = library.config.publicIp;
                         const newIp = body.ip;
                         if (currentIp !== newIp) {
-                            library.logger.log("acquireSelfIp: ", newIp);
+                           // library.logger.log("acquireSelfIp: ", newIp);
                             library.config.publicIp = newIp;
                             setImmediate(() => {
-                                library.bus.message("publicIpChanged", library.config.publicIp, library.config.port, true);
+                                library.bus.message("publicIpChanged", library.config.publicIp, library.config.peerPort, true);
                             });
                         }
                         return cb(null, true);
@@ -115,8 +120,9 @@ P2PHelper.prototype.onBind = function (scope) {
     modules = scope;
 }
 
-P2PHelper.prototype.onBlockchainReady = function () {
+P2PHelper.prototype.onPeerReady = function () {
     // 未配置acquireip选项，则不启用自动获取公网ip的操作
+  // console.log("acquireIp library.config.acquireip: ", library.config.acquireip);
     if (!library.config.acquireip) {
         return ;
     }
@@ -125,12 +131,19 @@ P2PHelper.prototype.onBlockchainReady = function () {
         setTimeout(nextUpdatePublicIp, 65 * 1000);
     });
 
-    setImmediate(function nextHeartBeat() {
-        if (library.config.publicIp) {
-            library.bus.message('heartBeat', library.config.publicIp, library.config.port, true);
-        }
-        setTimeout(nextHeartBeat, 60 * 1000);
-    });
+    // setImmediate(function nextHeartBeat() {
+    //     if (library.config.publicIp) {
+    //         const message = {
+    //             body: {
+    //                 ping:JSON.stringify(ip) ,//
+    //             },
+    //         }
+    //         //console.log('newPeer')
+    //         modules.peer.publish('newPeer', message)
+    //        //library.bus.message('heartBeat', library.config.publicIp, library.config.port, true);
+    //     }
+    //     setTimeout(nextHeartBeat, 60 * 1000);
+    // });
 
     setImmediate(function nextCheckPublicIp() {
         if (!library.config.publicIp) {
@@ -142,9 +155,6 @@ P2PHelper.prototype.onBlockchainReady = function () {
     });
 }
 
-P2PHelper.prototype.onPeerReady = function () {
-}
-
 P2PHelper.prototype.sandboxApi = function (call, args, cb) {
     sandboxHelper.callMethod(shared, call, args, cb);
 }
@@ -152,7 +162,7 @@ P2PHelper.prototype.sandboxApi = function (call, args, cb) {
 shared.acquireIp = function (req, res) {
     const remoteAddress = req.socket.remoteAddress;
     const remoteFamily = req.socket.remoteFamily;
-    library.logger.info("acquireIp: ", remoteAddress, remoteFamily);
+   // library.logger.info("acquireIp: ", remoteAddress, remoteFamily);
     const response = {
         ip: remoteAddress,
         family: remoteFamily

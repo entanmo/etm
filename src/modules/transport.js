@@ -518,15 +518,14 @@ __private.attachApi = function () {
   router.post('/p2p/ipChanged', function (req, res) {
     const body = req.body;
 
-    modules.peer.state(ip.toLong(body.ip), parseInt(body.port), 2);
-
+    //modules.peer.state(ip.toLong(body.ip), parseInt(body.port), 2);
+    modules.peer.addPeer(body.ip,parseInt(body.port))
     res.sendStatus(200);
   });
 
   router.post('/p2p/heartBeat', function (req, res) {
     const body = req.body;
-
-    modules.peer.heartbeat(ip.toLong(body.ip), parseInt(body.port));
+    
     res.sendStatus(200);
   })
 
@@ -803,11 +802,18 @@ Transport.prototype.onBlockchainReady = function () {
 }
 Transport.prototype.onPeerReady = () => {
   
+  modules.peer.subscribe('newPeer', (message) => {
+    try {
+      const ping = message.body.ping
+      console.log('receive newPeer', JSON.stringify(ping))
+    } catch (e) {
+      library.logger.error('Receive invalid newPeer', e)
+    }
+  })
   modules.peer.subscribe('propose', (message) => {
     try {
       const propose = library.protobuf.decodeBlockPropose(message.body.propose)
-     // console.log('receivePropose', JSON.stringify(propose))
-     // modules.peer.addNode(propose.address)
+      library.logger.debug('receive Propose', JSON.stringify(propose))
       library.bus.message('receivePropose', propose)
     } catch (e) {
       library.logger.error('Receive invalid propose', e)
@@ -953,9 +959,25 @@ Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
       ip: ip,
       port: port
     };
-    self.broadcast({}, {api: '/p2p/ipChanged', data: data, method: "POST"});
+    self.broadcastByPost({api: '/p2p/ipChanged', data: data, method: "POST"});
   }
 }
+
+// Transport.prototype.onHeartBeat = function (ip, port, broadcast) {
+//   if (broadcast) {
+//     // const data = {
+//     //   ip: ip,
+//     //   port: port
+//     // };
+//     const message = {
+//       body: {
+//         ping: ip,
+//       },
+//     }
+//      self.broadcast('a', message)
+//     // self.broadcastByPost( {api: '/p2p/heartBeat', data: data, method: "POST"})
+//   }
+// }
 
 
 

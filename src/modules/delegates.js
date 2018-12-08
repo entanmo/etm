@@ -498,7 +498,7 @@ __private.loop = function (cb) {
     return setImmediate(cb);
   }
 
-  if (!__private.loaded || modules.loader.syncing() || !modules.round.loaded()) {
+  if (!__private.loaded || modules.loader.syncing() || !modules.round.loaded()|| !modules.peer.isReady()) {
     library.logger.trace('Loop:', 'node not ready');
     return setImmediate(cb);
   }
