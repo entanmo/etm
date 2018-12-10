@@ -105,7 +105,7 @@ P2PHelper.prototype.broadcast = function (cb) {
                     return cb(null, false);
                 });
             }, function (err, result) {
-                if (result === undefined) {
+                if (!result) {
                     // TODO -- DetachLimit failure, so after 1 second to repeat.
                     setTimeout(() => {
                         self.broadcast();

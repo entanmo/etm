@@ -901,7 +901,7 @@ Transport.prototype.onPeerReady = () => {
 }
 Transport.prototype.onSignature = function (signature, broadcast) {
   if (broadcast) {
-    self.broadcast({}, { api: '/signatures', data: { signature: signature }, method: "POST" });
+    self.broadcastByPost( { api: 'signatures', data: { signature: signature }, method: "POST" });
     library.network.io.sockets.emit('signature/change', {});
   }
 }
@@ -949,7 +949,7 @@ Transport.prototype.onDappReady = function (dappId, broadcast) {
     var data = {
       dappId: dappId
     }
-    self.broadcast({}, { api: '/dappReady', data: data, method: "POST" })
+    self.broadcastByPost( { api: 'dappReady', data: data, method: "POST" })
   }
 }
 
@@ -959,7 +959,7 @@ Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
       ip: ip,
       port: port
     };
-    self.broadcastByPost({api: '/p2p/ipChanged', data: data, method: "POST"});
+    self.broadcastByPost({api: 'p2p/ipChanged', data: data, method: "POST"});
   }
 }
 
@@ -982,17 +982,34 @@ Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
 
 
 Transport.prototype.sendVotes = function (votes, address) {
-
   const parts = address.split(':')
   const contact = {
     host: parts[0],
     port: parseInt(parts[1])+1,
   }
-  modules.peer.request('votes', { votes }, contact, (err) => {
-    if (err) {
-      library.logger.error('send votes error', err)
-    }
-  })
+  modules.peer.listPeers( function (err, peers) {
+    if (!err) {
+      const nodesMap = new Map()
+      peers.forEach((n) => {
+        const a = `${n.host}:${n.port}`
+        console.log(" a in nodesMap == "+a );
+        if (!nodesMap.has(a)) nodesMap.set(a, n)
+      })
+      
+      const b = `${contact.host}:${contact.port}`
+      console.log("nodesMap.has(b) == "+nodesMap.has(b))
+      if(nodesMap.has(b)){
+        modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
+          if (err) {
+            library.logger.error('send votes error', err)
+            self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+          }
+        })
+      }else{
+        self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+      }
+    } 
+  });
 }
 
 Transport.prototype.onMessage = function (msg, broadcast) {

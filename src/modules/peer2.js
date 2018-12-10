@@ -13,7 +13,6 @@ const Database = require('nedb')
 let modules
 let library
 let self
-
 const SAVE_PEERS_INTERVAL = 1 * 60 * 1000
 const CHECK_BUCKET_OUTDATE = 3 * 60 * 1000
 const RECONNECT_SEED_INTERVAL = 30 * 1000
@@ -195,11 +194,11 @@ const priv = {
       if(err) return
       nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
       peers = priv.getRandomPeers(20, nodes)
-      library.logger.debug(`broadcast message to  nodes`+ JSON.stringify(peers) )
+      library.logger.debug(`findSeenNodesInDb  nodes`+ JSON.stringify(peers) )
       priv.dht.broadcast(message, peers)
     })
-  //   let nodes = priv.getHealthNodes() 
-  // //  library.logger.debug(`broadcast message to  nodes`+ JSON.stringify(nodes) )
+    //let nodes = priv.getHealthNodes() 
+   // library.logger.debug(`getHealthNodes`+ JSON.stringify(nodes) )
   //   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
   //   peers = peers || priv.getRandomPeers(20, nodes)
   //   library.logger.debug(`broadcast message to  nodes`+ JSON.stringify(peers) )
@@ -368,6 +367,7 @@ Peer.prototype.request = (method, params, contact, cb) => {
       version: global.Config.version,
     },
     json: true,
+    timeout: library.config.peers.options.timeout
   }
   request(reqOptions, (err, response, result) => {
     if (err) {
@@ -379,6 +379,33 @@ Peer.prototype.request = (method, params, contact, cb) => {
     return cb(null, result)
   })
 }
+
+Peer.prototype.proposeRequest = (method, params, contact, cb) => {
+  const address = `${contact.host}:${contact.port - 1}`
+  const uri = `http://${address}/peer/${method}`
+  library.logger.debug(`start to request ${uri}`)
+  const reqOptions = {
+    uri,
+    method: 'POST',
+    body: params,
+    headers: {
+      magic: global.Config.magic,
+      version: global.Config.version,
+    },
+    json: true,
+    timeout: library.config.peers.options.pingTimeout
+  }
+  request(reqOptions, (err, response, result) => {
+    if (err) {
+      return cb(`Failed to request remote peer: ${err}`)
+    } else if (response.statusCode !== 200) {
+      library.logger.debug('remote service error', result)
+      return cb(`Invalid status code: ${response.statusCode}`)
+    }
+    return cb(null, result)
+  })
+}
+
 
 Peer.prototype.randomRequest = (method, params, cb) => {
   const randomNode = priv.getRandomNode()
