@@ -802,18 +802,19 @@ Transport.prototype.onBlockchainReady = function () {
 }
 Transport.prototype.onPeerReady = () => {
   
-  modules.peer.subscribe('newPeer', (message) => {
+  modules.peer.subscribe('newPeer', (message,peer) => {
     try {
-      const ping = message.body.ping
-      console.log('receive newPeer', JSON.stringify(ping))
+    //const ping = message.body.ping
+    //console.log('receive newPeer  %s from %s', JSON.stringify(  new Buffer(ping).toString()),peer)
+    // console.log('receive newPeer ', JSON.stringify(  new Buffer(ping, 'base64').toString('hex')))
     } catch (e) {
       library.logger.error('Receive invalid newPeer', e)
     }
   })
-  modules.peer.subscribe('propose', (message) => {
+  modules.peer.subscribe('propose', (message,peer) => {
     try {
       const propose = library.protobuf.decodeBlockPropose(message.body.propose)
-      library.logger.debug('receive Propose', JSON.stringify(propose))
+      library.logger.debug('receive Propose address '+ propose.address +" from "+JSON.stringify(peer))
       library.bus.message('receivePropose', propose)
     } catch (e) {
       library.logger.error('Receive invalid propose', e)

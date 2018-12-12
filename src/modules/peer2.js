@@ -180,7 +180,7 @@ const priv = {
   getHealthNodes: () => {
     var peers  = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
    
-    peers.filter(n => {
+    peers = peers.filter(n => {
       const element = `${n.host}:${n.port}`
       const selfAddress = `${library.config.publicIp}:${library.config.peerPort}`
       return element != selfAddress
@@ -229,7 +229,7 @@ const priv = {
     peers = priv.getRandomPeers(20, nodes)
     priv.dht.broadcast(message, peers)
 
-    library.logger.debug(`broadcast message to  nodes`+ JSON.stringify(peers) )
+   // library.logger.debug(`broadcast `+JSON.stringify(message)+`to  nodes`+ JSON.stringify(peers) )
   //   priv.dht.broadcast(message, peers)
   }
 }
@@ -400,6 +400,16 @@ Peer.prototype.request = (method, params, contact, cb) => {
   }
   request(reqOptions, (err, response, result) => {
     if (err) {
+      if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
+        //library.logger.debug(JSON.stringify(err)) 
+        const node = { host: err.ip, port: Number(err.port) }
+        node.id = priv.getNodeIdentity(node)
+        priv.dht.removeNode(node.id, function (err) {
+          if (!err) {
+            library.logger.info(`failed to remove peer : ${err}`)
+          }
+        })
+      } 
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
       library.logger.debug('remote service error', result)
