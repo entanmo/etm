@@ -175,7 +175,7 @@ __private.attachApi = function () {
     req.sanitize(body,  scheme.sanitize_blocks, function (err, report, query) {
       if (err) return next(err);
       if (!report.isValid) return res.json({ success: false, error: report.issues });
-      console.log("/loadblocks  query.lastBlockId====="+ query.lastBlockId)
+      //console.log("/loadblocks  query.lastBlockId====="+ query.lastBlockId)
       // Get 1400+ blocks with all data (joins) from provided block id
       var blocksLimit = 200;
       if (query.limit) {
@@ -881,7 +881,7 @@ Transport.prototype.onPeerReady = () => {
       modules.transactions.receiveTransactions([transaction], cb);
     }, function (err, transactions) {
       if (err) {
-        library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
+       // library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
         __private.invalidTrsCache.set(transaction.id, true)
        // res.status(200).json({ success: false, error: err });
       } else {

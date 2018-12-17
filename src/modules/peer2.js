@@ -401,8 +401,8 @@ Peer.prototype.request = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        //library.logger.debug(JSON.stringify(err)) 
-        const node = { host: err.ip, port: Number(err.port) }
+        const node = { host: err.ip, port: Number(err.port)+1 }
+        library.logger.debug("remove node:"+JSON.stringify(node)) 
         node.id = priv.getNodeIdentity(node)
         priv.dht.removeNode(node.id, function (err) {
           if (!err) {
@@ -436,6 +436,16 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
   }
   request(reqOptions, (err, response, result) => {
     if (err) {
+      if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
+        const node = { host: err.ip, port: Number(err.port)+1 }
+        library.logger.debug("remove node:"+JSON.stringify(node)) 
+        node.id = priv.getNodeIdentity(node)
+        priv.dht.removeNode(node.id, function (err) {
+          if (!err) {
+            library.logger.info(`failed to remove peer : ${err}`)
+          }
+        })
+      } 
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
       library.logger.debug('remote service error', result)

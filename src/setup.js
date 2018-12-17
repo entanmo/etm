@@ -374,7 +374,7 @@ module.exports = function setup(options, done) {
           var parts = req.url.split('/');
           var ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   
-         scope.logger.debug(req.method + " " + req.url + " from " + ip);
+         scope.logger.trace(req.method + " " + req.url + " from " + ip);
   
           /* Instruct browser to deny display of <frame>, <iframe> regardless of origin.
            *

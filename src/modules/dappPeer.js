@@ -397,7 +397,7 @@ DappPeer.prototype.onBlockchainReady = function () {
   async.eachSeries(library.config.peers.list, function (peer, cb) {
     library.dbLite.query("INSERT OR IGNORE INTO peers(ip, port, state) VALUES($ip, $port, $state)", {
       ip: ip.toLong(peer.ip),
-      port: peer.port,
+      port: Number(peer.port)-1,
       state: 2
     }, cb);
   }, function (err) {
