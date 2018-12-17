@@ -135,14 +135,14 @@ P2PHelper.prototype.onPeerReady = function () {
     //     if (library.config.publicIp) {
     //         const message = {
     //             body: {
-    //                 ping:JSON.stringify(ip) ,//
-    //             },
+    //                 ping: library.config.publicIp  //
+    //             }
     //         }
-    //         //console.log('newPeer')
+    //         console.log('send newPeer '+library.config.publicIp)
     //         modules.peer.publish('newPeer', message)
     //        //library.bus.message('heartBeat', library.config.publicIp, library.config.port, true);
     //     }
-    //     setTimeout(nextHeartBeat, 60 * 1000);
+    //     setTimeout(nextHeartBeat, 3* 1000);
     // });
 
     setImmediate(function nextCheckPublicIp() {
@@ -162,7 +162,7 @@ P2PHelper.prototype.sandboxApi = function (call, args, cb) {
 shared.acquireIp = function (req, res) {
     const remoteAddress = req.socket.remoteAddress;
     const remoteFamily = req.socket.remoteFamily;
-   // library.logger.info("acquireIp: ", remoteAddress, remoteFamily);
+    library.logger.info("acquireIp: ", remoteAddress, remoteFamily);
     const response = {
         ip: remoteAddress,
         family: remoteFamily

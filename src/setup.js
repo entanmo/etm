@@ -128,7 +128,7 @@ const config = {
     'loader': './modules/loader.js',
     'system': './modules/system.js',
     'peer': './modules/peer2.js',
-   // 'peer2': './modules/peer2.js',
+    'dappPeer': './modules/dappPeer.js',
     'delegates': './modules/delegates.js',
     'round': './modules/round.js',
     'multisignatures': './modules/multisignatures.js',

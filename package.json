@@ -30,7 +30,7 @@
     "ejs": "^2.5.9",
     "entanmo-miner": "https://gitee.com/just-anohaker/multi-node.git",
     "etm-vm": "git+https://github.com/entanmo/etm-vm.git",
-    "bittorrent-dht": "https://github.com/AschPlatform/bittorrent-dht/tarball/v8.4.0+asch.2",
+    "bittorrent-dht": "https://github.com/AschPlatform/bittorrent-dht/tarball/master",
     "nedb": "=1.8.0",
     "express": "^4.16.3",
     "express-domain-middleware": "^0.1.0",

@@ -2150,7 +2150,7 @@ __private.launchApp = function (dapp, params, cb) {
       return setImmediate(cb, "Failed to read config.json file for: " + dapp.transactionId);
     }
     async.eachSeries(dappConfig.peers, function (peer, cb) {
-      modules.peer.addDapp({
+      modules.dappPeer.addDapp({
         ip: ip.toLong(peer.ip),
         port: peer.port,
         dappId: dapp.transactionId
