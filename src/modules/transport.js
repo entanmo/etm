@@ -1010,12 +1010,12 @@ Transport.prototype.sendVotes = function (votes, address) {
       const nodesMap = new Map()
       peers.forEach((n) => {
         const a = `${n.host}:${n.port}`
-        console.log(" a in nodesMap == "+a );
+       // console.log(" a in nodesMap == "+a );
         if (!nodesMap.has(a)) nodesMap.set(a, n)
       })
       
       const b = `${contact.host}:${contact.port}`
-      console.log("nodesMap.has(b) == "+nodesMap.has(b))
+     // console.log("nodesMap.has(b) == "+nodesMap.has(b))
       if(nodesMap.has(b)){
         modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
           if (err) {

@@ -449,7 +449,7 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
 Peer.prototype.randomRequest = (method, params, cb) => {
   const randomNode = priv.getRandomNode()
   if (!randomNode) return cb('No contact')
-  library.logger.debug('select random contract', randomNode)
+ // library.logger.debug('select random contract', randomNode)
   let isCallbacked = false
   setTimeout(() => {
     if (isCallbacked) return
