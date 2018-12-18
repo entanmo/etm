@@ -85,7 +85,7 @@ Round.prototype.loaded = function () {
 
 // Public methods
 Round.prototype.calc = function (height) {
-  return Math.floor(height / slots.delegates) + (height % slots.delegates > 0 ? 1 : 0);
+  return Math.floor(height / slots.roundBlocks) + (height % slots.roundBlocks > 0 ? 1 : 0);
 }
 
 Round.prototype.getVotes = function (round, cb) {
@@ -172,7 +172,7 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
       return done();
     }
 
-    if (__private.unDelegatesByRound[round].length !== slots.delegates && previousBlock.height !== 1) {
+    if (__private.unDelegatesByRound[round].length !== slots.roundBlocks && previousBlock.height !== 1) {
       return done();
     }
     library.logger.warn('Unexpected roll back cross round', {
@@ -402,7 +402,7 @@ Round.prototype.tick = function (block, cb) {
       return done();
     }
 
-    if (__private.delegatesByRound[round].length !== slots.delegates && block.height !== 1 && block.height !== slots.delegates) {
+    if (__private.delegatesByRound[round].length !== slots.roundBlocks && block.height !== 1 && block.height !== slots.roundBlocks) {
       return done();
     }
 
@@ -426,7 +426,26 @@ Round.prototype.tick = function (block, cb) {
               }
             }
           }
-          cb();
+
+          // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
+          async.eachSeries(roundDelegates, function (delegate, cb) {
+            modules.delegates.getDelegateVoters(delegate, function (err, voters) {
+              if (err) {
+                return cb(err);
+              }
+  
+              async.eachSeries(voters.accounts, function (voter, cb) {
+                modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, function (err) {
+                  
+                  return cb(err);
+                });
+              }, function (err) {
+                return cb(err);
+              });
+            });
+          }, function (err) {
+            return cb(err);
+          });
         });
       },
       function (cb) {
@@ -604,7 +623,7 @@ Round.prototype.onBind = function (scope) {
 
 Round.prototype.onBlockchainReady = function () {
   var round = self.calc(modules.blocks.getLastBlock().height);
-  library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / "+slots.delegates+" as integer) + (case when b.height % "+slots.delegates+" > 0 then 1 else 0 end))) = $round",
+  library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / "+slots.roundBlocks+" as integer) + (case when b.height % "+slots.roundBlocks+" > 0 then 1 else 0 end))) = $round",
     {
       round: round
     },

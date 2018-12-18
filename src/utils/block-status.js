@@ -19,19 +19,21 @@ var slots = require('./slots.js')
 
 function BlockStatus() {
   var milestones = [
-    350000000, // Initial Reward
-    300000000, // Milestone 1
-    200000000, // Milestone 2
-    100000000, // Milestone 3
-    50000000  // Milestone 4
+    600000000, // Initial Reward
+    500000000, // Milestone 1
+    400000000, // Milestone 2
+    400000000, // Milestone 3
+    300000000, // Milestone 4
+    200000000  // Milestone 5
   ];
 
-  var distance = 3000000, // Distance between each milestone
-      rewardOffset = 1; // Start rewards at block (n)
+  var distance = 10112000, // Distance between each milestone
+    rewardOffset = 1, // Start rewards at block (n)
+    lastRewardHeight = 59328000;
 
-  if (global.Config.netVersion === 'mainnet') {
-    rewardOffset = 464500;
-  }
+  // if (global.Config.netVersion === 'mainnet') {
+  //   rewardOffset = 464500;
+  // }
 
   var parseHeight = function (height) {
     height = parseInt(height);
@@ -45,7 +47,7 @@ function BlockStatus() {
 
   this.calcMilestone = function (height) {
     var location = Math.floor(parseHeight(height - rewardOffset) / distance),
-        lastMile = milestones[milestones.length - 1];
+      lastMile = milestones[milestones.length - 1];
 
     if (location > (milestones.length - 1)) {
       return milestones.lastIndexOf(lastMile);
@@ -57,7 +59,7 @@ function BlockStatus() {
   this.calcReward = function (height) {
     var height = parseHeight(height);
 
-    if (height < rewardOffset || height <= 1) {
+    if (height < rewardOffset || height <= 1 || height > lastRewardHeight) {
       return 0;
     } else {
       return milestones[this.calcMilestone(height)];
@@ -66,15 +68,16 @@ function BlockStatus() {
 
   this.calcSupply = function (height) {
     var height = parseHeight(height);
-    height -= height % slots.delegates;
+    height -= height % slots.roundBlocks;
     var milestone = this.calcMilestone(height);
-    var supply    = constants.totalAmount;
-    var rewards   = [];
+    var supply = constants.totalAmount;
+    var rewards = [];
 
     if (height <= 0) {
       return supply;
     }
-    var amount = 0, multiplier = 0;
+    var amount = 0,
+      multiplier = 0;
     height = height - rewardOffset + 1;
     for (var i = 0; i < milestones.length; i++) {
       if (milestone >= i) {

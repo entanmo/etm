@@ -711,31 +711,31 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
     __private._getRandomDelegateList([],truncDelegateList,function(delegateList){
 
       // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
-      let round = modules.round.calc(height);
-      if (global.round !== round && height !== 1 && (height-1)  % slots.delegates === 0) {
-        global.round = round;
-        async.eachSeries(delegateList, function (delegate, cb) {
+      // let round = modules.round.calc(height);
+      // if (global.round !== round && height !== 1 && (height-1)  % slots.roundBlocks === 0) {
+      //   global.round = round;
+      //   async.eachSeries(delegateList, function (delegate, cb) {
 
-          modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
-            if (err) {
-              return cb(err);
-            }
+      //     modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
+      //       if (err) {
+      //         return cb(err);
+      //       }
 
-            async.eachSeries(voters.accounts, function (voter, cb) {
-              modules.lockvote.updateLockVotes(voter.address, height, 0.5, function (err) {
+      //       async.eachSeries(voters.accounts, function (voter, cb) {
+      //         modules.lockvote.updateLockVotes(voter.address, height, 0.5, function (err) {
                 
-                return cb(err);
-              });
-            }, function (err) {
-              return cb(err);
-            });
-          });
-        }, function (err) {
-          if (err) {
-            return cb(err);
-          }
-        });
-      }
+      //           return cb(err);
+      //         });
+      //       }, function (err) {
+      //         return cb(err);
+      //       });
+      //     });
+      //   }, function (err) {
+      //     if (err) {
+      //       return cb(err);
+      //     }
+      //   });
+      // }
       
       cb(null, delegateList.map(function (el) {
         return el.publicKey
@@ -1042,7 +1042,7 @@ Delegates.prototype.disableForging = function () {
 }
 
 Delegates.prototype.isDelegatesContainKeypairs = function (round,cb) {
-  self.generateDelegateList(round * slots.delegates + 1, function(err,list){
+  self.generateDelegateList(round * slots.roundBlocks + 1, function(err,list){
     if(!err){
       let keypairsSet = new Set(Object.keys(__private.keypairs));
       let intersection = Array.from(new Set(list.filter(v => keypairsSet.has(v))));
