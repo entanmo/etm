@@ -128,12 +128,14 @@ function isLive() {
 function now() {
 
     const now = Date.now();
+    /*
     if (!isLive() ||
         now >= internals.last.expires) {
         if (!internals.syncing) {
             return now;
         }
     }
+    */
 
     return now + internals.last.offset;
 }

@@ -504,14 +504,14 @@ Loader.prototype.onPeerReady = function () {
     if (slots.getNextSlot() - lastSlot >= 3) {
       self.startSyncBlocks();
     }
-    setTimeout(nextSync, 10* 1000);
+    setTimeout(nextSync, 3 * 1000);
   });
 
   setImmediate(function nextLoadUnconfirmedTransactions() {
     if (!__private.loaded || self.syncing()) return;
     __private.loadUnconfirmedTransactions(function (err) {
       err && library.logger.error('loadUnconfirmedTransactions timer:', err);
-      setTimeout(nextLoadUnconfirmedTransactions, 14 * 1000)
+      setTimeout(nextLoadUnconfirmedTransactions, 4 * 1000)
     });
 
   });
@@ -521,7 +521,7 @@ Loader.prototype.onPeerReady = function () {
     __private.loadSignatures(function (err) {
       err && library.logger.error('loadSignatures timer:', err);
 
-      setTimeout(nextLoadSignatures, 14 * 1000)
+      setTimeout(nextLoadSignatures, 4 * 1000)
     });
   });
 }

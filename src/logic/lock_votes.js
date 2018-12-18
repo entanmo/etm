@@ -57,6 +57,7 @@ function LockVotes() {
 
     library.base.account.merge(sender.address, {
       balance: -amount,
+      u_balance: -amount,
       blockId: block.id,
       round: modules.round.calc(block.height)
     }, function (err, sender) {
@@ -83,6 +84,7 @@ function LockVotes() {
     const amount = Number(trs.args[0]) + trs.fee;
     library.base.account.merge(sender.address, {
       balance: amount,
+      u_balance: amount,
       blockId: block.id,
       round: modules.round.calc(block.height)
     }, function (err, sender) { return cb(err); });

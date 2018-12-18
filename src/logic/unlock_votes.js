@@ -78,7 +78,6 @@ function UnlockVotes() {
         if (trs == null) {
           return cb(new Error("no transaction of LOCK with id:", id));
         }
-        lockAmount += trs.lockAmount;
         
         library.dbLite.query("UPDATE lock_votes SET state = 0 WHERE transactionId = $transactionId", {
           transactionId: id
@@ -98,6 +97,7 @@ function UnlockVotes() {
 
       library.base.account.merge(sender.address, {
         balance: lockAmount,
+        u_balance: lockAmount,
         blockId: block.id,
         round: modules.round.calc(block.height)
       },cb);
@@ -117,8 +117,15 @@ function UnlockVotes() {
           return cb(new Error("no transaction of LOCK with id:", id));
         }
 
-        lockAmount += trs.lockAmount;
-        return cb();
+        library.dbLite.query("UPDATE lock_votes SET state = 1 WHERE transactionId = $transactionId", {
+          transactionId: id
+        }, (err) => {
+          if (err) {
+            return cb(err);
+          }
+          lockAmount += trs.asset.lockAmount;
+          cb();
+        });
       });
     }, function (err) {
       if (err) {
@@ -127,6 +134,7 @@ function UnlockVotes() {
 
       library.base.account.merge(sender.address, {
         balance: -lockAmount,
+        u_balance: -lockAmount,
         blockId: block.id,
         round: modules.round.calc(block.height)
       },cb);

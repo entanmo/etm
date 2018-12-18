@@ -1082,11 +1082,32 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
         return cb("Database error");
       }
       var lastBlock = modules.blocks.getLastBlock();
+      /*
       var totalSupply = __private.blockStatus.calcSupply(lastBlock.height || 1);
       rows.forEach(function (row) {
         row.weight = row.balance / totalSupply * 100;
       });
       return cb(null, {accounts: rows});
+      */
+      let totalVotes = 0;
+      const votes = [];
+      async.eachOf(rows, (voter, index, callback) => {
+        module.lockvote.calcLockVotes(voter.address, lastBlock.height, (err, result) => {
+          const val = err ? 0 : result;
+          votes[index] = val;
+          totalVotes += val;
+          callback();
+        });
+      }, err => {
+        if (err) {
+          return cb(err.toString());
+        }
+
+        rows.forEach((row, index) => {
+          row.weight = votes[index] / totalVotes * 100;
+        });
+        return cb(null, {accounts: row});
+      });
     });
   });
 }
