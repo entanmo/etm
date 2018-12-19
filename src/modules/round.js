@@ -426,6 +426,7 @@ Round.prototype.tick = function (block, cb) {
               }
             }
           }
+          cb();
         });
       },
       function (cb) {
