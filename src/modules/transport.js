@@ -944,7 +944,7 @@ Transport.prototype.onNewBlock = function (block, votes, broadcast) {
     };
    self.broadcastByPost({ api: 'blocks', data: data, method: "POST" });
    
-  library.network.io.sockets.emit('blocks/change', {});
+  library.network.io.sockets.emit('blocks/change', {height: block.height});
 
     // __private.votesCache = {};// 清除签名缓存
   }
