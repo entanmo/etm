@@ -276,7 +276,7 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
         }
         var bonus = '-' + new RoundChanges(round).getClubBonus()
         var dappId = global.state.clubInfo.transactionId
-        const BONUS_CURRENCY = 'XAS'
+        const BONUS_CURRENCY = 'ETM'
         library.logger.info('EnTanMo witness club get new bonus: ' + bonus)
         library.balanceCache.addAssetBalance(dappId, BONUS_CURRENCY, bonus)
         library.model.updateAssetBalance(BONUS_CURRENCY, bonus, dappId, cb)
@@ -507,7 +507,7 @@ Round.prototype.tick = function (block, cb) {
         }
         var bonus = new RoundChanges(round).getClubBonus()
         var dappId = global.state.clubInfo.transactionId
-        const BONUS_CURRENCY = 'XAS'
+        const BONUS_CURRENCY = 'ETM'
         library.logger.info('EnTanMo witness club get new bonus: ' + bonus)
         library.balanceCache.addAssetBalance(dappId, BONUS_CURRENCY, bonus)
         library.model.updateAssetBalance(BONUS_CURRENCY, bonus, dappId, cb)

@@ -106,7 +106,7 @@ function OutTransfer() {
     }
 
     var currency = trs.asset.outTransfer.currency
-    if (currency === 'XAS') return cb()
+    if (currency === 'ETM') return cb()
     library.model.getAssetByName(currency, function (err, assetDetail) {
       if (err) return cb('Database error: ' + err)
       if (!assetDetail) return cb('Asset not exists')
@@ -192,14 +192,14 @@ function OutTransfer() {
     var transfer = trs.asset.outTransfer
     __private.unconfirmedOutTansfers[transfer.transactionId] = false;
 
-    if (transfer.currency !== 'XAS') {
+    if (transfer.currency !== 'ETM') {
       library.balanceCache.addAssetBalance(trs.recipientId, transfer.currency, transfer.amount)
       async.series([
         function (next) {
           library.model.updateAssetBalance(transfer.currency, '-' + transfer.amount, transfer.dappId, next)
         },
         function (next) {
-          library.model.updateAssetBalance('XAS', '-' + trs.fee, transfer.dappId, next)
+          library.model.updateAssetBalance('ETM', '-' + trs.fee, transfer.dappId, next)
         },
         function (next) {
           library.model.updateAssetBalance(transfer.currency, transfer.amount, trs.recipientId, next)
@@ -219,7 +219,7 @@ function OutTransfer() {
           round: modules.round.calc(block.height)
         }, function (err) {
           if (err) return cb(err);
-          library.model.updateAssetBalance('XAS', -amount - trs.fee, transfer.dappId, cb);
+          library.model.updateAssetBalance('ETM', -amount - trs.fee, transfer.dappId, cb);
         });
       });
     }
@@ -229,14 +229,14 @@ function OutTransfer() {
     var transfer = trs.asset.outTransfer
     __private.unconfirmedOutTansfers[transfer.transactionId] = true;
 
-    if (transfer.currency !== 'XAS') {
+    if (transfer.currency !== 'ETM') {
       library.balanceCache.addAssetBalance(trs.recipientId, transfer.currency, transfer.amount)
       async.series([
         function (next) {
           library.model.updateAssetBalance(transfer.currency, transfer.amount, transfer.dappId, next)
         },
         function (next) {
-          library.model.updateAssetBalance('XAS', trs.fee, transfer.dappId, next)
+          library.model.updateAssetBalance('ETM', trs.fee, transfer.dappId, next)
         },
         function (next) {
           library.model.updateAssetBalance(transfer.currency, '-' + transfer.amount, trs.recipientId, next)
@@ -256,7 +256,7 @@ function OutTransfer() {
           round: modules.round.calc(block.height)
         }, function (err) {
           if (err) return cb(err);
-          library.model.updateAssetBalance('XAS', amount + trs.fee, transfer.dappId, cb);
+          library.model.updateAssetBalance('ETM', amount + trs.fee, transfer.dappId, cb);
         });
       });
     }
@@ -267,15 +267,15 @@ function OutTransfer() {
     __private.unconfirmedOutTansfers[transfer.transactionId] = true
     var balance = library.balanceCache.getAssetBalance(transfer.dappId, transfer.currency) || 0
     var fee = trs.fee
-    if (transfer.currency === 'XAS') {
+    if (transfer.currency === 'ETM') {
       var amount = Number(transfer.amount) + fee
       if (bignum(balance).lt(amount)) return setImmediate(cb, 'Insufficient balance')
       library.balanceCache.addAssetBalance(transfer.dappId, transfer.currency, -amount)
     } else {
-      var xasBalance = library.balanceCache.getAssetBalance(transfer.dappId, 'XAS') || 0
-      if (bignum(xasBalance).lt(fee)) return setImmediate(cb, 'Insufficient balance')
+      var etmBalance = library.balanceCache.getAssetBalance(transfer.dappId, 'ETM') || 0
+      if (bignum(etmBalance).lt(fee)) return setImmediate(cb, 'Insufficient balance')
       if (bignum(balance).lt(transfer.amount)) return setImmediate(cb, 'Insufficient asset balance')
-      library.balanceCache.addAssetBalance(transfer.dappId, 'XAS', -fee)
+      library.balanceCache.addAssetBalance(transfer.dappId, 'ETM', -fee)
       library.balanceCache.addAssetBalance(transfer.dappId, transfer.currency, '-' + transfer.amount)
     }
     setImmediate(cb)
@@ -285,11 +285,11 @@ function OutTransfer() {
     var transfer = trs.asset.outTransfer
     __private.unconfirmedOutTansfers[transfer.transactionId] = false
     var fee = trs.fee
-    if (transfer.currency === 'XAS') {
+    if (transfer.currency === 'ETM') {
       var amount = Number(transfer.amount) + fee
       library.balanceCache.addAssetBalance(transfer.dappId, transfer.currency, amount)
     } else {
-      library.balanceCache.addAssetBalance(transfer.dappId, 'XAS', fee)
+      library.balanceCache.addAssetBalance(transfer.dappId, 'ETM', fee)
       library.balanceCache.addAssetBalance(transfer.dappId, transfer.currency, transfer.amount)
     }
     setImmediate(cb)
@@ -384,7 +384,7 @@ function InTransfer() {
   this.create = function (data, trs) {
     trs.recipientId = null;
 
-    if (data.currency === 'XAS') {
+    if (data.currency === 'ETM') {
       trs.amount = Number(data.amount)
       trs.asset.inTransfer = {
         dappId: data.dappId,
@@ -416,7 +416,7 @@ function InTransfer() {
 
     var asset = trs.asset.inTransfer
 
-    if (asset.currency !== 'XAS') {
+    if (asset.currency !== 'ETM') {
       if (trs.amount || !asset.amount) return setImmediate(cb, "Invalid transfer amount")
       var error = amountHelper.validate(trs.asset.inTransfer.amount)
       if (error) return setImmediate(cb, error)
@@ -438,7 +438,7 @@ function InTransfer() {
       }
 
       var currency = trs.asset.inTransfer.currency
-      if (currency === 'XAS') return cb()
+      if (currency === 'ETM') return cb()
       library.model.getAssetByName(currency, function (err, assetDetail) {
         if (err) return cb('Database error: ' + err)
         if (!assetDetail) return cb('Asset not exists')
@@ -465,7 +465,7 @@ function InTransfer() {
     try {
       var buf = new Buffer([]);
       var dappId = new Buffer(trs.asset.inTransfer.dappId, 'utf8');
-      if (trs.asset.inTransfer.currency !== 'XAS') {
+      if (trs.asset.inTransfer.currency !== 'ETM') {
         var currency = new Buffer(trs.asset.inTransfer.currency, 'utf8');
         var amount = new Buffer(trs.asset.inTransfer.amount, 'utf8');
         buf = Buffer.concat([buf, dappId, currency, amount]);
@@ -484,7 +484,7 @@ function InTransfer() {
     var asset = trs.asset.inTransfer
     var dappId = asset.dappId
 
-    if (asset.currency === 'XAS') {
+    if (asset.currency === 'ETM') {
       library.balanceCache.addAssetBalance(dappId, asset.currency, trs.amount)
       library.model.updateAssetBalance(asset.currency, trs.amount, dappId, cb)
     } else {
@@ -504,7 +504,7 @@ function InTransfer() {
     var transfer = trs.asset.inTransfer
     var dappId = asset.dappId
 
-    if (transfer.currency === 'XAS') {
+    if (transfer.currency === 'ETM') {
       library.balanceCache.addAssetBalance(dappId, transfer.currency, '-' + trs.amount)
       library.model.updateAssetBalance(transfer.currency, '-' + trs.amount, dappId, cb)
     } else {
@@ -522,7 +522,7 @@ function InTransfer() {
 
   this.applyUnconfirmed = function (trs, sender, cb) {
     var transfer = trs.asset.inTransfer
-    if (transfer.currency === 'XAS') return setImmediate(cb)
+    if (transfer.currency === 'ETM') return setImmediate(cb)
     var balance = library.balanceCache.getAssetBalance(sender.address, transfer.currency) || 0
     var surplus = bignum(balance).sub(transfer.amount)
     if (surplus.lt(0)) return setImmediate(cb, 'Insufficient asset balance')
@@ -533,7 +533,7 @@ function InTransfer() {
 
   this.undoUnconfirmed = function (trs, sender, cb) {
     var transfer = trs.asset.inTransfer
-    if (transfer.currency === 'XAS') return setImmediate(cb)
+    if (transfer.currency === 'ETM') return setImmediate(cb)
     library.balanceCache.addAssetBalance(sender.address, transfer.currency, transfer.amount)
     setImmediate(cb);
   }

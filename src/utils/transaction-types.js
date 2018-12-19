@@ -15,7 +15,7 @@
 'use strict';
 
 module.exports = {
-  SEND: 0, // XAS TRANSFER
+  SEND: 0, // ETM TRANSFER
   SIGNATURE: 1, // SETUP SECOND_PASSWORD
   DELEGATE: 2, // SECOND_PASSWORD
   VOTE: 3, // VOTE FOR DELEGATE
