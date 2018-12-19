@@ -942,6 +942,8 @@ shared.getAccount = function (req, cb) {
           lockHeight: 0,
           effectivity: false
         }
+      } else {
+        account.effectivity = true;
       }
 
       var latestBlock = modules.blocks.getLastBlock();
@@ -957,7 +959,7 @@ shared.getAccount = function (req, cb) {
           multisignatures: account.multisignatures,
           u_multisignatures: account.u_multisignatures,
           lockHeight: account.lockHeight,
-          effectivity: true
+          effectivity: account.effectivity
         },
         latestBlock: {
           height: latestBlock.height,
