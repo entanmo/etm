@@ -128,7 +128,7 @@ const config = {
     'loader': './modules/loader.js',
     'system': './modules/system.js',
     'peer': './modules/peer2.js',
-   // 'peer2': './modules/peer2.js',
+    'dappPeer': './modules/dappPeer.js',
     'delegates': './modules/delegates.js',
     'round': './modules/round.js',
     'multisignatures': './modules/multisignatures.js',
@@ -374,7 +374,7 @@ module.exports = function setup(options, done) {
           var parts = req.url.split('/');
           var ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   
-         scope.logger.debug(req.method + " " + req.url + " from " + ip);
+         scope.logger.trace(req.method + " " + req.url + " from " + ip);
   
           /* Instruct browser to deny display of <frame>, <iframe> regardless of origin.
            *

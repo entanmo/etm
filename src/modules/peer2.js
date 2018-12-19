@@ -61,12 +61,22 @@ const priv = {
       if (!priv.blackPeers.has(p.ip)) priv.blackPeers.add(p.ip)
     })
 
+    priv.bootstrapSet = new Set();
+    bootstrapNodes.forEach(n => {
+      const address = `${n.host}:${n.port}`
+      if (!priv.bootstrapSet.has(address)) priv.bootstrapSet.add(address)
+    })
+
     dht.listen(port, () => library.logger.info(`p2p server listen on ${port}`))
 
     dht.on('node', (node) => {
       const nodeId = node.id.toString('hex')
-      library.logger.info(`add node (${nodeId}) ${node.host}:${node.port}`)
-      priv.updateNode(nodeId, node)
+     
+      priv.updateNode(nodeId, node,(err, data)=>{
+        if(err) return
+        library.logger.info(`add node (${nodeId}) ${node.host}:${node.port}`)
+      })
+   
     })
 
     dht.on('remove', (nodeId, reason) => {
@@ -168,7 +178,22 @@ const priv = {
   },
 
   getHealthNodes: () => {
-    return priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
+    var peers  = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
+   
+    peers = peers.filter(n => {
+      const element = `${n.host}:${n.port}`
+      const selfAddress = `${library.config.publicIp}:${library.config.peerPort}`
+      return element != selfAddress
+    })
+    const nodesMap = new Map()
+    for(var i = 0 ;i<peers.length;i++){
+      var n = peers[i]
+      const address = `${n.host}:${n.port}`
+      if (priv.bootstrapSet.has(address)) {continue};
+      if (!nodesMap.has(address)) nodesMap.set(address, n)
+    }
+    peers = [...nodesMap.values()] 
+    return peers
   },
 
   getRandomNode: ()=>{  
@@ -190,18 +215,21 @@ const priv = {
     return randomPeers
   },
   broadcast: (message, peers) =>{
-    priv.findSeenNodesInDb((err,nodes)=>{
-      if(err) return
-      nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
-      peers = priv.getRandomPeers(20, nodes)
-      library.logger.debug(`findSeenNodesInDb  nodes`+ JSON.stringify(peers) )
-      priv.dht.broadcast(message, peers)
-    })
-    //let nodes = priv.getHealthNodes() 
-   // library.logger.debug(`getHealthNodes`+ JSON.stringify(nodes) )
-  //   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
-  //   peers = peers || priv.getRandomPeers(20, nodes)
-  //   library.logger.debug(`broadcast message to  nodes`+ JSON.stringify(peers) )
+    // priv.findSeenNodesInDb((err,nodes)=>{
+    //   if(err) return
+    //   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
+    //   peers = priv.getRandomPeers(20, nodes)
+    //   library.logger.debug(`findSeenNodesInDb  nodes`+ JSON.stringify(peers) )
+    //   priv.dht.broadcast(message, peers)
+    // })
+    let nodes = priv.getHealthNodes() 
+  //  library.logger.debug(`getHealthNodes`+ JSON.stringify(nodes) )
+    nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
+
+    peers = priv.getRandomPeers(20, nodes)
+    priv.dht.broadcast(message, peers)
+
+   // library.logger.debug(`broadcast `+JSON.stringify(message)+`to  nodes`+ JSON.stringify(peers) )
   //   priv.dht.broadcast(message, peers)
   }
 }
@@ -244,16 +272,17 @@ priv.attachApi = () => {
   })
 }
 Peer.prototype.listPeers = ( cb) => {
-  // let nodes = priv.getHealthNodes() 
-  // nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
-  // var peers =  priv.getRandomPeers(20, nodes)
-  priv.findSeenNodesInDb((err,nodes)=>{
-    if(!err){
-      nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
-      var peers = priv.getRandomPeers(20, nodes)
-      cb(null,  peers)
-    }
-  })
+  let nodes = priv.getHealthNodes() 
+  nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
+  var peers =  priv.getRandomPeers(20, nodes)
+  cb(null,  peers)
+  // priv.findSeenNodesInDb((err,nodes)=>{
+  //   if(!err){
+  //     nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
+  //     var peers = priv.getRandomPeers(20, nodes)
+  //     cb(null,  peers)
+  //   }
+  // })
 
 }
 
@@ -261,14 +290,14 @@ Peer.prototype.addPeer = ( host,port) => {
   let node ={host,  port }
   node.id = priv.getNodeIdentity(node)
   priv.dht.addNode(node)
-  if (library.config.publicIp) {
-      const message = {
-          body: {
-              ping:JSON.stringify(ip) 
-          }
-      }
-      modules.peer.publish('newPeer', message)
-  }
+  // if (library.config.publicIp) {
+  //     const message = {
+  //         body: {
+  //             ping:JSON.stringify(library.config.publicIp) 
+  //         }
+  //     }
+  //     modules.peer.publish('newPeer', message)
+  // }
 
 }
 
@@ -371,6 +400,16 @@ Peer.prototype.request = (method, params, contact, cb) => {
   }
   request(reqOptions, (err, response, result) => {
     if (err) {
+      if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
+        const node = { host: contact.host, port: contact.port  }
+        library.logger.debug("remove node:"+JSON.stringify(node)) 
+        node.id = priv.getNodeIdentity(node)
+        priv.dht.removeNode(node.id, function (err) {
+          if (!err) {
+            library.logger.info(`failed to remove peer : ${err}`)
+          }
+        })
+      } 
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
       library.logger.debug('remote service error', result)
@@ -397,6 +436,16 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
   }
   request(reqOptions, (err, response, result) => {
     if (err) {
+      if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
+        const node = { host: contact.host, port: contact.port  }
+        library.logger.debug("remove node:"+JSON.stringify(node)) 
+        node.id = priv.getNodeIdentity(node)
+        priv.dht.removeNode(node.id, function (err) {
+          if (!err) {
+            library.logger.info(`failed to remove peer : ${err}`)
+          }
+        })
+      } 
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
       library.logger.debug('remote service error', result)
@@ -410,7 +459,7 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
 Peer.prototype.randomRequest = (method, params, cb) => {
   const randomNode = priv.getRandomNode()
   if (!randomNode) return cb('No contact')
-  library.logger.debug('select random contract', randomNode)
+ // library.logger.debug('select random contract', randomNode)
   let isCallbacked = false
   setTimeout(() => {
     if (isCallbacked) return
