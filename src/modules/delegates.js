@@ -1092,7 +1092,7 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
       let totalVotes = 0;
       const votes = [];
       async.eachOf(rows, (voter, index, callback) => {
-        module.lockvote.calcLockVotes(voter.address, lastBlock.height, (err, result) => {
+        modules.lockvote.calcLockVotes(voter.address, lastBlock.height, (err, result) => {
           const val = err ? 0 : result;
           votes[index] = val;
           totalVotes += val;
@@ -1106,7 +1106,7 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
         rows.forEach((row, index) => {
           row.weight = votes[index] / totalVotes * 100;
         });
-        return cb(null, {accounts: row});
+        return cb(null, {accounts: rows});
       });
     });
   });
