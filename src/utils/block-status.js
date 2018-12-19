@@ -76,6 +76,9 @@ function BlockStatus() {
     if (height <= 0) {
       return supply;
     }
+    if(height>lastRewardHeight){
+      return 24000000000000000;
+    }
     var amount = 0,
       multiplier = 0;
     height = height - rewardOffset + 1;
