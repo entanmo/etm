@@ -426,26 +426,6 @@ Round.prototype.tick = function (block, cb) {
               }
             }
           }
-
-          // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
-          async.eachSeries(roundDelegates, function (delegate, cb) {
-            modules.delegates.getDelegateVoters(delegate, function (err, voters) {
-              if (err) {
-                return cb(err);
-              }
-  
-              async.eachSeries(voters.accounts, function (voter, cb) {
-                modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, function (err) {
-                  
-                  return cb(err);
-                });
-              }, function (err) {
-                return cb(err);
-              });
-            });
-          }, function (err) {
-            return cb(err);
-          });
         });
       },
       function (cb) {
@@ -601,6 +581,33 @@ Round.prototype.tick = function (block, cb) {
         } else {
           cb()
         }
+      },
+      function(cb){
+        modules.delegates.generateDelegateList(block.height + 1, function (err, roundDelegates) {
+          if (err) {
+            return cb(err);
+          }
+
+          // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
+          async.eachSeries(roundDelegates, function (delegate, cb) {
+            modules.delegates.getDelegateVoters(delegate, function (err, voters) {
+              if (err) {
+                return cb(err);
+              }
+  
+              async.eachSeries(voters.accounts, function (voter, cb) {
+                modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, function (err) {
+                  
+                  return cb(err);
+                });
+              }, function (err) {
+                return cb(err);
+              });
+            });
+          }, function (err) {
+            return cb(err);
+          });
+        });
       }
     ], function (err) {
       delete __private.feesByRound[round];

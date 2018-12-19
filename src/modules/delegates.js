@@ -709,34 +709,6 @@ Delegates.prototype.generateDelegateList = function (height, cb) {
     // cb(null, truncDelegateList);
 
     __private._getRandomDelegateList([],truncDelegateList,function(delegateList){
-
-      // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
-      // let round = modules.round.calc(height);
-      // if (global.round !== round && height !== 1 && (height-1)  % slots.roundBlocks === 0) {
-      //   global.round = round;
-      //   async.eachSeries(delegateList, function (delegate, cb) {
-
-      //     modules.delegates.getDelegateVoters(delegate.publicKey, function (err, voters) {
-      //       if (err) {
-      //         return cb(err);
-      //       }
-
-      //       async.eachSeries(voters.accounts, function (voter, cb) {
-      //         modules.lockvote.updateLockVotes(voter.address, height, 0.5, function (err) {
-                
-      //           return cb(err);
-      //         });
-      //       }, function (err) {
-      //         return cb(err);
-      //       });
-      //     });
-      //   }, function (err) {
-      //     if (err) {
-      //       return cb(err);
-      //     }
-      //   });
-      // }
-      
       cb(null, delegateList.map(function (el) {
         return el.publicKey
       }));
@@ -1092,7 +1064,7 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
       let totalVotes = 0;
       const votes = [];
       async.eachOf(rows, (voter, index, callback) => {
-        module.lockvote.calcLockVotes(voter.address, lastBlock.height, (err, result) => {
+        modules.lockvote.calcLockVotes(voter.address, lastBlock.height, (err, result) => {
           const val = err ? 0 : result;
           votes[index] = val;
           totalVotes += val;
@@ -1106,7 +1078,7 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
         rows.forEach((row, index) => {
           row.weight = votes[index] / totalVotes * 100;
         });
-        return cb(null, {accounts: row});
+        return cb(null, {accounts: rows});
       });
     });
   });
