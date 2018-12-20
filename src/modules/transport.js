@@ -598,7 +598,7 @@ Transport.prototype.broadcast = (topic, message, recursive) => {
 Transport.prototype.broadcastByPost = function ( options, cb) {
   modules.peer.listPeers( function (err, peers) {
     if (!err) {
-      console.log("listPeers:"+JSON.stringify(peers))
+      //console.log("listPeers:"+JSON.stringify(peers))
       async.eachLimit(peers, 5, function (peer, cb) {
         modules.peer.request(options.api, options.data, peer, cb)//peer, options);
       //  setImmediate(cb);
@@ -819,15 +819,6 @@ Transport.prototype.onBlockchainReady = function () {
 }
 Transport.prototype.onPeerReady = () => {
   
-  modules.peer.subscribe('newPeer', (message,peer) => {
-    try {
-    //const ping = message.body.ping
-    //console.log('receive newPeer  %s from %s', JSON.stringify(  new Buffer(ping).toString()),peer)
-    // console.log('receive newPeer ', JSON.stringify(  new Buffer(ping, 'base64').toString('hex')))
-    } catch (e) {
-      library.logger.error('Receive invalid newPeer', e)
-    }
-  })
   modules.peer.subscribe('propose', (message,peer) => {
     try {
       const propose = library.protobuf.decodeBlockPropose(message.body.propose)
@@ -897,24 +888,8 @@ Transport.prototype.onPeerReady = () => {
           reportMsg.error = err.message;
         }
         reportor.report("transactions", reportMsg);
-        //console.log('-------Received transaction success id----- ' + JSON.stringify(transaction.id) );
-        // res.status(200).json({
-        //   success: true,
-        //   transactionId: transactions[0].id
-        // });
       }
     });
-   // console.log('Receive new block header', JSON.stringify(transaction))
-    // library.sequence.add((cb) => {
-    //   library.logger.info(`Received transaction ${transaction.id} from remote peer`)
-    //   modules.transactions.processUnconfirmedTransaction(transaction, cb)
-    // }, (err) => {
-    //   if (err) {
-    //     library.logger.warn(`Receive invalid transaction ${transaction.id}`, err)
-    //   } else {
-    //     // library.bus.message('unconfirmedTransaction', transaction, true)
-    //   }
-    // })
   })
 }
 Transport.prototype.onSignature = function (signature, broadcast) {
@@ -980,25 +955,6 @@ Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
     self.broadcastByPost({api: 'p2p/ipChanged', data: data, method: "POST"});
   }
 }
-
-// Transport.prototype.onHeartBeat = function (ip, port, broadcast) {
-//   if (broadcast) {
-//     // const data = {
-//     //   ip: ip,
-//     //   port: port
-//     // };
-//     const message = {
-//       body: {
-//         ping: ip,
-//       },
-//     }
-//      self.broadcast('a', message)
-//     // self.broadcastByPost( {api: '/p2p/heartBeat', data: data, method: "POST"})
-//   }
-// }
-
-
-
 Transport.prototype.sendVotes = function (votes, address) {
   const parts = address.split(':')
   const contact = {

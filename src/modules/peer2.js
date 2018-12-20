@@ -99,23 +99,6 @@ const priv = {
 
     lastNodes.forEach(n => dht.addNode(n))
 
-    // setInterval(() => {
-    //   const allNodes = dht.nodes.toArray().map(n => ({
-    //     host: n.host,
-    //     port: n.port,
-    //     seen: n.seen,
-    //     distance: n.distance,
-    //   }))
-    //   const peersFilePath = path.join(p2pOptions.peersDbDir, 'peers.json')
-    //   try {
-    //     const peersJson = JSON.stringify(allNodes, null, 2)
-    //     library.logger.debug('save %d peers, ', allNodes.length, peersJson)
-    //     fs.writeFileSync(peersFilePath, peersJson)
-    //   } catch (e) {
-    //     library.logger.warn('save peers failed, ', e)
-    //   }
-    // }, SAVE_PEERS_INTERVAL)
-
     setInterval(() => {
       const allNodes = dht.nodes.toArray()
       const isInDht = n => allNodes.some(dn => dn.host === n.host && dn.port === n.port)
@@ -176,7 +159,7 @@ const priv = {
       if (_.isFunction(callback)) callback(err, numRemoved)
     })
   },
-
+  
   getHealthNodes: () => {
     var peers  = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
    
@@ -290,14 +273,6 @@ Peer.prototype.addPeer = ( host,port) => {
   let node ={host,  port }
   node.id = priv.getNodeIdentity(node)
   priv.dht.addNode(node)
-  // if (library.config.publicIp) {
-  //     const message = {
-  //         body: {
-  //             ping:JSON.stringify(library.config.publicIp) 
-  //         }
-  //     }
-  //     modules.peer.publish('newPeer', message)
-  // }
 
 }
 
@@ -401,15 +376,23 @@ Peer.prototype.request = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        const node = { host: contact.host, port: contact.port  }
-        library.logger.debug("remove node:"+JSON.stringify(node)) 
-        node.id = priv.getNodeIdentity(node)
-        priv.dht.removeNode(node.id, function (err) {
-          if (!err) {
-            library.logger.info(`failed to remove peer : ${err}`)
-          }
-        })
-      } 
+        const host = contact.host
+        const port = contact.port
+        let node ={host, port }
+        const addr = `${host}:${port}`
+        if (!priv.bootstrapSet.has(addr)){
+          library.logger.debug("remove node:"+JSON.stringify(node)) 
+          const nodeid = priv.getNodeIdentity(node)
+          priv.dht.removeNode(nodeid, function (err) {
+            if (!err) {
+              library.logger.info(`failed to remove peer : ${err}`)
+            }
+          })
+         }
+        //else{
+        //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
+        // }
+      }
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
       library.logger.debug('remote service error', result)
@@ -437,15 +420,23 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        const node = { host: contact.host, port: contact.port  }
-        library.logger.debug("remove node:"+JSON.stringify(node)) 
-        node.id = priv.getNodeIdentity(node)
-        priv.dht.removeNode(node.id, function (err) {
-          if (!err) {
-            library.logger.info(`failed to remove peer : ${err}`)
-          }
-        })
-      } 
+        const host = contact.host
+        const port = contact.port
+        let node ={host,  port }
+        const addr = `${host}:${port}`
+        if (!priv.bootstrapSet.has(addr)){
+          library.logger.debug("remove node:"+JSON.stringify(node)) 
+          const nodeid = priv.getNodeIdentity(node)
+          priv.dht.removeNode(nodeid, function (err) {
+            if (!err) {
+              library.logger.info(`failed to remove peer : ${err}`)
+            }
+          })
+        }
+        // else{
+        //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
+        // }
+      }
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
       library.logger.debug('remote service error', result)

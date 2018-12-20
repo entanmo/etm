@@ -131,19 +131,6 @@ P2PHelper.prototype.onPeerReady = function () {
         setTimeout(nextUpdatePublicIp, 65 * 1000);
     });
 
-    // setImmediate(function nextHeartBeat() {
-    //     if (library.config.publicIp) {
-    //         const message = {
-    //             body: {
-    //                 ping: library.config.publicIp  //
-    //             }
-    //         }
-    //         console.log('send newPeer '+library.config.publicIp)
-    //         modules.peer.publish('newPeer', message)
-    //        //library.bus.message('heartBeat', library.config.publicIp, library.config.port, true);
-    //     }
-    //     setTimeout(nextHeartBeat, 3* 1000);
-    // });
 
     setImmediate(function nextCheckPublicIp() {
         if (!library.config.publicIp) {
