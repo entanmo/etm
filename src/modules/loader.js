@@ -30,6 +30,7 @@ var modules, library, self, __private = {}, shared = {};
 
 __private.loaded = false;
 __private.isActive = false;
+__private.syncing = false;
 __private.loadingLastBlock = null;
 __private.genesisBlock = null;
 __private.total = 0;
@@ -553,7 +554,14 @@ Loader.prototype.onPeerReady = function () {
     });
 
   });
-
+  // setImmediate(() => {
+  //   if (!__private.loaded || self.syncing()) return
+  //   __private.loadUnconfirmedTransactions((err) => {
+  //     if (err) {
+  //       library.logger.error('loadUnconfirmedTransactions timer:', err)
+  //     }
+  //   })
+  // })
   setImmediate(function nextLoadSignatures() {
     if (!__private.loaded) return;
     __private.loadSignatures(function (err) {

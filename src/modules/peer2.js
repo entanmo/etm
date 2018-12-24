@@ -8,6 +8,7 @@ const Router = require('../utils/router.js')
 const sandboxHelper = require('../utils/sandbox.js')
 const { promisify } = require('util')
 const Database = require('nedb')
+const async = require('async');
 // const fs = require('fs')
 
 let modules
@@ -159,7 +160,28 @@ const priv = {
       if (_.isFunction(callback)) callback(err, numRemoved)
     })
   },
-  
+  removeNodeByIp: (host,port,callback) => {
+    priv.nodesDb.find( { $and: [{ host: host }, { port: port }]})
+      .exec((err, nodes) => {
+        if (err) return callback(err);
+        //library.logger.warn(JSON.stringify(nodes));
+        let nodeids = nodes.map(n=>n.id);
+        async.eachSeries(nodeids, function (id, cb) {
+          priv.dht.removeNode(id, (err, numRemoved) => {
+            library.logger.warn(` remove node  (${id})`);
+            if (err) {
+              library.logger.warn(`faild to remove node id (${numRemoved})`);
+               cb(err, id);
+            } 
+             cb(null, id);
+          })
+        }, function (err) {
+          if (err) {
+            if (_.isFunction(callback)) callback(err, nodes);
+          } 
+        });
+      })
+  },
   getHealthNodes: () => {
     var peers  = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
    
@@ -376,14 +398,13 @@ Peer.prototype.request = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        const host = contact.host
-        const port = contact.port
-        let node ={host, port }
-        const addr = `${host}:${port}`
+        const host = contact.host;
+        const port = contact.port;
+        let node ={host, port };
+        const addr = `${host}:${port}`;
         if (!priv.bootstrapSet.has(addr)){
           library.logger.debug("remove node:"+JSON.stringify(node)) 
-          const nodeid = priv.getNodeIdentity(node)
-          priv.dht.removeNode(nodeid, function (err) {
+          priv.removeNodeByIp(host,port, function (err) {
             if (!err) {
               library.logger.info(`failed to remove peer : ${err}`)
             }
@@ -420,14 +441,13 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        const host = contact.host
-        const port = contact.port
-        let node ={host,  port }
-        const addr = `${host}:${port}`
+        const host = contact.host;
+        const port = contact.port;
+        let node ={host,  port };
+        const addr = `${host}:${port}`;
         if (!priv.bootstrapSet.has(addr)){
           library.logger.debug("remove node:"+JSON.stringify(node)) 
-          const nodeid = priv.getNodeIdentity(node)
-          priv.dht.removeNode(nodeid, function (err) {
+          priv.removeNodeByIp(host,port, function (err) {
             if (!err) {
               library.logger.info(`failed to remove peer : ${err}`)
             }
