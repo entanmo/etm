@@ -477,6 +477,61 @@ class Model {
     this.dbLite.query(sql.query, sql.values, fieldConv, cb)
   }
 
+  getAllDelayTransfer(cb) {
+    const returnResults = [];
+
+    const sql = jsonSql.build({
+      type: "select",
+      table: "delay_transfer",
+      fields: ["expired", "transactionId"],
+      condition: { state: 0 }
+    });
+    const fieldConv = {
+      expired: Number,
+      transactionId: String
+    };
+    this.dbLite.query(sql.query, sql.values, fieldConv, (err, results) => {
+      if (err) {
+        return cb(err);
+      }
+
+      async.eachSeries(results, (value, cb) => {
+        const { transactionId, expired } = value;
+        const sql = jsonSql.build({
+          type: "select",
+          table: "trs",
+          fields: ["senderId", "recipientId", "amount"],
+          condition: { id: transactionId }
+        });
+        const fieldConv = {
+          senderId: String,
+          recipientId: String,
+          amount: Number
+        };
+        this.dbLite.query(sql.query, sql.values, fieldConv, (err, results) => {
+          if (err && results.length <= 0) {
+            return cb(err);
+          }
+          const { senderId, recipientId, amount } = results[0];
+          returnResults.push({
+            transactionId,
+            senderId,
+            recipientId,
+            amount,
+            expired
+          });
+          return cb();
+        });
+      }, err => {
+        if (err) {
+          return cb(err);
+        }
+
+        return cb(null, returnResults);
+      });      
+    });
+  }
+
   getDApps(condition, cb) {
     var sql = jsonSql.build({
       type: 'select',

@@ -917,6 +917,7 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
     function done(err) {
       if (err) {
         library.balanceCache.rollback()
+        library.delayTransferMgr.rollback();
         var finalErr = 'applyBlock err: ' + err;
         library.dbLite.query('ROLLBACK TO SAVEPOINT applyblock', function (rollbackErr) {
           if (rollbackErr) {
@@ -952,6 +953,7 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
             self.setLastBlock(block);
             library.oneoff.clear()
             library.balanceCache.commit()
+            library.delayTransferMgr.commit();
             __private.blockCache = {};
             __private.proposeCache = {};
             __private.lastVoteTime = null;
@@ -1027,27 +1029,33 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
         library.logger.error("Failed to apply block", err);
         return done(err);
       }
-      library.logger.debug("apply block ok");
-      if (saveBlock) {
-        __private.saveBlock(block, function (err) {
-          if (err) {
-            library.logger.error("Failed to save block: " + err);
-            reportor.report("nodejs", {
-              subaction: "exit",
-              data: {
-                method: "applyBlock",
-                reason: "Failed to save block: " + err
+      library.delayTransferMgr.blockTick(block)
+        .then(result => {
+          library.logger.debug("apply block ok");
+          if (saveBlock) {
+            __private.saveBlock(block, function (err) {
+              if (err) {
+                library.logger.error("Failed to save block: " + err);
+                reportor.report("nodejs", {
+                  subaction: "exit",
+                  data: {
+                    method: "applyBlock",
+                    reason: "Failed to save block: " + err
+                  }
+                });
+                process.exit(1);
+                return;
               }
+              library.logger.debug("save block ok");
+              modules.round.tick(block, done);
             });
-            process.exit(1);
-            return;
+          } else {
+            modules.round.tick(block, done);
           }
-          library.logger.debug("save block ok");
-          modules.round.tick(block, done);
+        })
+        .catch(error => {
+          return done(error);
         });
-      } else {
-        modules.round.tick(block, done);
-      }
     });
   }
 

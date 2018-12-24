@@ -176,6 +176,51 @@ module.exports = {
         required: ["secret", "amount", "recipientId"]
     },
 
+    addDelayTransactions: {
+        id: 'transactions.addDelayTransactions',
+        type: "object",
+        properties: {
+            secret: {
+                type: "string",
+                minLength: 1,
+                maxLength: 100
+            },
+            amount: {
+                type: "integer",
+                minimum: 1,
+                maximum: constants.totalAmount
+            },
+            recipientId: {
+                type: "string",
+                minLength: 1
+            },
+            publicKey: {
+                type: "string",
+                format: "publicKey"
+            },
+            secondSecret: {
+                type: "string",
+                minLength: 1,
+                maxLength: 100
+            },
+            multisigAccountPublicKey: {
+                type: "string",
+                format: "publicKey"
+            },
+            message: {
+                type: "string",
+                maxLength: 256
+            },
+            args: {
+                type: 'array',
+                minLength: 1,
+                maxLength: 1,
+                uniqueItems: true
+            }
+        },
+        required: ["secret", "amount", "recipientId", "args"]
+    },
+
     putStorage: {
         id: 'transactions.putStorage',
         type: "object",

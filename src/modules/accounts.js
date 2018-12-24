@@ -209,7 +209,8 @@ __private.attachApi = function () {
     "put /delegates": "addDelegates",
     "get /": "getAccount",
     "get /new": "newAccount",
-    "get /effectivity": "accountOnBlockchain"
+    "get /effectivity": "accountOnBlockchain",
+    "get /delayOrders": "listDelayTransfer"
   });
 
   if (process.env.DEBUG && process.env.DEBUG.toUpperCase() == "TRUE") {
@@ -636,8 +637,8 @@ shared.getBalance = function (req, cb) {
       }
       var balance = account ? account.balance : 0;
       var unconfirmedBalance = account ? account.u_balance : 0;
-
-      cb(null, { balance: balance, unconfirmedBalance: unconfirmedBalance });
+      const totalAmount = library.delayTransferMgr.totalAmount(query.address);
+      cb(null, { balance: balance, unconfirmedBalance: unconfirmedBalance, delayAmount: totalAmount });
     });
   });
 }
@@ -940,10 +941,13 @@ shared.getAccount = function (req, cb) {
           multisignatures: '',
           u_multisignatures: '',
           lockHeight: 0,
-          effectivity: false
+          effectivity: false,
+          delayAmount: 0
         }
       } else {
+        const delayAmount = library.delayTransferMgr.totalAmount(query.address);
         account.effectivity = true;
+        account.delayAmount = delayAmount;
       }
 
       var latestBlock = modules.blocks.getLastBlock();
@@ -959,7 +963,8 @@ shared.getAccount = function (req, cb) {
           multisignatures: account.multisignatures,
           u_multisignatures: account.u_multisignatures,
           lockHeight: account.lockHeight,
-          effectivity: account.effectivity
+          effectivity: account.effectivity,
+          delayAmount: account.delayAmount
         },
         latestBlock: {
           height: latestBlock.height,
@@ -995,6 +1000,47 @@ shared.accountOnBlockchain = function (req, cb) {
         effectivity: !!account
       });
     });
+  });
+}
+
+shared.listDelayTransfer = function (req, cb) {
+  const query = req.body;
+  library.scheme.validate(query, {
+    type: "object",
+    properties: {
+      mode: {
+        type: "integer"
+      },
+      address: {
+        type: "string",
+        minLength: 1
+      }
+    },
+    required: ["mode", "address"]
+  }, err => {
+    if (err) {
+      return cb(err[0].message);
+    }
+
+    const { address, mode } = query;
+    if ([0, 1].indexOf(mode) === -1) {
+      return cb("mode must in [0, 1]");
+    }
+    if (!addressHelper.isAddress(address)) {
+      return cb("Invalid address");
+    }
+    const block = modules.blocks.getLastBlock();
+    if (mode == 0) {
+      // recipientId
+      const list = library.delayTransferMgr.listByRecipientId(address);
+      return cb(null, {result: list, latestHeight: block.height});
+    } else if (mode == 1) {
+      // senderId
+      const list = library.delayTransferMgr.listBySenderId(address);
+      return cb(null, {result: list, latestHeight: block.height});
+    } else {
+      return cb("Account not found.");
+    }
   });
 }
 

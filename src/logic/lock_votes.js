@@ -91,10 +91,18 @@ function LockVotes() {
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
+    const key = sender.address + ":" + trs.type;
+    if (library.oneoff.has(key)) {
+      return setImmediate(cb, "Double submit");
+    }
+
+    library.oneoff.set(key, true);
     setImmediate(cb);
   }
 
   this.undoUnconfirmed = function (trs, sender, cb) {
+    const key = sender.address + ":" + trs.type;
+    library.oneoff.delete(key);
     setImmediate(cb);
   }
 

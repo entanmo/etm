@@ -328,6 +328,23 @@ __private.loadBalances = function (cb) {
   })
 }
 
+__private.loadDelayTransfer = function (cb) {
+  library.model.getAllDelayTransfer(function (err, results) {
+    if (err) return cb("Failed to load delay transfer: " + err);
+    for (let i = 0; i < results.length; i++) {
+      let { transactionId, senderId, recipientId, amount, expired } = results[i];
+      library.delayTransferMgr.addDelayTransfer(transactionId, {
+        transactionId,
+        senderId,
+        recipientId,
+        amount,
+        expired
+      });
+    }
+    cb(null);
+  });
+}
+
 __private.loadBlockChain = function (cb) {
   var offset = 0, limit = Number(library.config.loading.loadPerIteration) || 1000;
   var verify = library.config.loading.verifyOnLoading;
@@ -371,14 +388,28 @@ __private.loadBlockChain = function (cb) {
                     modules.blocks.simpleDeleteAfterBlock(err.block.id, function (err, res) {
                       if (err) return cb(err)
                       library.logger.error('Blockchain clipped');
+                      async.waterfall([
+                        (next => __private.loadBalances(next)),
+                        (next => __private.loadDelayTransfer(next))
+                      ], cb)
+                      /*
                       __private.loadBalances(cb);
+                      __private.loadDelayTransfer(cb);
+                      */
                     })
                   } else {
                     cb(err);
                   }
                 } else {
                   library.logger.info('Blockchain ready');
+                  async.waterfall([
+                    (next => __private.loadBalances(next)),
+                    (next => __private.loadDelayTransfer(next))
+                  ], cb);
+                  /*
                   __private.loadBalances(cb);
+                  __private.loadDelayTransfer(cb);
+                  */
                 }
               }
             )
@@ -439,7 +470,14 @@ __private.loadBlockChain = function (cb) {
                               load(count);
                             } else {
                               library.logger.info('Blockchain ready');
+                              async.waterfall([
+                                (next => __private.loadBalances(next)),
+                                (next => __private.loadDelayTransfer(next))
+                              ], cb);
+                              /*
                               __private.loadBalances(cb);
+                              __private.loadDelayTransfer(cb);
+                              */
                             }
                           });
                         }

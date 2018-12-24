@@ -26,6 +26,7 @@ var Sequence = require('./utils/sequence.js');
 var slots = require('./utils/slots.js');
 var natUpnp = require('nat-upnp');
 const SyncTime = require("./utils/sync-time");
+const DelayTransferMgr = require("./utils/delay-transfer-manager");
 
 function getPublicIp() {
     var publicIp = null;
@@ -335,6 +336,11 @@ module.exports = function setup(options, done) {
           }
         });
         cb(null, sequence);
+      }],
+
+      delayTransferMgr: ["logger", function (scope, cb) {
+        const delayTransferMgr = new DelayTransferMgr();
+        cb(null, delayTransferMgr);
       }],
   
       connect: ['config', 'genesisblock', 'logger', 'network', function (scope, cb) {
