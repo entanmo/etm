@@ -16,6 +16,7 @@
 
 const constants = require('../utils/constants.js');
 const addressHelper = require("../utils/address");
+const slots = require("../utils/slots");
 
 function DelayTransfer() {
   this.create = function (data, trs) {
@@ -31,8 +32,19 @@ function DelayTransfer() {
 
   this.verify = function (trs, sender, cb) {
     let expired = Number(trs.args[0]);
-    if(!Number.isSafeInteger(expired) || expired <= 0 /* || //TODO */){
+    /*
+    if(!Number.isSafeInteger(expired) || expired <= 0){
         return cb('Invalid expired value');
+    }
+    */
+    if (!Number.isSafeInteger(expired)) {
+      return cb("Invalid expired value");
+    }
+
+    const endTime = slots.getTime(expired);
+    const numOfSlots = (endTime - trs.timestamp) / slots.interval;
+    if (numOfSlots < 24 * 60 * 60 / 3) {
+      return cb("Invalid expired value, must bigger than 24 hours");
     }
 
     if (!addressHelper.isAddress(trs.recipientId)) {
@@ -60,12 +72,14 @@ function DelayTransfer() {
 
   this.apply = function (trs, block, sender, cb) {
     const expired = Number(trs.args[0]);
+    const endTime = slots.getTime(expired);
+    const numOfSlots = (endTime - trs.timestamp) / slots.interval;
     library.delayTransferMgr.addDelayTransfer(trs.id, {
       transactionId: trs.id,
       senderId: trs.senderId,
       recipientId: trs.recipientId,
       amount: trs.amount,
-      expired: block.height + expired
+      expired: block.height + numOfSlots
     })
     setImmediate(cb);
   }
@@ -108,12 +122,14 @@ function DelayTransfer() {
 
   this.dbSave = function (trs, cb) {
     const expired = Number(trs.args[0]);
+    const endTime = slots.getTime(expired);
+    const numOfSlots = (endTime - trs.timestamp) / slots.interval;
     if (library.genesisblock.block.id == trs.blockId) {
         // genesis block
         const block = library.genesisblock.block;
         library.dbLite.query("INSERT INTO delay_transfer(expired, transactionId, state)"+
         "VALUES($expired, $transactionId, 0);", {
-            expired: block.height + expired,
+            expired: block.height + numOfSlots,
             transactionId: trs.id
         }, cb);
     } else {
@@ -125,7 +141,7 @@ function DelayTransfer() {
             const block = result.block;
             library.dbLite.query("INSERT INTO delay_transfer(expired, transactionId, state)"+
             "VALUES($expired, $transactionId, 0);", {
-                expired: block.height + expired,
+                expired: block.height + numOfSlots,
                 transactionId: trs.id
             }, cb);
         })
