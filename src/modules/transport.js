@@ -54,10 +54,10 @@ function Transport(cb, scope) {
 __private.attachApi = function () {
   var router = new Router();
 
-  router.use(function (req, res, next) {
-    if (modules && __private.loaded && !modules.loader.syncing()) return next();
-    res.status(500).send({ success: false, error: "Blockchain is loading" });
-  });
+  // router.use(function (req, res, next) {
+  //   if (modules && __private.loaded && !modules.loader.syncing()) return next();
+  //   res.status(500).send({ success: false, error: "Blockchain is loading" });
+  // });
 
   router.use(function (req, res, next) {
     var peerIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -340,6 +340,12 @@ __private.attachApi = function () {
   })
   
   router.post("/transactions", function (req, res) {
+    if (modules.loader.syncing()) {
+      return res.status(500).send({
+        success: false,
+        error: 'Blockchain is syncing',
+      })
+    }
     var lastBlock = modules.blocks.getLastBlock();
     var lastSlot = slots.getSlotNumber(lastBlock.timestamp);
     if (slots.getNextSlot() - lastSlot >= 40) {
@@ -519,7 +525,7 @@ __private.attachApi = function () {
     const body = req.body;
 
     //modules.peer.state(ip.toLong(body.ip), parseInt(body.port), 2);
-    modules.peer.addPeer(body.ip,parseInt(body.port))
+    modules.peer.addPeer(body.ip,body.port)
     res.sendStatus(200);
   });
 
