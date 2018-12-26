@@ -43,7 +43,7 @@ function DelayTransfer() {
 
     const endTime = slots.getTime(expired);
     const numOfSlots = (endTime - trs.timestamp) / slots.interval;
-    if (numOfSlots < 24 * 60 * 60 / 3) {
+    if (numOfSlots < 1 * 60 * 60 / 3) {
       return cb("Invalid expired value, must bigger than 24 hours");
     }
 
@@ -90,17 +90,21 @@ function DelayTransfer() {
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
+    /*
     const key = sender.address + ":" + trs.type;
     if (library.oneoff.has(key)) {
         return setImmediate(cb, "Double submit");
     }
     library.oneoff.set(key, true);
+    */
     setImmediate(cb);
   }
 
   this.undoUnconfirmed = function (trs, sender, cb) {
+    /*
     const key = sender.address + ":" + trs.type;
     library.oneoff.delete(key);
+    */
     setImmediate(cb);
   }
 
