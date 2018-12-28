@@ -391,7 +391,8 @@ __private.loadBlockChain = function (cb) {
                       library.logger.error('Blockchain clipped');
                       async.waterfall([
                         (next => __private.loadBalances(next)),
-                        (next => __private.loadDelayTransfer(next))
+                        (next => __private.loadDelayTransfer(next)),
+                        (next => modules.round.roundrewardsRecovery(next))
                       ], cb)
                       /*
                       __private.loadBalances(cb);
@@ -405,7 +406,8 @@ __private.loadBlockChain = function (cb) {
                   library.logger.info('Blockchain ready');
                   async.waterfall([
                     (next => __private.loadBalances(next)),
-                    (next => __private.loadDelayTransfer(next))
+                    (next => __private.loadDelayTransfer(next)),
+                    (next => modules.round.roundrewardsRecovery(next))
                   ], cb);
                   /*
                   __private.loadBalances(cb);
@@ -473,7 +475,8 @@ __private.loadBlockChain = function (cb) {
                               library.logger.info('Blockchain ready');
                               async.waterfall([
                                 (next => __private.loadBalances(next)),
-                                (next => __private.loadDelayTransfer(next))
+                                (next => __private.loadDelayTransfer(next)),
+                                (next => modules.round.roundrewardsRecovery(next))
                               ], cb);
                               /*
                               __private.loadBalances(cb);

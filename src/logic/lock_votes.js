@@ -119,7 +119,8 @@ function LockVotes() {
         originHeight: parseInt(raw.lv_originHeight),
         currentHeight: parseInt(raw.lv_currentHeight),
         lockAmount: parseInt(raw.lv_lockAmount),
-        state: parseInt(raw.lv_state)
+        state: parseInt(raw.lv_state),
+        vote: raw.lv_vote ? parseInt(raw.lv_vote) : 0
       };
     }
   }
@@ -128,7 +129,7 @@ function LockVotes() {
     const lockAmount = Number(trs.args[0]);
     if (library.genesisblock.block.id == trs.blockId) {
       const block = library.genesisblock.block;
-      library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
+      library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, vote, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 0, 1)", {
         address: trs.senderId,
         lockAmount: lockAmount,
         originHeight: block.height,
@@ -142,7 +143,7 @@ function LockVotes() {
         }
 
         const block = result.block;
-        library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
+        library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, vote, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 0, 1)", {
           address: trs.senderId,
           lockAmount: lockAmount,
           originHeight: block.height,

@@ -20,6 +20,8 @@ var sandboxHelper = require('../utils/sandbox.js');
 var constants = require('../utils/constants.js');
 var ethos = require('../utils/ethos-mine.js');
 const reportor = require("../utils/kafka-reportor");
+const BlockStatus = require("../utils/block-status");
+const VoterBonus = require("../utils/voter-bonus");
 
 // Private fields
 var modules, library, self, __private = {}, shared = {};
@@ -27,11 +29,16 @@ var modules, library, self, __private = {}, shared = {};
 __private.loaded = false;
 
 __private.feesByRound = {};
+__private.bonusByRound = {};
 __private.rewardsByRound = {};
 __private.delegatesByRound = {};
 __private.unFeesByRound = {};
+__private.unbonusByRound = {};
 __private.unRewardsByRound = {};
 __private.unDelegatesByRound = {};
+
+__private.blockStatus = new BlockStatus();
+__private.voterBonus = new VoterBonus();
 
 const CLUB_BONUS_RATIO = 0.2
 
@@ -48,9 +55,11 @@ function RoundChanges(round, back) {
   if (!back) {
     var roundFees = parseInt(__private.feesByRound[round]) || 0;
     var roundRewards = (__private.rewardsByRound[round] || []);
+    var bonusRewards = (__private.bonusByRound[round] || []);
   } else {
     var roundFees = parseInt(__private.unFeesByRound[round]) || 0;
     var roundRewards = (__private.unRewardsByRound[round] || []);
+    var bonusRewards = (__private.unbonusByRound[round] || []);
   }
 
   this.at = function (index) {
@@ -76,6 +85,10 @@ function RoundChanges(round, back) {
       rewards += (reward - Math.floor(reward * (1 - CLUB_BONUS_RATIO)))
     }
     return fees + rewards
+  }
+
+  this.getDelegateVotersBonus = function () {
+
   }
 }
 
@@ -166,6 +179,11 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
     let removedDelegate = __private.delegatesByRound[round].pop()
     __private.unDelegatesByRound[round] = (__private.unDelegatesByRound[round] || [])
     __private.unDelegatesByRound[round].push(removedDelegate)
+
+    __private.bonusByRound[round] = (__private.bonusByRound[round] || []);
+    let removeBonus = __private.bonusByRound[round].pop();
+    __private.unbonusByRound[round] = (__private.unbonusByRound[round] || []);
+    __private.unbonusByRound[round].push(removeBonus);
     
 
     if (prevRound === round && previousBlock.height !== 1) {
@@ -302,7 +320,7 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
 
               let totalVotes = 0;
               async.eachSeries(voters.accounts, function (voter, cb) {
-                modules.lockvote.calcLockVotes(voter.address, block.height, function (err, votes) {
+                modules.lockvote.refreshRoundLockVotes(voter.address, block.height, function (err, votes) {
                   if(err){
                     return cb(err);
                   }
@@ -376,6 +394,7 @@ Round.prototype.tick = function (block, cb) {
     cb && setImmediate(cb, err);
   }
 
+  console.log("-------------- round tick:", block.height);
   modules.accounts.mergeAccountAndGet({
     publicKey: block.generatorPublicKey,
     producedblocks: 1,
@@ -395,6 +414,9 @@ Round.prototype.tick = function (block, cb) {
 
     __private.delegatesByRound[round] = __private.delegatesByRound[round] || [];
     __private.delegatesByRound[round].push(block.generatorPublicKey);
+
+    __private.bonusByRound[round] = (__private.bonusByRound[round] || []);
+    __private.bonusByRound[round].push(__private.blockStatus.calcDelegateVotersBonus(block.height));
 
     var nextRound = self.calc(block.height + 1);
 
@@ -493,6 +515,22 @@ Round.prototype.tick = function (block, cb) {
         library.balanceCache.addAssetBalance(dappId, BONUS_CURRENCY, bonus)
         library.model.updateAssetBalance(BONUS_CURRENCY, bonus, dappId, cb)
       },
+
+      function (callback) {
+        const bonusByRound = __private.bonusByRound[round] || [];
+        const totalBonus = bonusByRound.length <= 0 ? 0 : bonusByRound.reduce((prevValue, currValue) => {
+          return prevValue + currValue;
+        }, 0);
+        __private.voterBonus.commitBonus(round, bonusByRound, block)
+          .then(result => {
+            void (result);
+            callback();
+          })
+          .catch(error => {
+            callback(error);
+          });
+      },
+
       function (cb) {
         modules.accounts.getAccounts({
           isDelegate: 1,
@@ -514,7 +552,7 @@ Round.prototype.tick = function (block, cb) {
 
               let totalVotes = 0;
               async.eachSeries(voters.accounts, function (voter, cb) {
-                modules.lockvote.calcLockVotes(voter.address, block.height, function (err, votes) {
+                modules.lockvote.refreshRoundLockVotes(voter.address, block.height, function (err, votes) {
                   if(err){
                     return cb(err);
                   }
@@ -535,8 +573,6 @@ Round.prototype.tick = function (block, cb) {
               });
             });
           },function (err) {
-                  
-            library.bus.message('finishRound', round);
             self.flush(round, function (err2) {
               cb(err || err2);
             });
@@ -570,19 +606,6 @@ Round.prototype.tick = function (block, cb) {
         //   })
         // });
       },
-      function (cb) {
-        // Fix NaN asset balance issue caused by flowed amount validate function
-        // [HARDFORK] Need to be reviewed by entanmo community
-        if (round === 33348) {
-          library.balanceCache.setAssetBalance('ABrWsCGv25nahd4qqZ7bofj3MuSfpSX1Rg', 'ABSORB.YLB', '32064016000000')
-          library.balanceCache.setAssetBalance('A5Hyw75AHCthHnevjpyP9J4146uXvHTX4P', 'ABSORB.YLB', '15932769000000')
-          var sql = 'update mem_asset_balances set balance = "32064016000000" where currency="ABSORB.YLB" and address="ABrWsCGv25nahd4qqZ7bofj3MuSfpSX1Rg";' +
-                    'update mem_asset_balances set balance = "15932769000000" where currency="ABSORB.YLB" and address="A5Hyw75AHCthHnevjpyP9J4146uXvHTX4P";'
-          library.dbLite.query(sql, cb)
-        } else {
-          cb()
-        }
-      },
       function(cb){
         modules.delegates.generateDelegateList(block.height + 1, function (err, roundDelegates) {
           if (err) {
@@ -606,9 +629,20 @@ Round.prototype.tick = function (block, cb) {
               });
             });
           }, function (err) {
+            library.bus.message('finishRound', round);
             return cb(err);
           });
         });
+      },
+      function (callback) {
+        __private.voterBonus.beginBonus(nextRound, block)
+          .then(result => {
+            void (result);
+            callback();
+          })
+          .catch(error => {
+            callback(error);
+          });
       }
     ], function (err) {
       delete __private.feesByRound[round];
@@ -624,12 +658,27 @@ Round.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);
 }
 
+Round.prototype.roundrewardsRecovery = function (cb) {
+  __private.voterBonus.recovery()
+    .then(result => {
+      return cb();
+    })
+    .catch(error => {
+      return cb(error);
+    });
+}
+
 // Events
 Round.prototype.onBind = function (scope) {
   modules = scope;
 }
 
 Round.prototype.onBlockchainReady = function () {
+  /*
+  setInterval(() => {
+    console.log("delegateByRound:", JSON.stringify(__private.delegatesByRound));
+  }, 4000);
+  */
   var round = self.calc(modules.blocks.getLastBlock().height);
   library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / "+slots.roundBlocks+" as integer) + (case when b.height % "+slots.roundBlocks+" > 0 then 1 else 0 end))) = $round",
     {

@@ -969,17 +969,23 @@ Blocks.prototype.applyBlock = function (block, votes, broadcast, saveBlock, call
       }
     }
     var sortedTrs = block.transactions.sort(function (a, b) {
-      if (a.type == 1) {
+      if (a.type == TransactionTypes.SIGNATURE) {
         return 1;
       }
-      if (a.type == 0) {
+      if (a.type == TransactionTypes.SEND) {
         return -1;
       }
       
-      if (a.type == 101 && b.type == 3) {
+      if (a.type == TransactionTypes.LOCK_VOTES && b.type == TransactionTypes.VOTE) {
         return -1;
       }
-      if (a.type == 3 && b.type == 101) {
+      if (a.type == TransactionTypes.VOTE && b.type == TransactionTypes.LOCK_VOTES) {
+        return 1;
+      }
+      if (a.type == TransactionTypes.DELAY_TRANSFER && b.type == TransactionTypes.VOTE) {
+        return -1;
+      }
+      if (a.type == TransactionTypes.VOTE && b.type == TransactionTypes.DELAY_TRANSFER) {
         return 1;
       }
       return 0;

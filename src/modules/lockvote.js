@@ -109,7 +109,7 @@ __private.listLockVotes = function (query, cb) {
     }
     library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
         "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
-        "lv.address, lv.originHeight, lv.currentHeight, lv.lockAmount, lv.state, " +
+        "lv.address, lv.originHeight, lv.currentHeight, lv.lockAmount, lv.vote, lv.state, " +
         "(select max(height) + 1 from blocks) - b.height " +
         "from trs t " +
         "inner join blocks b on t.blockId = b.id " +
@@ -119,7 +119,7 @@ __private.listLockVotes = function (query, cb) {
         [
             't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
             't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
-            'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', 'lv_state', 'confirmations'
+            'lv_address', 'lv_originHeight', 'lv_currentHeight', 'lv_lockAmount', "lv_vote", 'lv_state', 'confirmations'
         ],
         function (err, rows) {
             if (err) {
@@ -220,7 +220,7 @@ LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
     });
 }
 
-LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
+LockVote.prototype.refreshRoundLockVotes = function (address, blockHeight, cb) {
     __private.listLockVotes({address: address, state: 1}, (err, result) => {
         if (err) {
             return cb(err);
@@ -232,23 +232,51 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
 
         let totalVotes = 0;
 
-        async.eachSeries(result.trs, (value, cb) => {
-            /*
-            const info = value.asset;
-            let currentHeight = info.currentHeight;
-            if (info.originHeight !== 1) {
-                if (info.originHeight == info.currentHeight) {
-                    currentHeight = info.currentHeight + slots.getHeightPerDay();
-                }
-                if (blockHeight < currentHeight) {
-                    return cb();
-                }
-            }
+        // 将延迟到账的金额加入到总票数里面
+        totalVotes += library.delayTransferMgr.totalAmount(address);
 
-            let factor = 1 + Math.floor((blockHeight - currentHeight) / slots.getHeightPerDay());
-            factor = Math.min(32, Math.max(1, factor));
-            let numOfVote = factor * info.lockAmount;
+        async.eachSeries(result.trs, (value, cb) => {
+            const numOfVote = __private.calcNumOfVotes(value.asset, blockHeight);
+            library.dbLite.query("UPDATE lock_votes SET vote=$vote where transactionId = $transactionId and state = 1",{
+                vote: numOfVote,
+                transactionId: value.id
+            }, err => {
+                if (err) {
+                    return cb(err);
+                }
+
+                totalVotes += numOfVote;
+                cb();
+            });
+            /*
+            totalVotes += numOfVote;
+            cb();
             */
+        }, (err) => {
+            if (err) {
+                return cb(err);
+            }
+            
+            return cb(null, totalVotes);
+        });
+    });
+}
+
+LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
+    __private.listLockVotes({address: address, state: 1}, (err, result) => {
+        if (err) {
+            return cb(err);
+        }
+
+        if (result.count <= 0) {
+            return cb();
+        }
+
+        let totalVotes = 0;
+        // 将延迟到账的金额加入到总票数里面
+        totalVotes += library.delayTransferMgr.totalAmount(address);
+
+        async.eachSeries(result.trs, (value, cb) => {
             const numOfVote = __private.calcNumOfVotes(value.asset, blockHeight);
             totalVotes += numOfVote;
             cb();

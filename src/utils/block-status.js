@@ -27,6 +27,15 @@ function BlockStatus() {
     200000000  // Milestone 5
   ];
 
+  var bonuses = [
+    100000000,  // Initial bonus
+    50000000,   // bonus in milestone 1
+    25000000,   // bonus in milestone 2
+    25000000,   // bonus in milestone 3
+    25000000,   // bonus in milestone 4
+    26000000    // bonus in milestone 5
+  ];
+
   var distance = 10112000, // Distance between each milestone
     rewardOffset = 1, // Start rewards at block (n)
     lastRewardHeight = 59328000;
@@ -65,6 +74,16 @@ function BlockStatus() {
       return milestones[this.calcMilestone(height)];
     }
   };
+
+  this.calcDelegateVotersBonus = function (height) {
+    var height = parseHeight(height);
+
+    if (height < rewardOffset || height <= 1 || height > lastRewardHeight) {
+      return 0;
+    } else {
+      return bonuses[this.calcMilestone(height)];
+    }
+  }
 
   this.calcSupply = function (height) {
     var height = parseHeight(height);
