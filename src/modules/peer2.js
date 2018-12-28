@@ -53,6 +53,8 @@ const priv = {
       timeBucketOutdated: CHECK_BUCKET_OUTDATE,
       bootstrap: bootstrapNodes,
       nodeId: priv.getNodeIdentity({ host, port }),
+      peerPort:p2pOptions.peerPort,
+      magic: p2pOptions.magic
     })
     priv.dht = dht
     priv.bootstrapNodes = bootstrapNodes
@@ -165,9 +167,10 @@ const priv = {
       .exec((err, nodes) => {
         if (err) return callback(err);
         //library.logger.warn(JSON.stringify(nodes));
-        let nodeids = nodes.map(n=>n.id);
+        let nodeids = nodes.filter(node => node.seen ).map(n=>n.id);//remove all host:port have seen 
         async.eachSeries(nodeids, function (id, cb) {
-          priv.dht.removeNode(id, (err, numRemoved) => {
+          if (!id) return
+          priv.nodesDb.remove({ id: id }, (err, numRemoved) => {
             library.logger.warn(` remove node  (${id})`);
             if (err) {
               library.logger.warn(`faild to remove node id (${numRemoved})`);
@@ -294,6 +297,8 @@ Peer.prototype.listPeers = ( cb) => {
 Peer.prototype.addPeer = ( host,port) => {
   let node ={host,  port }
   node.id = priv.getNodeIdentity(node)
+  node.distance = 0
+  node.seen = Date.now()
   priv.dht.addNode(node)
 
 }
@@ -398,18 +403,19 @@ Peer.prototype.request = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        const host = contact.host;
-        const port = contact.port;
-        let node ={host, port };
-        const addr = `${host}:${port}`;
+        const host = contact.host
+        const port = contact.port
+        let node ={host,  port }
+        const addr = `${host}:${port}`
         if (!priv.bootstrapSet.has(addr)){
           library.logger.debug("remove node:"+JSON.stringify(node)) 
-          priv.removeNodeByIp(host,port, function (err) {
+          const nodeid = priv.getNodeIdentity(node)
+          priv.dht.removeNode(nodeid, function (err) {
             if (!err) {
               library.logger.info(`failed to remove peer : ${err}`)
             }
           })
-         }
+        }
         //else{
         //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
         // }
@@ -441,13 +447,14 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        const host = contact.host;
-        const port = contact.port;
-        let node ={host,  port };
-        const addr = `${host}:${port}`;
+        const host = contact.host
+        const port = contact.port
+        let node ={host,  port }
+        const addr = `${host}:${port}`
         if (!priv.bootstrapSet.has(addr)){
           library.logger.debug("remove node:"+JSON.stringify(node)) 
-          priv.removeNodeByIp(host,port, function (err) {
+          const nodeid = priv.getNodeIdentity(node)
+          priv.dht.removeNode(nodeid, function (err) {
             if (!err) {
               library.logger.info(`failed to remove peer : ${err}`)
             }
@@ -497,6 +504,7 @@ Peer.prototype.onBlockchainReady = () => {
   priv.initDHT({
     publicIp: library.config.publicIp,
     peerPort: library.config.peerPort,
+    magic: library.config.magic,
     seedPeers: library.config.peers.list,
     blackPeers: library.config.peers.blackList,
     persistentPeers: library.config.peers.persistent === false ? false : true,
