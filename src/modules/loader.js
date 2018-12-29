@@ -460,7 +460,7 @@ __private.loadBlockChain = function (cb) {
                       load(count);
                     } else {
                       // Load delegates
-                      library.dbLite.query("SELECT lower(hex(publicKey)) FROM mem_accounts WHERE isDelegate=1", ['publicKey'], function (err, delegates) {
+                      library.dbLite.query("SELECT lower(hex(publicKey)) FROM mem_accounts WHERE isDelegate > 0", ['publicKey'], function (err, delegates) {
                         if (err || delegates.length == 0) {
                           library.logger.error(err || "No delegates, reload database");
                           library.logger.info("Failed to verify db integrity 3");

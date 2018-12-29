@@ -301,7 +301,7 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
       },
       function (cb) {
         modules.accounts.getAccounts({
-          isDelegate: 1,
+          isDelegate: { $gt: 0 },
           sort: {
             "vote": -1,
             "publicKey": 1
@@ -533,7 +533,7 @@ Round.prototype.tick = function (block, cb) {
 
       function (cb) {
         modules.accounts.getAccounts({
-          isDelegate: 1,
+          isDelegate:{ $gt: 0 },
           sort: {
             "vote": -1,
             "publicKey": 1
@@ -606,7 +606,34 @@ Round.prototype.tick = function (block, cb) {
         //   })
         // });
       },
-      function(cb){
+      function(cb){// 改变代理人信息
+        modules.accounts.getAccounts({
+          isDelegate: 2,
+          sort: {
+            "vote": -1,
+            "publicKey": 1
+          }
+        }, function (err, delegates) {
+          if (err) {
+            return cb(err);
+          }
+          async.eachSeries(delegates, function (delegate, cb) {
+            var data = {
+              address: delegate.address,
+              u_isDelegate: 2,
+              isDelegate: 0,
+              username: null,
+              u_username: delegate.username,
+              vote: 0
+            }
+        
+            modules.accounts.setAccountAndGet(data, cb);
+          },function (err) {
+            cb(err);  
+          });
+        });
+      },
+      function(cb){// 计算票数
         modules.delegates.generateDelegateList(block.height + 1, function (err, roundDelegates) {
           if (err) {
             return cb(err);

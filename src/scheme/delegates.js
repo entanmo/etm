@@ -160,6 +160,28 @@ module.exports = {
         }
         },
         required: ["secret"]
+    },
+
+    delDelegate: {
+        id: 'delegates.delDelegate',
+        type: "object",
+        properties: {
+            secret: {
+                type: "string",
+                minLength: 1,
+                maxLength: 100
+            },
+            publicKey: {
+                type: "string",
+                format: "publicKey"
+            },
+            secondSecret: {
+                type: "string",
+                minLength: 1,
+                maxLength: 100
+            },
+        },
+        required: ["secret"]
     }
 
 }

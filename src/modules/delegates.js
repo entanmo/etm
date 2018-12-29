@@ -43,8 +43,10 @@ __private.forgingEanbled = true;
 
 function Delegate() {
   this.create = function (data, trs) {
-    trs.recipientId = null;
-    trs.amount = 0;
+    // trs.recipientId = null;
+    // trs.amount = 0;
+    trs.recipientId = "A4MFB3MaPd355ug19GYPMSakCAWKbLjDTb";
+    trs.amount = 500*100000000;
     trs.asset.delegate = {
       username: data.username,
       publicKey: data.sender.publicKey
@@ -58,19 +60,20 @@ function Delegate() {
   }
 
   this.calculateFee = function (trs, sender) {
-    return 100 * constants.fixedPoint;
+    return 0.1 * constants.fixedPoint;
+    // return 100 * constants.fixedPoint;
   }
 
   this.verify = function (trs, sender, cb) {
-    if (trs.recipientId) {
-      return setImmediate(cb, "Invalid recipient");
-    }
+    // if (trs.recipientId) {
+    //   return setImmediate(cb, "Invalid recipient");
+    // }
 
-    if (trs.amount != 0) {
-      return setImmediate(cb, "Invalid transaction amount");
-    }
+    // if (trs.amount != 0) {
+    //   return setImmediate(cb, "Invalid transaction amount");
+    // }
 
-    if (sender.isDelegate) {
+    if (sender.isDelegate > 0) {
       return cb("Account is already a delegate");
     }
 
@@ -151,7 +154,33 @@ function Delegate() {
       data.username = trs.asset.delegate.username;
     }
 
-    modules.accounts.setAccountAndGet(data, cb);
+    modules.accounts.setAccountAndGet(data, (err) => {
+      if (err) {
+        return cb(err);
+      }
+
+      if (block.height !== 1) {
+        modules.accounts.loadOrCreate({
+          address: trs.recipientId
+        }, function (err, recipient) {
+          if (err) {
+            return cb(err);
+          }
+
+          modules.accounts.mergeAccountAndGet({
+            address: trs.recipientId,
+            balance: trs.amount,
+            u_balance: trs.amount,
+            blockId: block.id,
+            round: modules.round.calc(block.height)
+          }, function (err) {
+            cb(err);
+          });
+        });
+      } else {
+        cb();
+      }
+    });
   }
 
   this.undo = function (trs, block, sender, cb) {
@@ -167,11 +196,37 @@ function Delegate() {
       data.u_username = trs.asset.delegate.username;
     }
 
-    modules.accounts.setAccountAndGet(data, cb);
+    modules.accounts.setAccountAndGet(data, (err) => {
+      if (err) {
+        return cb(err);
+      }
+      
+      if (block.height !== 1) {
+        modules.accounts.setAccountAndGet({
+          address: trs.recipientId
+        }, function (err, recipient) {
+          if (err) {
+            return cb(err);
+          }
+
+          modules.accounts.mergeAccountAndGet({
+            address: trs.recipientId,
+            balance: -trs.amount,
+            u_balance: -trs.amount,
+            blockId: block.id,
+            round: modules.round.calc(block.height)
+          }, function (err) {
+            cb(err);
+          });
+        });
+      } else {
+        cb();
+      }
+    });
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
-    if (sender.isDelegate) {
+    if (sender.isDelegate > 0) {
       return cb("Account is already a delegate");
     }
 
@@ -227,9 +282,154 @@ function Delegate() {
   }
 
   this.dbSave = function (trs, cb) {
-    library.dbLite.query("INSERT INTO delegates(username, transactionId) VALUES($username, $transactionId)", {
+    library.dbLite.query("INSERT INTO delegates(username, transactionId, state, senderId) VALUES($username, $transactionId, 1, $senderId)", {
       username: trs.asset.delegate.username,
-      transactionId: trs.id
+      transactionId: trs.id,
+      senderId: trs.senderId
+    }, cb);
+  }
+
+  this.ready = function (trs, sender) {
+    if (util.isArray(sender.multisignatures) && sender.multisignatures.length) {
+      if (!trs.signatures) {
+        return false;
+      }
+      return trs.signatures.length >= sender.multimin - 1;
+    } else {
+      return true;
+    }
+  }
+}
+
+function UnDelegate() {
+  this.create = function (data, trs) {
+    trs.recipientId = null;
+    trs.amount = 0;
+    // trs.asset.delegate = {
+    //   publicKey: data.sender.publicKey
+    // };
+
+    return trs;
+  }
+
+  this.calculateFee = function (trs, sender) {
+    return 0.1 * constants.fixedPoint;
+  }
+
+  this.verify = function (trs, sender, cb) {
+    if (trs.recipientId) {
+      return setImmediate(cb, "Invalid recipient");
+    }
+
+    if (trs.amount != 0) {
+      return setImmediate(cb, "Invalid transaction amount");
+    }
+
+    if (sender.isDelegate == 0) {
+      return cb("Account is not a delegate");
+    }
+
+    if (sender.isDelegate == 2) {
+      return cb("Account has canceled delegate,just wait round change");
+    }
+
+    cb(null, trs);
+  }
+
+  this.process = function (trs, sender, cb) {
+    setImmediate(cb, null, trs);
+  }
+
+  this.getBytes = function (trs) {
+    return null;
+  }
+
+  this.apply = function (trs, block, sender, cb) {
+    var data = {
+      address: sender.address,
+      u_isDelegate: 1,
+      isDelegate: 2,
+      // username: null,
+      // u_username: sender.username,
+      // vote: 0
+    }
+    modules.accounts.setAccountAndGet(data, cb);
+  }
+
+  this.undo = function (trs, block, sender, cb) {
+    var data = {
+      address: sender.address,
+      u_isDelegate: 2,
+      isDelegate: 1,
+      // username: sender.u_username,
+      // u_username: null,
+      // vote: 0
+    }
+
+    modules.accounts.setAccountAndGet(data, cb);
+  }
+
+  this.applyUnconfirmed = function (trs, sender, cb) {
+    // if (!sender.isDelegate) {
+    //   return cb("Account is not a delegate");
+    // }
+
+    // var nameKey = trs.asset.delegate.username + ':' + trs.type
+    // var idKey = sender.address + ':' + trs.type
+    // if (library.oneoff.has(nameKey) || library.oneoff.has(idKey)) {
+    //   return setImmediate(cb, 'Double submit')
+    // }
+    // library.oneoff.set(nameKey, true)
+    // library.oneoff.set(idKey, true)
+    setImmediate(cb) 
+  }
+
+  this.undoUnconfirmed = function (trs, sender, cb) {
+    // var nameKey = trs.asset.delegate.name + ':' + trs.type
+    // var idKey = sender.address + ':' + trs.type
+    // library.oneoff.delete(nameKey)
+    // library.oneoff.delete(idKey)
+    setImmediate(cb)
+  }
+
+  this.objectNormalize = function (trs) {
+    // var report = library.scheme.validate(trs.asset.delegate, /*{
+    //   type: "object",
+    //   properties: {
+    //     publicKey: {
+    //       type: "string",
+    //       format: "publicKey"
+    //     }
+    //   },
+    //   required: ["publicKey"]
+    // }*/scheme.delegate);
+
+    // if (!report) {
+    //   throw Error("Can't verify delegate transaction, incorrect parameters: " + library.scheme.getLastError());
+    // }
+
+    return trs;
+  }
+
+  this.dbRead = function (raw) {
+    // if (!raw.d_username) {
+    //   return null;
+    // } else {
+    //   var delegate = {
+    //     username: raw.d_username,
+    //     publicKey: raw.t_senderPublicKey,
+    //     address: raw.t_senderId
+    //   }
+
+    //   return {delegate: delegate};
+    // }
+    return null;
+  }
+
+  this.dbSave = function (trs, cb) {
+    console.log(trs)
+    library.dbLite.query("UPDATE delegates set state = 0 where (senderId = $senderId and state = 1)", {
+      senderId: trs.senderId
     }, cb);
   }
 
@@ -253,6 +453,7 @@ function Delegates(cb, scope) {
   __private.attachApi();
 
   library.base.transaction.attachAssetType(TransactionTypes.DELEGATE, new Delegate());
+  library.base.transaction.attachAssetType(TransactionTypes.UN_DELEGATE, new UnDelegate());
 
   setImmediate(cb, null, self);
 }
@@ -273,7 +474,8 @@ __private.attachApi = function () {
     "get /": "getDelegates",
     "get /fee": "getFee",
     "get /forging/getForgedByAccount": "getForgedByAccount",
-    "put /": "addDelegate"
+    "put /": "addDelegate",
+    "put /undelegate": "delDelegate",
   });
 
   if (process.env.DEBUG) {
@@ -332,7 +534,7 @@ __private.attachApi = function () {
         if (err) {
           return res.json({success: false, error: err.toString()});
         }
-        if (account && account.isDelegate) {
+        if (account && account.isDelegate > 0) {
           __private.keypairs[keypair.publicKey.toString('hex')] = keypair;
           library.logger.info("Forging enabled on account: " + account.address);
           return res.json({success: true, address: account.address});
@@ -386,7 +588,7 @@ __private.attachApi = function () {
         if (err) {
           return res.json({success: false, error: err.toString()});
         }
-        if (account && account.isDelegate) {
+        if (account && account.isDelegate > 0) {
           delete __private.keypairs[keypair.publicKey.toString('hex')];
           library.logger.info("Forging disabled on account: " + account.address);
           return res.json({success: true, address: account.address});
@@ -427,7 +629,7 @@ __private.attachApi = function () {
 
 __private.getKeysSortByVote = function (cb) {
   modules.accounts.getAccounts({
-    isDelegate: 1,
+    isDelegate: { $gt: 0 },
     vote: { $gt: 0 },
     sort: {
       "vote": -1,
@@ -559,7 +761,7 @@ __private.loadMyDelegates = function (cb) {
         return cb("Account " + keypair.publicKey.toString('hex') + " not found");
       }
 
-      if (account.isDelegate) {
+      if (account.isDelegate > 0) {
         __private.keypairs[keypair.publicKey.toString('hex')] = keypair;
         library.logger.info("Forging enabled on account: " + account.address);
       } else {
@@ -783,7 +985,7 @@ Delegates.prototype.checkDelegates = function (publicKey, votes, cb) {
                 return next("Failed to remove vote, account has not voted for this delegate");
               }
       
-              modules.accounts.getAccount({publicKey: publicKey, isDelegate: 1}, function (err, account) {
+              modules.accounts.getAccount({publicKey: publicKey, isDelegate: { $gt: 0 }}, function (err, account) {
                 if (err) {
                   return next(err);
                 }
@@ -888,7 +1090,7 @@ Delegates.prototype.checkUnconfirmedDelegates = function (publicKey, votes, cb) 
           return cb("Failed to remove vote, account has not voted for this delegate");
         }
 
-        modules.accounts.getAccount({publicKey: publicKey, isDelegate: 1}, function (err, account) {
+        modules.accounts.getAccount({publicKey: publicKey, isDelegate: { $gt: 0 }}, function (err, account) {
           if (err) {
             return cb(err);
           }
@@ -952,7 +1154,7 @@ Delegates.prototype.getDelegates = function (query, cb) {
     throw "Missing query argument";
   }
   modules.accounts.getAccounts({
-    isDelegate: 1,
+    isDelegate: { $gt: 0 },
     sort: { "vote": -1, "publicKey": 1 }
   }, ["username", "address", "publicKey", "vote", "missedblocks", "producedblocks", "fees", "rewards", "balance"], function (err, delegates) {
     if (err) {
@@ -1467,6 +1669,124 @@ shared.addDelegate = function (req, cb) {
     });
   });
 }
+
+shared.delDelegate = function (req, cb) {
+  var body = req.body;
+  library.scheme.validate(body, scheme.delDelegate, function (err) {
+    if (err) {
+      return cb(err[0].message);
+    }
+
+    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+    var keypair = ed.MakeKeypair(hash);
+
+    if (body.publicKey) {
+      if (keypair.publicKey.toString('hex') != body.publicKey) {
+        return cb("Invalid passphrase");
+      }
+    }
+
+    library.balancesSequence.add(function (cb) {
+      if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
+        modules.accounts.getAccount({publicKey: body.multisigAccountPublicKey}, function (err, account) {
+          if (err) {
+            return cb(err.toString());
+          }
+
+          if (!account) {
+            return cb("Multisignature account not found");
+          }
+
+          if (!account.multisignatures || !account.multisignatures) {
+            return cb("Account does not have multisignatures enabled");
+          }
+
+          if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
+            return cb("Account does not belong to multisignature group");
+          }
+
+          modules.accounts.getAccount({publicKey: keypair.publicKey}, function (err, requester) {
+            if (err) {
+              return cb(err.toString());
+            }
+
+            if (!requester || !requester.publicKey) {
+              return cb("Invalid requester");
+            }
+
+            if (requester.secondSignature && !body.secondSecret) {
+              return cb("Invalid second passphrase");
+            }
+
+            if (requester.publicKey == account.publicKey) {
+              return cb("Incorrect requester");
+            }
+
+            var secondKeypair = null;
+
+            if (requester.secondSignature) {
+              var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+              secondKeypair = ed.MakeKeypair(secondHash);
+            }
+
+            try {
+              var transaction = library.base.transaction.create({
+                type: TransactionTypes.UN_DELEGATE,
+                sender: account,
+                keypair: keypair,
+                secondKeypair: secondKeypair,
+                requester: keypair
+              });
+            } catch (e) {
+              return cb(e.toString());
+            }
+            modules.transactions.receiveTransactions([transaction], cb);
+          });
+        });
+      } else {
+        modules.accounts.getAccount({publicKey: keypair.publicKey.toString('hex')}, function (err, account) {
+          if (err) {
+            return cb(err.toString());
+          }
+
+          if (!account) {
+            return cb("Account not found");
+          }
+
+          if (account.secondSignature && !body.secondSecret) {
+            return cb("Invalid second passphrase");
+          }
+
+          var secondKeypair = null;
+
+          if (account.secondSignature) {
+            var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+            secondKeypair = ed.MakeKeypair(secondHash);
+          }
+
+          try {
+            var transaction = library.base.transaction.create({
+              type: TransactionTypes.UN_DELEGATE,
+              sender: account,
+              keypair: keypair,
+              secondKeypair: secondKeypair
+            });
+          } catch (e) {
+            return cb(e.toString());
+          }
+          modules.transactions.receiveTransactions([transaction], cb);
+        });
+      }
+    }, function (err, transaction) {
+      if (err) {
+        return cb(err.toString());
+      }
+
+      cb(null, {transaction: transaction[0]});
+    });
+  });
+}
+
 
 // Export
 module.exports = Delegates;
