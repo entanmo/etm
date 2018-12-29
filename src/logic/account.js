@@ -49,18 +49,18 @@ function Account(scope, cb) {
       name: "isDelegate",
       type: "BigInt",
       filter: {
-        type: "boolean"
+        type: "integer"
       },
-      conv: Boolean,
+      conv: Number,
       default: 0
     },
     {
       name: "u_isDelegate",
       type: "BigInt",
       filter: {
-        type: "boolean"
+        type: "integer"
       },
-      conv: Boolean,
+      conv: Number,
       default: 0
     },
     {

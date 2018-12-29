@@ -57,7 +57,8 @@ module.exports = function init(options) {
     appConfig.buildVersion = 'development';
     appConfig.netVersion = process.env.NET_VERSION || 'localnet';
     appConfig.publicDir = path.join(baseDir, 'public', 'dist');
-    appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps')
+    appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps');
+    appConfig.dbName = 'blockchain.db';
     if(program.dataDir){
         appConfig.dataDir =  path.join(baseDir, program.dataDir);
     }else{
@@ -164,7 +165,7 @@ module.exports = function init(options) {
 
 
     return {
-        dbFile: program.blockchain || path.join(baseDir, 'blockchain.db'),
+        dbFile: program.blockchain || path.join(baseDir, appConfig.dbName),
         appConfig: appConfig,
         genesisblock: genesisblock,
         logger: logger,

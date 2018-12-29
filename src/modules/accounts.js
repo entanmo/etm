@@ -724,7 +724,7 @@ shared.getDelegates = function (req, cb) {
       }
       if (account.delegates) {
         self.getAccounts({
-          isDelegate: 1,
+          isDelegate: { $gt: 0 },
           sort: { "vote": -1, "publicKey": 1 }
         }, ["username", "address", "publicKey", "vote", "missedblocks", "producedblocks"], function (err, delegates) {
           if (err) {

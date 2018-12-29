@@ -22,7 +22,7 @@ var sandboxHelper = require('../utils/sandbox.js');
 var slots = require('../utils/slots.js');
 var scheme = require('../scheme/loader');
 const reportor = require("../utils/kafka-reportor");
-
+const shell = require("shelljs");
 require('colors');
 
 // Private fields
@@ -457,10 +457,31 @@ __private.loadBlockChain = function (cb) {
                     if (err || rows.length > 0) {
                       library.logger.error(err || "Encountered missing block, looks like node went down during block processing");
                       library.logger.info("Failed to verify db integrity 2");
-                      load(count);
+
+                      modules.system.backupDb(function(isbackup){
+                        if(isbackup){
+                          shell.rm('-f', 'data/blockchain-personal.db');
+                          __private.loadBlockChain(function (err) {
+                            if (err) {
+                              library.logger.error('Failed to load blockchain', err)
+                              reportor.report("nodejs", {
+                                subaction: "exit",
+                                data: {
+                                  method: "backupDb",
+                                  reason: "Failed to load blockchain " + err.toString()
+                                }
+                              });
+                              return process.exit(1)
+                            }
+                            library.bus.message('blockchainReady');
+                          });
+                        }else{
+                          load(count);
+                        }
+                      });
                     } else {
                       // Load delegates
-                      library.dbLite.query("SELECT lower(hex(publicKey)) FROM mem_accounts WHERE isDelegate=1", ['publicKey'], function (err, delegates) {
+                      library.dbLite.query("SELECT lower(hex(publicKey)) FROM mem_accounts WHERE isDelegate > 0", ['publicKey'], function (err, delegates) {
                         if (err || delegates.length == 0) {
                           library.logger.error(err || "No delegates, reload database");
                           library.logger.info("Failed to verify db integrity 3");
