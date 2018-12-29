@@ -19,7 +19,8 @@ var sandboxHelper = require('../utils/sandbox.js');
 var slots = require('../utils/slots.js');
 var Router = require('../utils/router.js');
 var shell = require('../utils/shell.js');
-
+const shell2 = require("shelljs")
+var fs= require("fs");
 // Private fields
 var modules, library, self, __private = {}, shared = {};
 
@@ -35,12 +36,26 @@ function System(cb, scope) {
   __private.port = library.config.port;
   __private.magic = library.config.magic;
   __private.osName = os.platform() + os.release();
-  
   __private.attachApi();
 
   setImmediate(cb, null, self);
 }
-
+System.prototype.onNewBlock = function (block, votes, broadcast) {
+     if( block.height%slots.roundBlocks == slots.roundBlocks - 500){
+      shell2.cp('-f',library.config.dbName, 'data/'+library.config.dbName);
+      console.log("copy blockchain.db in system at height : "+JSON.stringify(block.height));
+     }
+}
+System.prototype.backupDb = function (cb) {
+  fs.exists("data/"+library.config.dbName, function(exists) {
+    if(exists){
+    //  shell2.cp('-f','blockchain-personal.db', 'data/blockchain-personal-old.db');
+      shell2.cp('-f','data/'+library.config.dbName, library.config.dbName);
+      console.log("backupDb");
+    }
+    cb(exists)
+  })
+}
 // Private methods
 __private.attachApi = function () {
   var router = new Router();
