@@ -44,7 +44,7 @@ function DelayTransfer() {
     const endTime = slots.getTime(expired);
     const numOfSlots = (endTime - trs.timestamp) / slots.interval;
     if (numOfSlots < 1 * 60 * 60 / 3) {
-      return cb("Invalid expired value, must bigger than 24 hours");
+      return cb("Invalid expired value, must bigger than 1 hours");
     }
 
     if (!addressHelper.isAddress(trs.recipientId)) {
@@ -73,7 +73,7 @@ function DelayTransfer() {
   this.apply = function (trs, block, sender, cb) {
     const expired = Number(trs.args[0]);
     const endTime = slots.getTime(expired);
-    const numOfSlots = (endTime - trs.timestamp) / slots.interval;
+    const numOfSlots = Math.floor((endTime - trs.timestamp) / slots.interval);
     library.delayTransferMgr.addDelayTransfer(trs.id, {
       transactionId: trs.id,
       senderId: trs.senderId,
@@ -127,7 +127,7 @@ function DelayTransfer() {
   this.dbSave = function (trs, cb) {
     const expired = Number(trs.args[0]);
     const endTime = slots.getTime(expired);
-    const numOfSlots = (endTime - trs.timestamp) / slots.interval;
+    const numOfSlots = Math.floor((endTime - trs.timestamp) / slots.interval);
     if (library.genesisblock.block.id == trs.blockId) {
         // genesis block
         const block = library.genesisblock.block;
