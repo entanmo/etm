@@ -8,9 +8,9 @@ class VoterBonus {
     constructor() {
         this.roundCaches = {};
 
-        setInterval(() => {
-            console.log("VoterBonus Caches:", JSON.stringify(this.roundCaches, null, 2));
-        }, 5000);
+        // setInterval(() => {
+        //     console.log("VoterBonus Caches:", JSON.stringify(this.roundCaches, null, 2));
+        // }, 5000);
     }
 
     async _asyncGetAccounts(filter, fields) {
@@ -74,7 +74,7 @@ class VoterBonus {
 
     async _saveToDB(value) {
         return new Promise((resolve, reject) => {
-            console.log("++++++++++++++++++++++ saveToDB:", JSON.stringify(value, null, 2));
+            // console.log("++++++++++++++++++++++ saveToDB:", JSON.stringify(value, null, 2));
             const base64Voters = Buffer.from(value.voters, "utf8").toString("base64");
             library.dbLite.query("INSERT INTO mem_roundrewards(round, isTop, delegatePublicKey, voters)"+
                 "VALUES($round, $isTop, $delegatePublicKey, $voters);", {
@@ -104,7 +104,7 @@ class VoterBonus {
                     return reject(err);
                 }
 
-                console.log("-----------------------------:", rows);
+                // console.log("-----------------------------:", rows);
                 return resolve(rows);
             });
         });
@@ -169,7 +169,7 @@ class VoterBonus {
     }
 
     async beginBonus(round, block) {
-        console.log("begin bonus:", round, block.height);
+        // console.log("begin bonus:", round, block.height);
         this.roundCaches[round] = this.roundCaches[round] || {};
         this.roundCaches[round].allDelegateVoters = await this._allDelegatesVoters();
         this.roundCaches[round].delegates = await this._asyncGenerateDelegateList(block.height);
@@ -195,11 +195,11 @@ class VoterBonus {
             await this._saveToDB(cache[i]);
         }
 
-        console.log("begin bonus:", JSON.stringify(this.roundCaches[round], null, 2));
+        // console.log("begin bonus:", JSON.stringify(this.roundCaches[round], null, 2));
     }
 
     async commitBonus(round, bonusAmount, block) {
-        console.log("commit bonus:", round, bonusAmount, block.height);
+        // console.log("commit bonus:", round, bonusAmount, block.height);
         if (this.roundCaches[round] == null) {
             return;
         }
@@ -210,7 +210,7 @@ class VoterBonus {
         const {allDelegateVoters, delegates} = this.roundCaches[round];
         this.roundCaches[round].bonusAmount = bonusAmount;
         this.roundCaches[round].block = block;
-        console.log("commit bonus:", JSON.stringify(this.roundCaches[round], null, 2));
+        // console.log("commit bonus:", JSON.stringify(this.roundCaches[round], null, 2));
 
 
         // calc total votes
@@ -252,7 +252,7 @@ class VoterBonus {
             const voters = topDelegateVoters[delegateKeys[i]];
 
             const voterKeys = Object.keys(voters);
-            const delegateTotalVotes = 0;
+            let delegateTotalVotes = 0;
             voterKeys.forEach(el => {
                 delegateTotalVotes += voters[el];
             });
@@ -293,7 +293,7 @@ class VoterBonus {
         this.roundCaches[cacheRound].allDelegateVoters = allDelegateVoters;
         this.roundCaches[cacheRound].delegates = delegates;
 
-        console.log("==========================:", JSON.stringify(this.roundCaches[cacheRound], null, 2));
+        // console.log("==========================:", JSON.stringify(this.roundCaches[cacheRound], null, 2));
     }
 }
 
