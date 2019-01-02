@@ -167,16 +167,16 @@ const priv = {
       .exec((err, nodes) => {
         if (err) return callback(err);
         //library.logger.warn(JSON.stringify(nodes));
-        let nodeids = nodes.filter(node => node.seen ).map(n=>n.id);//remove all host:port have seen 
-        async.eachSeries(nodeids, function (id, cb) {
-          if (!id) return
-          priv.nodesDb.remove({ id: id }, (err, numRemoved) => {
-            library.logger.warn(` remove node  (${id})`);
+      //  let nodeids = nodes.map(n=>n.id);//remove all host:port have seen  .filter(node => node.seen )
+        async.eachSeries(nodes, function (node, cb) {
+          if (!node.id) return
+          priv.dht.removeNode( node.id , (err, numRemoved) => {
+            library.logger.warn(` remove node  (${node.id})`);
             if (err) {
               library.logger.warn(`faild to remove node id (${numRemoved})`);
-               cb(err, id);
+               cb(err, node.id);
             } 
-             cb(null, id);
+             cb(null, node.id);
           })
         }, function (err) {
           if (err) {
@@ -415,8 +415,8 @@ Peer.prototype.request = (method, params, contact, cb) => {
         const addr = `${host}:${port}`
         if (!priv.bootstrapSet.has(addr)){
           library.logger.debug("remove node:"+JSON.stringify(node)) 
-          const nodeid = priv.getNodeIdentity(node)
-          priv.dht.removeNode(nodeid, function (err) {
+         // const nodeid = priv.getNodeIdentity(node)
+          priv.removeNodeByIp(host,port, function (err) {
             if (!err) {
               library.logger.info(`failed to remove peer : ${err}`)
             }
@@ -459,8 +459,8 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
         const addr = `${host}:${port}`
         if (!priv.bootstrapSet.has(addr)){
           library.logger.debug("remove node:"+JSON.stringify(node)) 
-          const nodeid = priv.getNodeIdentity(node)
-          priv.dht.removeNode(nodeid, function (err) {
+          //const nodeid = priv.getNodeIdentity(node)
+          priv.removeNodeByIp(host,port, function (err) {
             if (!err) {
               library.logger.info(`failed to remove peer : ${err}`)
             }
