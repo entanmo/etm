@@ -63,7 +63,7 @@ __private.attachApi = function () {
 
 P2PHelper.prototype.broadcast = function (cb) {
         
-    modules.peer.getRandomNode( function (err, peers) {
+    modules.peer.getbootstrapNode( function (err, peers) {
         if (!err) {
            
             async.detectLimit(peers, 1, function (peer, cb) {
@@ -84,7 +84,7 @@ P2PHelper.prototype.broadcast = function (cb) {
                 };
                 //console.log("acquireIp request: ", url);
                 request(req, function (err, resp, body) {
-                 //   console.log("response request: ", JSON.stringify(body));
+                    //console.log("acquireIp response : ", JSON.stringify(body));
                     if (err || resp.statusCode !== 200) {
                         return cb(null, false);
                     }
@@ -93,7 +93,7 @@ P2PHelper.prototype.broadcast = function (cb) {
                         const currentIp = library.config.publicIp;
                         const newIp = body.ip;
                         if (currentIp !== newIp) {
-                           // library.logger.log("acquireSelfIp: ", newIp);
+                            library.logger.log("acquireSelfIp: ", newIp);
                             library.config.publicIp = newIp;
                             setImmediate(() => {
                                 library.bus.message("publicIpChanged", library.config.publicIp, library.config.peerPort, true);
@@ -107,6 +107,7 @@ P2PHelper.prototype.broadcast = function (cb) {
             }, function (err, result) {
                 if (!result) {
                     // TODO -- DetachLimit failure, so after 1 second to repeat.
+                    //console.log("acquireIp result : ", JSON.stringify(result));
                     setTimeout(() => {
                         self.broadcast();
                     }, 1 * 1000);
@@ -122,7 +123,7 @@ P2PHelper.prototype.onBind = function (scope) {
 
 P2PHelper.prototype.onPeerReady = function () {
     // 未配置acquireip选项，则不启用自动获取公网ip的操作
-  // console.log("acquireIp library.config.acquireip: ", library.config.acquireip);
+   //console.log("acquireIp library.config.acquireip: ", library.config.acquireip);
     if (!library.config.acquireip) {
         return ;
     }

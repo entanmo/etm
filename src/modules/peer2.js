@@ -237,7 +237,7 @@ const priv = {
     peers = priv.getRandomPeers(20, nodes)
     priv.dht.broadcast(message, peers)
 
-   // library.logger.debug(`broadcast `+JSON.stringify(message)+`to  nodes`+ JSON.stringify(peers) )
+    library.logger.debug(`broadcast `+JSON.stringify(message.topic)+`to  nodes`+ JSON.stringify(peers.map(n=>`${n.host}:${n.port}`)) )
   //   priv.dht.broadcast(message, peers)
   }
 }
@@ -310,6 +310,12 @@ Peer.prototype.getRandomNode = (cb) => {
   //library.logger.debug("in RandomNode---getHealthNodes=="+JSON.stringify(nodes)+JSON.stringify(nodes.length))
   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
   var peers =  priv.getRandomPeers(1, nodes)
+  //library.logger.debug("in RandomNode---getRandomPeers=="+JSON.stringify(peers))
+  cb(null,  peers)
+}
+Peer.prototype.getbootstrapNode = (cb) => {
+  let nodes = priv.bootstrapNodes
+  let peers =  priv.getRandomPeers(1, nodes)
   cb(null,  peers)
 }
 Peer.prototype.list = (options, cb) => {
@@ -416,9 +422,9 @@ Peer.prototype.request = (method, params, contact, cb) => {
             }
           })
         }
-        //else{
-        //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
-        // }
+        else{
+          library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
+        }
       }
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
@@ -460,9 +466,9 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
             }
           })
         }
-        // else{
-        //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
-        // }
+        else{
+          library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
+        }
       }
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
