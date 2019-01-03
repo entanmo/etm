@@ -942,7 +942,7 @@ shared.getAccount = function (req, cb) {
           u_multisignatures: '',
           lockHeight: 0,
           effectivity: false,
-          delayAmount: 0
+          delayAmount: library.delayTransferMgr.totalAmount(query.address)
         }
       } else {
         const delayAmount = library.delayTransferMgr.totalAmount(query.address);
