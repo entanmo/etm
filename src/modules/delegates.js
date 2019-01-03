@@ -1156,7 +1156,7 @@ Delegates.prototype.getDelegates = function (query, cb) {
   modules.accounts.getAccounts({
     isDelegate: { $gt: 0 },
     sort: { "vote": -1, "publicKey": 1 }
-  }, ["username", "address", "publicKey", "vote", "missedblocks", "producedblocks", "fees", "rewards", "balance"], function (err, delegates) {
+  }, ["username", "address", "publicKey", "vote", "missedblocks", "producedblocks", "fees", "rewards", "balance","isDelegate"], function (err, delegates) {
     if (err) {
       return cb(err);
     }
