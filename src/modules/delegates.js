@@ -45,8 +45,8 @@ function Delegate() {
   this.create = function (data, trs) {
     // trs.recipientId = null;
     // trs.amount = 0;
-    trs.recipientId = "A4MFB3MaPd355ug19GYPMSakCAWKbLjDTb";
-    trs.amount = 500*100000000;
+    trs.recipientId = "A4MFB3MaPd355ug19GYPMSakCAWKbLjDTb";//TODO:零时添加以后换成基金会地址
+    trs.amount = 1000 * constants.fixedPoint;
     trs.asset.delegate = {
       username: data.username,
       publicKey: data.sender.publicKey
@@ -330,7 +330,7 @@ function UnDelegate() {
     }
 
     if (sender.isDelegate == 2) {
-      return cb("Account has canceled delegate,just wait round change");
+      return cb("Account has cancelled delegate,just wait round change");
     }
 
     cb(null, trs);
@@ -370,25 +370,28 @@ function UnDelegate() {
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
-    // if (!sender.isDelegate) {
-    //   return cb("Account is not a delegate");
-    // }
+    if (sender.isDelegate === 0) {
+      return cb("Account is not a delegate");
+    }
+    if (sender.isDelegate === 2) {
+      return cb("Account is the process of cancelling delegate");
+    }
 
-    // var nameKey = trs.asset.delegate.username + ':' + trs.type
-    // var idKey = sender.address + ':' + trs.type
-    // if (library.oneoff.has(nameKey) || library.oneoff.has(idKey)) {
-    //   return setImmediate(cb, 'Double submit')
-    // }
-    // library.oneoff.set(nameKey, true)
-    // library.oneoff.set(idKey, true)
+    var nameKey = trs.id + ':' + trs.type
+    var idKey = sender.address + ':' + trs.type
+    if (library.oneoff.has(nameKey) || library.oneoff.has(idKey)) {
+      return setImmediate(cb, 'Double submit')
+    }
+    library.oneoff.set(nameKey, true)
+    library.oneoff.set(idKey, true)
     setImmediate(cb) 
   }
 
   this.undoUnconfirmed = function (trs, sender, cb) {
-    // var nameKey = trs.asset.delegate.name + ':' + trs.type
-    // var idKey = sender.address + ':' + trs.type
-    // library.oneoff.delete(nameKey)
-    // library.oneoff.delete(idKey)
+    var nameKey = trs.id + ':' + trs.type
+    var idKey = sender.address + ':' + trs.type
+    library.oneoff.delete(nameKey)
+    library.oneoff.delete(idKey)
     setImmediate(cb)
   }
 
