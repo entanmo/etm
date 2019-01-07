@@ -320,9 +320,20 @@ Consensus.prototype.verifyPOW = function (propose, cb) {
       return buf.toString("hex");
     }
 
+    const proposePoWHashConvert = (hexPoWHash) => {
+      const buf = Buffer.from(hexPoWHash, "hex");
+      for (let i = 0; i < slots.leading; i++) {
+        const v = buf.readUInt8(i);
+        const r = v && 0x77;
+        buf.writeUInt8(r, i);
+      }
+      return buf.toString("hex");
+    }
+
     const sha256Result = entanmoPoWVerifier(hash, propose.nonce);
     global.library.logger.log(`verifyPoW: ${propose.hash}, ${propose.nonce}`);
-    if (sha256Result === propose.hash && sha256Result.indexOf(target) === 0) {
+    const proposePoWResult = proposePoWHashConvert(propose.hash);
+    if (sha256Result === proposePoWResult && sha256Result.indexOf(target) === 0) {
       return cb(null, true);
     }
     return cb(null, false);
