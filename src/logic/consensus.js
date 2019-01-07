@@ -333,6 +333,7 @@ Consensus.prototype.verifyPOW = function (propose, cb) {
     const sha256Result = entanmoPoWVerifier(hash, propose.nonce);
     global.library.logger.log(`verifyPoW: ${propose.hash}, ${propose.nonce}`);
     const proposePoWResult = proposePoWHashConvert(propose.hash);
+    global.library.logger.log(`verify: sha256Result: ${sha256Result}, proposeResult: ${proposePoWResult}, target: ${target}`);
     if (sha256Result === proposePoWResult && sha256Result.indexOf(target) === 0) {
       return cb(null, true);
     }
