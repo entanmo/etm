@@ -324,7 +324,7 @@ Consensus.prototype.verifyPOW = function (propose, cb) {
       const buf = Buffer.from(hexPoWHash, "hex");
       for (let i = 0; i < slots.leading; i++) {
         const v = buf.readUInt8(i);
-        const r = v && 0x77;
+        const r = v & 0x77;
         buf.writeUInt8(r, i);
       }
       return buf.toString("hex");
