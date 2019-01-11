@@ -1361,7 +1361,7 @@ shared.getDelegate = function (req, cb) {
 }
 
 shared.count = function(req, cb) {
-  library.dbLite.query("select count(*) from delegates", {"count": Number}, function(err, rows) {
+  library.dbLite.query("select count(*) from delegates where state > 0", {"count": Number}, function(err, rows) {
     if (err) {
       return cb("Failed to count delegates");
     } else {
