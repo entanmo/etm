@@ -1608,7 +1608,7 @@ Blocks.prototype.onReceivePropose = function (propose) {
     }
 
     // if (__private.lastVoteTime && Date.now() - __private.lastVoteTime < 5 * 1000) {
-    if (__private.lastVoteTime && library.synctime.now() - __private.lastVoteTime < 5 * 1000) {
+    if (__private.lastVoteTime && library.synctime.now() - __private.lastVoteTime < slots.interval * 1000) {
       library.logger.debug("ignore the frequently propose");
       return setImmediate(cb);
     }
