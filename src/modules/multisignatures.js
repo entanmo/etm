@@ -384,6 +384,9 @@ shared.getAccounts = function (req, cb) {
         library.logger.error(err.toString());
         return cb("Database error");
       }
+      if(rows.length === 0){
+        return cb(null, {accounts: rows});
+      }
 
       var addresses = rows[0].accountId.split(',');
 
