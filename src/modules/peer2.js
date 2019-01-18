@@ -201,7 +201,7 @@ const priv = {
     for(var i = 0 ;i<peers.length;i++){
       var n = peers[i]
       const address = `${n.host}:${n.port}`
-      if (priv.bootstrapSet.has(address)) {continue};
+      //if (priv.bootstrapSet.has(address)) {continue};
       if (!nodesMap.has(address)) nodesMap.set(address, n)
     }
     peers = [...nodesMap.values()] 
