@@ -71,15 +71,22 @@ class dblite {
                 if(HAS_PARAMS.test(sql)){
                     params = arguments[1];
                 }
-                let sta=  this.db.prepare(sql)
-                if(sta.returnsData){
-                    ret.result = sta.all(params || [])
-                }else{
-                    const r = sta.run(params || []);
-                    ret.result = {
-                        lastInsertRowId: r.lastInsertROWID.toString(),
-                        rowsEffected: r.changes
-                     }
+                try {
+                    let sta=  this.db.prepare(sql)
+                    if(sta.returnsData){
+                        ret.result = sta.all(params || [])
+                    }else{
+                        const r = sta.run(params || []);
+                        ret.result = {
+                            lastInsertRowId: r.lastInsertROWID.toString(),
+                            rowsEffected: r.changes
+                        }
+                    }
+                } catch (e) {
+                    if (ret.err = e, 
+                        console.log(sql+" sql error" + e)
+                        , !cb)
+                            throw e
                 }
                 cb && cb(ret.err, ret.result)
                 return this
@@ -153,15 +160,22 @@ class dblite {
                 if(HAS_PARAMS.test(sql)){
                     params = arguments[1];
                 }
-                let sta=  this.db.prepare(sql)
-                if(sta.returnsData){
-                    ret.result = sta.all(params || [])
-                }else{
-                    const r = sta.run(params || []);
-                    ret.result = {
-                        lastInsertRowId: r.lastInsertROWID.toString(),
-                        rowsEffected: r.changes
-                     }
+                try {
+                    let sta=  this.db.prepare(sql)
+                    if(sta.returnsData){
+                        ret.result = sta.all(params || [])
+                    }else{
+                        const r = sta.run(params || []);
+                        ret.result = {
+                            lastInsertRowId: r.lastInsertROWID.toString(),
+                            rowsEffected: r.changes
+                        }
+                    }
+                } catch (e) {
+                    if (ret.err = e, 
+                        console.log(sql+" sql error" + e)
+                        , !cb)
+                            throw e
                 }
                 cb && cb(ret.err, ret.result)
                 return this

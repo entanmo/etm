@@ -17,7 +17,7 @@ let self
 const SAVE_PEERS_INTERVAL = 1 * 60 * 1000
 const CHECK_BUCKET_OUTDATE = 3 * 60 * 1000
 const RECONNECT_SEED_INTERVAL = 30 * 1000
-
+const DISCOVER_PEERS_TIMEOUT = 12 * 1000
 const priv = {
   handlers: {},
   dht: null,
@@ -51,6 +51,7 @@ const priv = {
     const [host, port] = [p2pOptions.publicIp, p2pOptions.peerPort]
     const dht = new DHT({
       timeBucketOutdated: CHECK_BUCKET_OUTDATE,
+      timeout:DISCOVER_PEERS_TIMEOUT,
       bootstrap: bootstrapNodes,
       nodeId: priv.getNodeIdentity({ host, port }),
       peerPort:p2pOptions.peerPort,
@@ -107,7 +108,10 @@ const priv = {
       const isInDht = n => allNodes.some(dn => dn.host === n.host && dn.port === n.port)
       bootstrapNodes.filter(node => !isInDht(node))
         .filter(n => n.host !== host && n.port !== port)
-        .forEach(n => dht.addNode(n))
+        .forEach(n => {
+          console.log('RECONNECT addNode:'+n.host +':'+ port)
+          dht.addNode(n)
+        })
     }, RECONNECT_SEED_INTERVAL)
   },
   findAllNodesInDb: (callback) => {

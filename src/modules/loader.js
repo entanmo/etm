@@ -421,7 +421,35 @@ __private.loadBlockChain = function (cb) {
       }
     });
   }
-
+  function loadDelegates(count,cb) {
+    // Load delegates
+    library.dbLite.query("SELECT lower(hex(publicKey)) FROM mem_accounts WHERE isDelegate > 0", ['publicKey'], function (err, delegates) {
+     if (err || delegates.length == 0) {
+       library.logger.error(err || "No delegates, reload database");
+       library.logger.info("Failed to verify db integrity 3");
+       load(count);
+     } else {
+       modules.blocks.loadBlocksOffset(1, count, verify, function (err, lastBlock) {
+         if (err) {
+           library.logger.error(err || "Unable to load last block");
+           library.logger.info("Failed to verify db integrity 4");
+           load(count);
+         } else {
+           library.logger.info('Blockchain ready');
+           async.waterfall([
+             (next => __private.loadBalances(next)),
+             (next => __private.loadDelayTransfer(next)),
+             (next => modules.round.roundrewardsRecovery(next))
+           ], cb);
+           /*
+           __private.loadBalances(cb);
+           __private.loadDelayTransfer(cb);
+           */
+         }
+       });
+     }
+   });
+ }
   library.base.account.createTables(function (err) {
     if (err) {
       throw err;
@@ -460,66 +488,34 @@ __private.loadBlockChain = function (cb) {
 
                       modules.system.backupDb(function(isbackup){
                         if(isbackup){
-                          shell.rm('-f', 'data/blockchain-personal.db');
-                          __private.loadBlockChain(function (err) {
-                            if (err) {
-                              library.logger.error('Failed to load blockchain', err)
-                              reportor.report("nodejs", {
-                                subaction: "exit",
-                                data: {
-                                  method: "backupDb",
-                                  reason: "Failed to load blockchain " + err.toString()
-                                }
-                              });
-                              return process.exit(1)
-                            }
-                            library.bus.message('blockchainReady');
-                          });
+                          shell.exec('rm -f '+'data/'+library.config.dbName ,
+                          function(code, stdout, stderr) {
+                          // __private.isBackUp = false;
+                           console.log('backupDb remove old db code:', code);
+                           console.log('backupDb  remove old db Program stderr:', stderr);
+                          if(code == 0){
+                            loadDelegates(count,cb);
+                          }else{
+                            library.logger.error('Failed to load blockchain', err)
+                            return process.exit(1)
+                          }
+                        });
                         }else{
-                          load(count);
+                          loadDelegates(count,cb);
                         }
                       });
                     } else {
-                      // Load delegates
-                      library.dbLite.query("SELECT lower(hex(publicKey)) FROM mem_accounts WHERE isDelegate > 0", ['publicKey'], function (err, delegates) {
-                        if (err || delegates.length == 0) {
-                          library.logger.error(err || "No delegates, reload database");
-                          library.logger.info("Failed to verify db integrity 3");
-                          load(count);
-                        } else {
-                          modules.blocks.loadBlocksOffset(1, count, verify, function (err, lastBlock) {
-                            if (err) {
-                              library.logger.error(err || "Unable to load last block");
-                              library.logger.info("Failed to verify db integrity 4");
-                              load(count);
-                            } else {
-                              library.logger.info('Blockchain ready');
-                              async.waterfall([
-                                (next => __private.loadBalances(next)),
-                                (next => __private.loadDelayTransfer(next)),
-                                (next => modules.round.roundrewardsRecovery(next))
-                              ], cb);
-                              /*
-                              __private.loadBalances(cb);
-                              __private.loadDelayTransfer(cb);
-                              */
-                            }
-                          });
-                        }
-                      });
+                      loadDelegates(count,cb);
                     }
                   });
                 }
               });
           }
-
         });
       });
     }
   });
-
 }
-
 // Public methods
 // Loader.prototype.syncing = function () {
 //   return !!__private.syncIntervalId;

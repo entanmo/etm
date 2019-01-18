@@ -21,6 +21,9 @@ var Router = require('../utils/router.js');
 var shell = require('../utils/shell.js');
 const shell2 = require("shelljs")
 var fs= require("fs");
+var chaos = require('../utils/chaos.js');
+var ip = require('ip');
+var crypto = require('crypto');
 // Private fields
 var modules, library, self, __private = {}, shared = {};
 
@@ -31,7 +34,8 @@ function System(cb, scope) {
   library = scope;
   self = this;
   self.__private = __private;
-
+  __private.backupDate ;
+  __private.isBackUp = false; 
   __private.version = library.config.version;
   __private.port = library.config.port;
   __private.magic = library.config.magic;
@@ -41,19 +45,64 @@ function System(cb, scope) {
   setImmediate(cb, null, self);
 }
 System.prototype.onNewBlock = function (block, votes, broadcast) {
-     if( block.height%slots.roundBlocks == slots.roundBlocks - 500){
-      shell2.cp('-f',library.config.dbName, 'data/'+library.config.dbName);
+
+  if( block.height%slots.roundBlocks == slots.roundBlocks - 20 ){
+    var d = new Date();
+    var fullday= d.getFullYear().toString() + (d.getMonth()+1).toString() + d.getDate().toString();
+    if( __private.isBackUp == true || __private.backupDate == fullday  ){
+      __private.isBackUp == true ?
+      console.log("__private.isBackUp "+__private.isBackUp ):console.log("backuped today "+fullday)
+      return
+    }
+    let hash = crypto.createHash('sha256').update(library.config.magic).digest('hex');
+    let index ;
+    var hours = d.getHours();
+    console.log("chaos get days "+fullday)
+    console.log("chaos get hours "+hours)
+    if(library.config.publicIp){
+      index = chaos(hash, ip.toLong(library.config.publicIp)+ __private.port  , 24);// 0 - 23
+      console.log("backupDb chaos get index "+index)
+    }else{
+      index = chaos(hash, ip.toLong('127.0.0.0')+ __private.port , 24);
+      console.log("backupDb chaos get index "+index)
+    }
+
+    if(index == hours){// 0 - 23   hours
+      //shell2.cp('-f',library.config.dbName, 'data/'+library.config.dbName);
+      shell2.exec('cp -f '+library.config.dbName + ' data/'+library.config.dbName,
+      function(code, stdout, stderr) {
+      console.log('Exit code:', code);
+      // console.log('backupDb Program output:', stdout);
+       console.log('backupDb Program stderr:', stderr);
       console.log("copy blockchain.db in system at height : "+JSON.stringify(block.height));
-     }
+      if(code == 0){
+        __private.backupDate = fullday
+        console.log("backupDb ok "+fullday + ' at hours ' + hours)
+      }
+    });
+    }
+ }
 }
 System.prototype.backupDb = function (cb) {
   fs.exists("data/"+library.config.dbName, function(exists) {
     if(exists){
-    //  shell2.cp('-f','blockchain-personal.db', 'data/blockchain-personal-old.db');
-      shell2.cp('-f','data/'+library.config.dbName, library.config.dbName);
-      console.log("backupDb");
+     // shell2.cp('-f','data/'+library.config.dbName, library.config.dbName);
+     // console.log("backupDb");
+     __private.isBackUp = true;
+      shell2.exec('cp -f '+'data/'+library.config.dbName +' '+library.config.dbName,
+      function(code, stdout, stderr) {
+      __private.isBackUp = false;
+      console.log('backupDb code:', code);
+      console.log('backupDb blockchain.db  Program stderr:', stderr);
+      if(code == 0){
+        cb(exists)
+      }else{
+        cb(false)
+      }
+    });
+    }else{
+      cb(false)
     }
-    cb(exists)
   })
 }
 // Private methods

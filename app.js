@@ -19,7 +19,7 @@ var assert = require('assert');
 var program = require('commander');
 var async = require('async');
 var fs = require('fs');
-
+var path = require('path');
 var init = require('./src/init');
 var setup = require('./src/setup');
 var packageJson = require('./package.json');
