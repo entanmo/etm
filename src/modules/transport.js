@@ -969,25 +969,25 @@ Transport.prototype.sendVotes = function (votes, address) {
   }
   modules.peer.listPeers( function (err, peers) {
     if (!err) {
-      const nodesMap = new Map()
-      peers.forEach((n) => {
-        const a = `${n.host}:${n.port}`
-       // console.log(" a in nodesMap == "+a );
-        if (!nodesMap.has(a)) nodesMap.set(a, n)
-      })
+      // const nodesMap = new Map()
+      // peers.forEach((n) => {
+      //   const a = `${n.host}:${n.port}`
+      //  // console.log(" a in nodesMap == "+a );
+      //   if (!nodesMap.has(a)) nodesMap.set(a, n)
+      // })
       
-      const b = `${contact.host}:${contact.port}`
+      // const b = `${contact.host}:${contact.port}`
      // console.log("nodesMap.has(b) == "+nodesMap.has(b))
-      if(nodesMap.has(b)){
+      // if(nodesMap.has(b)){
         modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
           if (err) {
             library.logger.error('send votes error', err)
             self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
           }
         })
-      }else{
-        self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
-      }
+      // }else{
+      //   self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+      // }
     } 
   });
 }

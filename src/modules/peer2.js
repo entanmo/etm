@@ -457,22 +457,23 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
   request(reqOptions, (err, response, result) => {
     if (err) {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-        const host = contact.host
-        const port = contact.port
-        let node ={host,  port }
-        const addr = `${host}:${port}`
-        if (!priv.bootstrapSet.has(addr)){
-          library.logger.debug("remove node:"+JSON.stringify(node)) 
-          //const nodeid = priv.getNodeIdentity(node)
-          priv.removeNodeByIp(host,port, function (err) {
-            if (!err) {
-              library.logger.info(`failed to remove peer : ${err}`)
-            }
-          })
-        }
-        else{
-          library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
-        }
+        // const host = contact.host
+        // const port = contact.port
+        // let node ={host,  port }
+        //const addr = `${host}:${port}`
+        library.logger.debug("failed connect node:"+JSON.stringify(contact)) 
+        // if (!priv.bootstrapSet.has(addr)){
+        //   library.logger.debug("remove node:"+JSON.stringify(node)) 
+        //   //const nodeid = priv.getNodeIdentity(node)
+        //   priv.removeNodeByIp(host,port, function (err) {
+        //     if (!err) {
+        //       library.logger.info(`failed to remove peer : ${err}`)
+        //     }
+        //   })
+        //  }
+         // else{
+         //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
+         // }
       }
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
