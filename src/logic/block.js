@@ -63,9 +63,7 @@ Block.prototype.sortTransactions = function (data) {
   });
 }
 Block.prototype.create = function (data) {
-  global.library.logger.info("begin sort transactions");
   var transactions = this.sortTransactions(data);
-  global.library.logger.info("end sort transactions");
 
   var nextHeight = (data.previousBlock) ? data.previousBlock.height + 1 : 1;
 
@@ -75,7 +73,6 @@ Block.prototype.create = function (data) {
   var blockTransactions = [];
   var payloadHash = crypto.createHash('sha256');
 
-  global.library.logger.info("begin get bytes");
   for (var i = 0; i < transactions.length; i++) {
     var transaction = transactions[i];
     var bytes = this.scope.transaction.getBytes(transaction);
@@ -92,7 +89,6 @@ Block.prototype.create = function (data) {
     blockTransactions.push(transaction);
     payloadHash.update(bytes);
   }
-  global.library.logger.info("end get bytes");
 
   var block = {
     version: 0,
@@ -111,9 +107,7 @@ Block.prototype.create = function (data) {
   try {
     block.blockSignature = this.sign(block, data.keypair);
 
-    global.library.logger.info("begin object normalize");
     block = this.objectNormalize(block);
-    global.library.logger.info("end object normalize");
   } catch (e) {
     throw Error(e.toString());
   }

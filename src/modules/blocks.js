@@ -1381,7 +1381,7 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
   }
   //console.log("generateBlock enter transactions.length :"+transactions.length)
   const generateUptime = reportor.uptime;
-  library.logger.info("handle block trs at height " + (__private.lastBlock.height + 1));
+
   async.eachSeries(transactions, function (transaction, next) {
     // modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
     //   if (err || !sender) {
@@ -1406,7 +1406,6 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
     next();
   }, function () {
     library.logger.debug("All unconfirmed transactions ready");
-    library.logger.info("create block at height " + (__private.lastBlock.height + 1));
     var block;
     try {
       block = library.base.block.create({

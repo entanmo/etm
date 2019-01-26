@@ -68,7 +68,7 @@ __private.attachApi = function () {
 
     req.headers['port'] = parseInt(req.headers['port']);
 
-    req.sanitize(req.headers,  scheme.sanitize_port, function (err, report, headers) {
+    req.sanitize(req.headers, scheme.sanitize_port, function (err, report, headers) {
       if (err) return next(err);
       if (!report.isValid) return res.status(500).send({ success: false, error: report.issues });
 
@@ -124,7 +124,7 @@ __private.attachApi = function () {
   router.post("/commonBlock", function (req, res, next) {
     res.set(__private.headers);
     const { body } = req
-    req.sanitize(body,  scheme.sanitize_blocks_common, function (err, report, query) {
+    req.sanitize(body, scheme.sanitize_blocks_common, function (err, report, query) {
       if (err) return next(err);
       if (!report.isValid) return res.json({ success: false, error: report.issue });
 
@@ -143,7 +143,7 @@ __private.attachApi = function () {
         library.logger.log('Invalid common block request, ban 60 min', peerStr);
 
         if (report) {
-         // modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
+          // modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
         }
 
         return res.json({ success: false, error: "Invalid block id sequence" });
@@ -171,8 +171,8 @@ __private.attachApi = function () {
   router.post("/loadblocks", function (req, res) {
     res.set(__private.headers);
     const { body } = req
-   
-    req.sanitize(body,  scheme.sanitize_blocks, function (err, report, query) {
+
+    req.sanitize(body, scheme.sanitize_blocks, function (err, report, query) {
       if (err) return next(err);
       if (!report.isValid) return res.json({ success: false, error: report.issues });
       //console.log("/loadblocks  query.lastBlockId====="+ query.lastBlockId)
@@ -217,7 +217,7 @@ __private.attachApi = function () {
       library.logger.log('Block ' + (block ? block.id : 'null') + ' is not valid, ban 60 min', peerStr);
 
       if (peerIp && req.headers['port'] > 0 && req.headers['port'] < 65536) {
-      //  modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
+        //  modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
       }
 
       return res.sendStatus(200);
@@ -230,8 +230,8 @@ __private.attachApi = function () {
 
   router.post("/votes", function (req, res) {
     res.set(__private.headers);
-  
-    library.scheme.validate(req.body.votes,  scheme.votes, function (err) {
+
+    library.scheme.validate(req.body.votes, scheme.votes, function (err) {
       //console.log("receiveVotes err"+JSON.stringify(req.body.votes,))
       if (err) {
         return res.status(200).json({ success: false, error: "Schema validation error" });
@@ -246,7 +246,7 @@ __private.attachApi = function () {
     if (typeof req.body.propose == 'string') {
       req.body.propose = library.protobuf.decodeBlockPropose(new Buffer(req.body.propose, 'base64'));
     }
-    library.scheme.validate(req.body.propose,  scheme.propose, function (err) {
+    library.scheme.validate(req.body.propose, scheme.propose, function (err) {
       if (err) {
         return res.status(200).json({ success: false, error: "Schema validation error" });
       }
@@ -277,18 +277,18 @@ __private.attachApi = function () {
       },
       required: ['signature']
     }*/ scheme.signatures, function (err) {
-      if (err) {
-        return res.status(200).json({ success: false, error: "Validation error" });
-      }
-
-      modules.multisignatures.processSignature(req.body.signature, function (err) {
         if (err) {
-          return res.status(200).json({ success: false, error: "Process signature error" });
-        } else {
-          return res.status(200).json({ success: true });
+          return res.status(200).json({ success: false, error: "Validation error" });
         }
+
+        modules.multisignatures.processSignature(req.body.signature, function (err) {
+          if (err) {
+            return res.status(200).json({ success: false, error: "Process signature error" });
+          } else {
+            return res.status(200).json({ success: true });
+          }
+        });
       });
-    });
   });
 
   router.get('/signatures', function (req, res) {
@@ -326,7 +326,7 @@ __private.attachApi = function () {
 
       setImmediate(cb);
     }, function () {
-      return res.status(200).json({signatures: signatures });
+      return res.status(200).json({ signatures: signatures });
     });
   });
   router.get("/transactions", function (req, res) {
@@ -336,9 +336,9 @@ __private.attachApi = function () {
   });
   router.post('/getUnconfirmedTransactions', (req, res) => {
     res.status(200).json({ transactions: modules.transactions.getUnconfirmedTransactionList() });
-   // res.send({ transactions: modules.transactions.getUnconfirmedTransactionList() })
+    // res.send({ transactions: modules.transactions.getUnconfirmedTransactionList() })
   })
-  
+
   router.post("/transactions", function (req, res) {
     if (modules.loader.syncing()) {
       return res.status(500).send({
@@ -349,13 +349,13 @@ __private.attachApi = function () {
     var lastBlock = modules.blocks.getLastBlock();
     var lastSlot = slots.getSlotNumber(lastBlock.timestamp);
     if (slots.getNextSlot() - lastSlot >= 40) {
-     // library.logger.error("OS INFO", shell.getInfo())
-      library.logger.error("Blockchain is not ready", {getNextSlot:slots.getNextSlot(),lastSlot:lastSlot,lastBlockHeight:lastBlock.height})
+      // library.logger.error("OS INFO", shell.getInfo())
+      library.logger.error("Blockchain is not ready", { getNextSlot: slots.getNextSlot(), lastSlot: lastSlot, lastBlockHeight: lastBlock.height })
       return res.status(200).json({ success: false, error: "Blockchain is not ready" });
     }
 
     res.set(__private.headers);
-    
+
     var peerIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     var peerStr = peerIp ? peerIp + ":" + (isNaN(req.headers['port']) ? 'unknown' : req.headers['port']) : 'unknown';
     if (typeof req.body.transaction == 'string') {
@@ -514,24 +514,24 @@ __private.attachApi = function () {
       },
       required: ["dappId"]
     }*/ scheme.dappReady, function (err) {
-      if (err) {
-        return res.status(200).json({ success: false, error: "Schema validation error" });
-      }
-      res.sendStatus(200);
-    });
+        if (err) {
+          return res.status(200).json({ success: false, error: "Schema validation error" });
+        }
+        res.sendStatus(200);
+      });
   });
 
   router.post('/p2p/ipChanged', function (req, res) {
     const body = req.body;
 
     //modules.peer.state(ip.toLong(body.ip), parseInt(body.port), 2);
-    modules.peer.addPeer(body.ip,body.port)
+    modules.peer.addPeer(body.ip, body.port)
     res.sendStatus(200);
   });
 
   router.post('/p2p/heartBeat', function (req, res) {
     const body = req.body;
-    
+
     res.sendStatus(200);
   })
 
@@ -552,10 +552,10 @@ __private.attachApi = function () {
       return res.sendStatus(200);
     }
     __private.votesCache.set(votesId.toString('hex'), true);
-    
+
     // 当前签名的块是否是链的下一个块
     var lastBlock = library.modules.blocks.getLastBlock();
-    if(!lastBlock || lastBlock.height + 1 != votes.height){
+    if (!lastBlock || lastBlock.height + 1 != votes.height) {
       library.logger.debug(`/vote/forward get from ${body.address}, but is in invalid height(${votes.height}, ${lastBlock.height})`);
       return res.sendStatus(200);
     }
@@ -569,7 +569,7 @@ __private.attachApi = function () {
     */
     library.logger.debug(`/vote/forward forward sendVotes(${votesId.toString('hex')}) from ${body.address}`);
     self.sendVotes(body.votes, body.address);
-    
+
     res.sendStatus(200);
   })
 
@@ -601,13 +601,13 @@ __private.hashsum = function (obj) {
 Transport.prototype.broadcast = (topic, message, recursive) => {
   modules.peer.publish(topic, message, recursive)
 }
-Transport.prototype.broadcastByPost = function ( options, cb) {
-  modules.peer.listPeers( function (err, peers) {
+Transport.prototype.broadcastByPost = function (options, cb) {
+  modules.peer.listPeers(function (err, peers) {
     if (!err) {
       //console.log("listPeers:"+JSON.stringify(peers))
       async.eachLimit(peers, 5, function (peer, cb) {
         modules.peer.request(options.api, options.data, peer, cb)//peer, options);
-      //  setImmediate(cb);
+        //  setImmediate(cb);
       })
     } else {
       cb && setImmediate(cb, err);
@@ -651,7 +651,7 @@ Transport.prototype.getFromRandomPeer = function (config, options, cb) {
   // }, function (err, results) {
   //   cb(err, results)
   // });
-} 
+}
 
 /**
  * Send request to selected peer
@@ -696,10 +696,10 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     req.body = options.data;
   }
 
-  if(options.changeReqTimeout){
+  if (options.changeReqTimeout) {
     req.timeout = library.config.peers.options.pingTimeout;
   }
-  
+
   return request(req, function (err, response, body) {
     if (err || response.statusCode != 200) {
       library.logger.debug('Request', {
@@ -732,7 +732,7 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
 
     response.headers['port'] = parseInt(response.headers['port']);
 
-    var report = library.scheme.validate(response.headers,  scheme.getFromPeer);
+    var report = library.scheme.validate(response.headers, scheme.getFromPeer);
 
     if (!report) {
       return cb && cb(null, { body: body, peer: peer });
@@ -824,11 +824,11 @@ Transport.prototype.onBlockchainReady = function () {
   __private.loaded = true;
 }
 Transport.prototype.onPeerReady = () => {
-  
-  modules.peer.subscribe('propose', (message,peer) => {
+
+  modules.peer.subscribe('propose', (message, peer) => {
     try {
       const propose = library.protobuf.decodeBlockPropose(message.body.propose)
-     // library.logger.debug('receive Propose address '+ propose.address +" from "+JSON.stringify(peer))
+      // library.logger.debug('receive Propose address '+ propose.address +" from "+JSON.stringify(peer))
       library.bus.message('receivePropose', propose)
     } catch (e) {
       library.logger.error('Receive invalid propose', e)
@@ -851,16 +851,16 @@ Transport.prototype.onPeerReady = () => {
       if (Buffer.isBuffer(transaction)) transaction = transaction.toString()
       transaction = JSON.parse(transaction)
       if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
-          //console.log('hasUnconfirmedTransaction has',  transaction.id)
-          return  ;
-        }
+        //console.log('hasUnconfirmedTransaction has',  transaction.id)
+        return;
+      }
       if (transaction.id && __private.invalidTrsCache.has(transaction.id)) {
-       // console.log('invalidTrsCache has',  transaction.id)
-        return 
+        // console.log('invalidTrsCache has',  transaction.id)
+        return
       }
       transaction = library.base.transaction.objectNormalize(transaction)
       transaction.asset = transaction.asset || {}
-     // console.log('=========receive transaction ========',  JSON.stringify(transaction) )
+      // console.log('=========receive transaction ========',  JSON.stringify(transaction) )
     } catch (e) {
       console.log('Received transaction parse error', {
         message,
@@ -871,16 +871,16 @@ Transport.prototype.onPeerReady = () => {
     const receiveUptime = reportor.uptime;
     library.balancesSequence.add(function (cb) {
       if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
-      //  console.log('hasUnconfirmedTransaction has',  transaction.id)
+        //  console.log('hasUnconfirmedTransaction has',  transaction.id)
         return cb('Already exists');
       }
-     // console.log('-------Received transaction----- ' + JSON.stringify(transaction) );
+      // console.log('-------Received transaction----- ' + JSON.stringify(transaction) );
       modules.transactions.receiveTransactions([transaction], cb);
     }, function (err, transactions) {
       if (err) {
-       // library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
+        // library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
         __private.invalidTrsCache.set(transaction.id, true)
-       // res.status(200).json({ success: false, error: err });
+        // res.status(200).json({ success: false, error: err });
       } else {
         let reportMsg = {
           subaction: "receive",
@@ -900,7 +900,7 @@ Transport.prototype.onPeerReady = () => {
 }
 Transport.prototype.onSignature = function (signature, broadcast) {
   if (broadcast) {
-    self.broadcastByPost( { api: 'signatures', data: { signature: signature }, method: "POST" });
+    self.broadcastByPost({ api: 'signatures', data: { signature: signature }, method: "POST" });
     library.network.io.sockets.emit('signature/change', {});
   }
 }
@@ -923,9 +923,9 @@ Transport.prototype.onNewBlock = function (block, votes, broadcast) {
       block: library.protobuf.encodeBlock(block).toString('base64'),
       votes: library.protobuf.encodeBlockVotes(votes).toString('base64'),
     };
-   self.broadcastByPost({ api: 'blocks', data: data, method: "POST" });
-   
-  library.network.io.sockets.emit('blocks/change', {height: block.height});
+    self.broadcastByPost({ api: 'blocks', data: data, method: "POST" });
+
+    library.network.io.sockets.emit('blocks/change', { height: block.height });
 
     // __private.votesCache = {};// 清除签名缓存
   }
@@ -938,8 +938,9 @@ Transport.prototype.onNewPropose = function (propose, broadcast) {
         propose: library.protobuf.encodeBlockPropose(propose)
       },
     }
-    self.broadcast('propose', message)
-   // self.broadcast({}, { api: '/propose', data: data, method: "POST" });
+    // self.broadcast('propose', message)
+    self.broadcastByPost({ api: blocks, data: message.body, method: "POST" });
+    // self.broadcast({}, { api: '/propose', data: data, method: "POST" });
   }
 }
 
@@ -948,7 +949,7 @@ Transport.prototype.onDappReady = function (dappId, broadcast) {
     var data = {
       dappId: dappId
     }
-    self.dappBroadcast( { api: '/dappReady', data: data, method: "POST" })
+    self.dappBroadcast({ api: '/dappReady', data: data, method: "POST" })
   }
 }
 
@@ -958,16 +959,16 @@ Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
       ip: ip,
       port: port
     };
-    self.broadcastByPost({api: 'p2p/ipChanged', data: data, method: "POST"});
+    self.broadcastByPost({ api: 'p2p/ipChanged', data: data, method: "POST" });
   }
 }
 Transport.prototype.sendVotes = function (votes, address) {
   const parts = address.split(':')
   const contact = {
     host: parts[0],
-    port: parseInt(parts[1])+1,
+    port: parseInt(parts[1]) + 1,
   }
-  modules.peer.listPeers( function (err, peers) {
+  modules.peer.listPeers(function (err, peers) {
     if (!err) {
       // const nodesMap = new Map()
       // peers.forEach((n) => {
@@ -975,20 +976,20 @@ Transport.prototype.sendVotes = function (votes, address) {
       //  // console.log(" a in nodesMap == "+a );
       //   if (!nodesMap.has(a)) nodesMap.set(a, n)
       // })
-      
+
       // const b = `${contact.host}:${contact.port}`
-     // console.log("nodesMap.has(b) == "+nodesMap.has(b))
+      // console.log("nodesMap.has(b) == "+nodesMap.has(b))
       // if(nodesMap.has(b)){
-        modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
-          if (err) {
-            library.logger.error('send votes error', err)
-            self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
-          }
-        })
+      modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
+        if (err) {
+          library.logger.error('send votes error', err)
+          self.broadcastByPost({ api: 'vote/forward', data: { votes: votes, address: address }, method: "POST" })
+        }
+      })
       // }else{
       //   self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
       // }
-    } 
+    }
   });
 }
 
