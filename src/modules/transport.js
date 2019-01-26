@@ -939,7 +939,7 @@ Transport.prototype.onNewPropose = function (propose, broadcast) {
       },
     }
     // self.broadcast('propose', message)
-    self.broadcastByPost({ api: blocks, data: message.body, method: "POST" });
+    self.broadcastByPost({ api: 'propose', data: message.body, method: "POST" });
     // self.broadcast({}, { api: '/propose', data: data, method: "POST" });
   }
 }
