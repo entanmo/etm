@@ -21,7 +21,7 @@ const DISCOVER_PEERS_TIMEOUT = 12 * 1000
 const priv = {
   handlers: {},
   dht: null,
-  ready:false,
+  ready: false,
   getNodeIdentity: (node) => {
     const address = `${node.host}:${node.port}`
     return crypto.createHash('ripemd160').update(address).digest()
@@ -51,10 +51,10 @@ const priv = {
     const [host, port] = [p2pOptions.publicIp, p2pOptions.peerPort]
     const dht = new DHT({
       timeBucketOutdated: CHECK_BUCKET_OUTDATE,
-      timeout:DISCOVER_PEERS_TIMEOUT,
+      timeout: DISCOVER_PEERS_TIMEOUT,
       bootstrap: bootstrapNodes,
       nodeId: priv.getNodeIdentity({ host, port }),
-      peerPort:p2pOptions.peerPort,
+      peerPort: p2pOptions.peerPort,
       magic: p2pOptions.magic
     })
     priv.dht = dht
@@ -75,17 +75,17 @@ const priv = {
 
     dht.on('node', (node) => {
       const nodeId = node.id.toString('hex')
-     
-      priv.updateNode(nodeId, node,(err, data)=>{
-        if(err) return
+
+      priv.updateNode(nodeId, node, (err, data) => {
+        if (err) return
         library.logger.info(`add node (${nodeId}) ${node.host}:${node.port}`)
       })
-   
+
     })
 
     dht.on('remove', (nodeId, reason) => {
       library.logger.info(`remove node (${nodeId}), reason: ${reason}`)
-      priv.removeNode(nodeId)
+      //priv.removeNode(nodeId)
     })
 
     dht.on('error', (err) => {
@@ -109,7 +109,7 @@ const priv = {
       bootstrapNodes.filter(node => !isInDht(node))
         .filter(n => n.host !== host && n.port !== port)
         .forEach(n => {
-          console.log('RECONNECT addNode:'+n.host +':'+ port)
+          console.log('RECONNECT addNode:' + n.host + ':' + port)
           dht.addNode(n)
         })
     }, RECONNECT_SEED_INTERVAL)
@@ -119,7 +119,7 @@ const priv = {
   },
   findSeenNodesInDb: (callback) => {
     priv.nodesDb.find({ /* seen: { $exists: true } */ })
-     // .sort({ seen: -1 })
+      // .sort({ seen: -1 })
       .exec((err, nodes) => {
         if (err) return callback(err)
 
@@ -166,59 +166,59 @@ const priv = {
       if (_.isFunction(callback)) callback(err, numRemoved)
     })
   },
-  removeNodeByIp: (host,port,callback) => {
-    priv.nodesDb.find( { $and: [{ host: host }, { port: port }]})
+  removeNodeByIp: (host, port, callback) => {
+    priv.nodesDb.find({ $and: [{ host: host }, { port: port }] })
       .exec((err, nodes) => {
         if (err) return callback(err);
         //library.logger.warn(JSON.stringify(nodes));
-      //  let nodeids = nodes.map(n=>n.id);//remove all host:port have seen  .filter(node => node.seen )
+        //  let nodeids = nodes.map(n=>n.id);//remove all host:port have seen  .filter(node => node.seen )
         async.eachSeries(nodes, function (node, cb) {
           if (!node.id) return
-          priv.dht.removeNode( node.id , (err, numRemoved) => {
+          priv.dht.removeNode(node.id, (err, numRemoved) => {
             library.logger.warn(` remove node  (${node.id})`);
             if (err) {
               library.logger.warn(`faild to remove node id (${numRemoved})`);
-               cb(err, node.id);
-            } 
-             cb(null, node.id);
+              cb(err, node.id);
+            }
+            cb(null, node.id);
           })
         }, function (err) {
           if (err) {
             if (_.isFunction(callback)) callback(err, nodes);
-          } 
+          }
         });
       })
   },
   getHealthNodes: () => {
-    var peers  = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
-   
+    var peers = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
+
     peers = peers.filter(n => {
       const element = `${n.host}:${n.port}`
       const selfAddress = `${library.config.publicIp}:${library.config.peerPort}`
       return element != selfAddress
     })
     const nodesMap = new Map()
-    for(var i = 0 ;i<peers.length;i++){
+    for (var i = 0; i < peers.length; i++) {
       var n = peers[i]
       const address = `${n.host}:${n.port}`
       //if (priv.bootstrapSet.has(address)) {continue};
       if (!nodesMap.has(address)) nodesMap.set(address, n)
     }
-    peers = [...nodesMap.values()] 
+    peers = [...nodesMap.values()]
     return peers
   },
 
-  getRandomNode: ()=>{  
-    let nodes = priv.getHealthNodes() 
+  getRandomNode: () => {
+    let nodes = priv.getHealthNodes()
     nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
     const rnd = Math.floor(Math.random() * nodes.length)
-    return nodes[rnd]     
+    return nodes[rnd]
   },
-  getRandomPeers: (count, allNodes)=>{
+  getRandomPeers: (count, allNodes) => {
     if (allNodes.length <= count) return allNodes
 
     const randomPeers = []
-    while(count-- > 0 && allNodes.length > 0) {
+    while (count-- > 0 && allNodes.length > 0) {
       const rnd = Math.floor(Math.random() * allNodes.length)
       const peer = allNodes[rnd]
       allNodes.splice(rnd, 1)
@@ -226,7 +226,7 @@ const priv = {
     }
     return randomPeers
   },
-  broadcast: (message, peers) =>{
+  broadcast: (message, peers) => {
     // priv.findSeenNodesInDb((err,nodes)=>{
     //   if(err) return
     //   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
@@ -234,15 +234,15 @@ const priv = {
     //   library.logger.debug(`findSeenNodesInDb  nodes`+ JSON.stringify(peers) )
     //   priv.dht.broadcast(message, peers)
     // })
-    let nodes = priv.getHealthNodes() 
-  //  library.logger.debug(`getHealthNodes`+ JSON.stringify(nodes) )
+    let nodes = priv.getHealthNodes()
+    //  library.logger.debug(`getHealthNodes`+ JSON.stringify(nodes) )
     nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
 
     peers = priv.getRandomPeers(20, nodes)
     priv.dht.broadcast(message, peers)
 
-    library.logger.debug(`broadcast `+JSON.stringify(message.topic)+`to  nodes`+ JSON.stringify(peers.map(n=>`${n.host}:${n.port}`)) )
-  //   priv.dht.broadcast(message, peers)
+    library.logger.debug(`broadcast ` + JSON.stringify(message.topic) + `to  nodes` + JSON.stringify(peers.map(n => `${n.host}:${n.port}`)))
+    //   priv.dht.broadcast(message, peers)
   }
 }
 
@@ -283,11 +283,11 @@ priv.attachApi = () => {
     return res.status(500).send({ success: false, error: err.toString() })
   })
 }
-Peer.prototype.listPeers = ( cb) => {
-  let nodes = priv.getHealthNodes() 
+Peer.prototype.listPeers = (cb) => {
+  let nodes = priv.getHealthNodes()
   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
-  var peers =  priv.getRandomPeers(20, nodes)
-  cb(null,  peers)
+  var peers = priv.getRandomPeers(20, nodes)
+  cb(null, peers)
   // priv.findSeenNodesInDb((err,nodes)=>{
   //   if(!err){
   //     nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
@@ -298,8 +298,8 @@ Peer.prototype.listPeers = ( cb) => {
 
 }
 
-Peer.prototype.addPeer = ( host,port) => {
-  let node ={host,  port }
+Peer.prototype.addPeer = (host, port) => {
+  let node = { host, port }
   node.id = priv.getNodeIdentity(node)
   node.distance = 0
   node.seen = Date.now()
@@ -307,20 +307,20 @@ Peer.prototype.addPeer = ( host,port) => {
 
 }
 
-Peer.prototype.isReady = () => {return priv.ready}
+Peer.prototype.isReady = () => { return priv.ready }
 
 Peer.prototype.getRandomNode = (cb) => {
-  let nodes = priv.getHealthNodes() 
+  let nodes = priv.getHealthNodes()
   //library.logger.debug("in RandomNode---getHealthNodes=="+JSON.stringify(nodes)+JSON.stringify(nodes.length))
   nodes = nodes.length === 0 ? priv.bootstrapNodes : nodes
-  var peers =  priv.getRandomPeers(1, nodes)
+  var peers = priv.getRandomPeers(1, nodes)
   //library.logger.debug("in RandomNode---getRandomPeers=="+JSON.stringify(peers))
-  cb(null,  peers)
+  cb(null, peers)
 }
 Peer.prototype.getbootstrapNode = (cb) => {
   let nodes = priv.bootstrapNodes
-  let peers =  priv.getRandomPeers(1, nodes)
-  cb(null,  peers)
+  let peers = priv.getRandomPeers(1, nodes)
+  cb(null, peers)
 }
 Peer.prototype.list = (options, cb) => {
   // FIXME
@@ -415,19 +415,19 @@ Peer.prototype.request = (method, params, contact, cb) => {
       if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
         const host = contact.host
         const port = contact.port
-        let node ={host,  port }
+        let node = { host, port }
         const addr = `${host}:${port}`
-        if (!priv.bootstrapSet.has(addr)){
-          library.logger.debug("remove node:"+JSON.stringify(node)) 
-         // const nodeid = priv.getNodeIdentity(node)
-          priv.removeNodeByIp(host,port, function (err) {
+        if (!priv.bootstrapSet.has(addr)) {
+          library.logger.debug("remove node:" + JSON.stringify(node))
+          // const nodeid = priv.getNodeIdentity(node)
+          priv.removeNodeByIp(host, port, function (err) {
             if (!err) {
               library.logger.info(`failed to remove peer : ${err}`)
             }
           })
         }
-        else{
-          library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
+        else {
+          library.logger.debug("bootstrap node: " + JSON.stringify(node) + " connect failed! wait for reconnect")
         }
       }
       return cb(`Failed to request remote peer: ${err}`)
@@ -461,7 +461,7 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
         // const port = contact.port
         // let node ={host,  port }
         //const addr = `${host}:${port}`
-        library.logger.debug("failed connect node:"+JSON.stringify(contact)) 
+        library.logger.debug("failed connect node:" + JSON.stringify(contact))
         // if (!priv.bootstrapSet.has(addr)){
         //   library.logger.debug("remove node:"+JSON.stringify(node)) 
         //   //const nodeid = priv.getNodeIdentity(node)
@@ -471,9 +471,9 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
         //     }
         //   })
         //  }
-         // else{
-         //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
-         // }
+        // else{
+        //   library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
+        // }
       }
       return cb(`Failed to request remote peer: ${err}`)
     } else if (response.statusCode !== 200) {
@@ -488,7 +488,7 @@ Peer.prototype.proposeRequest = (method, params, contact, cb) => {
 Peer.prototype.randomRequest = (method, params, cb) => {
   const randomNode = priv.getRandomNode()
   if (!randomNode) return cb('No contact')
- // library.logger.debug('select random contract', randomNode)
+  // library.logger.debug('select random contract', randomNode)
   let isCallbacked = false
   setTimeout(() => {
     if (isCallbacked) return
