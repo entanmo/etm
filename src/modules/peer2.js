@@ -420,11 +420,11 @@ Peer.prototype.request = (method, params, contact, cb) => {
         if (!priv.bootstrapSet.has(addr)){
           library.logger.debug("remove node:"+JSON.stringify(node)) 
          // const nodeid = priv.getNodeIdentity(node)
-          // priv.removeNodeByIp(host,port, function (err) {
-          //   if (!err) {
-          //     library.logger.info(`failed to remove peer : ${err}`)
-          //   }
-          // })
+          priv.removeNodeByIp(host,port, function (err) {
+            if (!err) {
+              library.logger.info(`failed to remove peer : ${err}`)
+            }
+          })
         }
         else{
           library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
