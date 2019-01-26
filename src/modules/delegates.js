@@ -39,6 +39,7 @@ __private.loaded = false;
 __private.blockStatus = new BlockStatus();
 __private.keypairs = {};
 __private.forgingEanbled = true;
+__private.lastSlotNumber = null;
 
 
 function Delegate() {
@@ -716,8 +717,13 @@ __private.loop = function (cb) {
     return setImmediate(cb);
   }
 
-  if (Date.now() % 3000 > 1500) {
-    library.logger.trace('Loop:', 'maybe too late to collect votes');
+  // if (Date.now() % 10000 > 5000) {
+  //   library.logger.trace('Loop:', 'maybe too late to collect votes');
+  //   return setImmediate(cb);
+  // }
+
+  if (__private.lastSlotNumber == currentSlot) {
+    library.logger.trace("Loop", "generate more than one block in same slotNumber");
     return setImmediate(cb);
   }
 
@@ -730,6 +736,7 @@ __private.loop = function (cb) {
     library.sequence.add(function generateBlock(cb) {
       if (slots.getSlotNumber(currentBlockData.time) == slots.getSlotNumber() &&
         modules.blocks.getLastBlock().timestamp < currentBlockData.time) {
+        __private.lastSlotNumber = slots.getSlotNumber();
         modules.blocks.generateBlock(currentBlockData.keypair, currentBlockData.time, cb);
       } else {
         // library.logger.log('Loop', 'exit: ' + _activeDelegates[slots.getSlotNumber() % slots.delegates] + ' delegate slot');
@@ -737,6 +744,7 @@ __private.loop = function (cb) {
       }
     }, function (err) {
       if (err) {
+        __private.lastSlotNumber = null;
         library.logger.error("Failed generate block within slot:", err);
       }
       return setImmediate(cb);
