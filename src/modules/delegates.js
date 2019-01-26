@@ -716,7 +716,7 @@ __private.loop = function (cb) {
     return setImmediate(cb);
   }
 
-  if (Date.now() % 2000 > 1000) {
+  if (Date.now() % 500 > 300) {
     library.logger.trace('Loop:', 'maybe too late to collect votes');
     return setImmediate(cb);
   }
