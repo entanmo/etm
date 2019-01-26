@@ -938,7 +938,7 @@ Transport.prototype.onNewPropose = function (propose, broadcast) {
         propose: library.protobuf.encodeBlockPropose(propose)
       },
     }
-    // self.broadcast('propose', message)
+    self.broadcast('propose', message)
     self.broadcastByPost({ api: 'propose', data: message.body, method: "POST" });
     // self.broadcast({}, { api: '/propose', data: data, method: "POST" });
   }
