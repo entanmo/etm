@@ -1668,7 +1668,7 @@ Blocks.prototype.onReceivePropose = function (propose) {
       library.logger.debug("onReceivePropose finished");
       cb();
     });
-  });
+  },{'priority':0});
 }
 
 Blocks.prototype.onReceiveVotes = function (votes) {
@@ -1707,7 +1707,7 @@ Blocks.prototype.onReceiveVotes = function (votes) {
     } else {
       setImmediate(cb);
     }
-  });
+  },{'priority':0});
 }
 
 Blocks.prototype.getSupply = function () {

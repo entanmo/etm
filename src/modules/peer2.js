@@ -178,9 +178,9 @@ const priv = {
             library.logger.warn(` remove node  (${node.id})`);
             if (err) {
               library.logger.warn(`faild to remove node id (${numRemoved})`);
-               cb(err, node.id);
+              return  cb(err, node.id);
             } 
-             cb(null, node.id);
+            return cb(null, node.id);
           })
         }, function (err) {
           if (err) {
