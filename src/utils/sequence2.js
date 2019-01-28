@@ -68,11 +68,11 @@ class Sequence {
       }
       if (util.isObject(args)) {
         task.counter = this.counter++
-        this.queue.push(task,args.priority,tmpLog(worker.name,args.priority))
+        this.queue.push(task,args.priority)//,tmpLog(worker.name,args.priority)
         return 
       }
       task.counter = this.counter++
-      this.queue.push(task,this.defaultPriority,tmpLog(worker.name,this.defaultPriority))
+      this.queue.push(task,this.defaultPriority)//,tmpLog(worker.name,this.defaultPriority)
     }
   }
 
