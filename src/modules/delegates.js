@@ -1279,9 +1279,14 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
         if (err) {
           return cb(err.toString());
         }
-
+        
         rows.forEach((row, index) => {
-          row.weight = votes[index] / totalVotes * 100;
+          if(totalVotes === 0){
+            row.weight = 100;
+          }
+          else{
+            row.weight = votes[index] / totalVotes * 100;
+          }
         });
         return cb(null, {accounts: rows});
       });

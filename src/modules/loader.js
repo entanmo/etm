@@ -141,7 +141,7 @@ __private.findUpdate = function (lastBlock, peer, cb) {
                 backHeight = 1;
               } else {
                 backHeight = backHeight - backHeight % slots.roundBlocks;
-              }s
+              }
               modules.blocks.getBlock({ height: backHeight }, function (err, result) {
                 if (result && result.block) {
                   commonBlock = result.block;
