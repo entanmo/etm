@@ -29,6 +29,7 @@
     "decompress-zip": "^0.3.1",
     "ejs": "^2.5.9",
     "entanmo-miner": "https://gitee.com/just-anohaker/multi-node.git",
+    "etm-js": "git+https://github.com/entanmo/etm-js.git",
     "etm-vm": "git+https://github.com/entanmo/etm-vm.git",
     "bittorrent-dht": "git+https://github.com:entanmo/etm-dht.git",
     "nedb": "=1.8.0",
