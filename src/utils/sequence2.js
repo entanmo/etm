@@ -15,7 +15,7 @@
 'use strict';
 const util = require('util')
 const async = require('async')
-const TASK_TIMEOUT_MS = 10 * 1000
+const TASK_TIMEOUT_MS = 20 * 1000
 
 function tick(task, cb) {
   let isCallbacked = false

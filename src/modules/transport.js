@@ -39,6 +39,10 @@ __private.loaded = false;
 __private.messages = {};
 __private.invalidTrsCache = new LimitCache();
 __private.votesCache = new LimitCache();
+const MAX_BATCH_TRANSACTIONS = 100;
+const DETECT_INTERVAL = 3000;
+__private.boardcastTrs = [];
+
 
 // Constructor
 function Transport(cb, scope) {
@@ -822,6 +826,76 @@ Transport.prototype.onBind = function (scope) {
 
 Transport.prototype.onBlockchainReady = function () {
   __private.loaded = true;
+  setImmediate(function tick() {
+    console.log("[transport] 3s boardcast tr count:", __private.boardcastTrs.length);
+    if (__private.boardcastTrs.length > 0) {
+      let message = packageBatchTrsForBoardcast(__private.boardcastTrs)
+      //console.log("boardcast transactions:", JSON.stringify(message)); 
+      modules.peer.publish("transactions", message)
+      //self.boardcast("transactions", message);
+      __private.boardcastTrs = [];
+    }
+    setTimeout(tick, DETECT_INTERVAL);
+  });
+}
+function packageBatchTrsForBoardcast(trs) {
+  // TODO: return package batch transactions
+  const m = {
+    body: {
+      transactions: JSON.stringify(trs),
+    },
+  }
+  return m
+}
+function processTxs(transaction){
+  try {
+    
+    if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
+        //console.log('hasUnconfirmedTransaction has',  transaction.id)
+        return  ;
+      }
+    if (transaction.id && __private.invalidTrsCache.has(transaction.id)) {
+     // console.log('invalidTrsCache has',  transaction.id)
+      return 
+    }
+    transaction = library.base.transaction.objectNormalize(transaction)
+    transaction.asset = transaction.asset || {}
+   // console.log('=========receive transaction ========',  JSON.stringify(transaction) )
+  } catch (e) {
+    console.log('Received transaction parse error', {
+      transaction,
+      error: e.toString(),
+    })
+    return
+  }
+  const receiveUptime = reportor.uptime;
+  library.balancesSequence.add(function (cb) {
+    if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
+    //  console.log('hasUnconfirmedTransaction has',  transaction.id)
+      return cb('Already exists');
+    }
+   // console.log('-------Received transaction----- ' + JSON.stringify(transaction) );
+    modules.transactions.receiveTransactions([transaction], cb);
+  }, function (err, transactions) {
+    if (err) {
+     // library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
+      __private.invalidTrsCache.set(transaction.id, true)
+     // res.status(200).json({ success: false, error: err });
+    } else {
+      let reportMsg = {
+        subaction: "receive",
+        trType: transactions[0].type,
+        id: transactions[0].id,
+        timestamp: transactions[0].timestamp,
+        senderPublicKey: transactions[0].senderPublicKey,
+        duration: reportor.uptime - receiveUptime
+      };
+      if (err) {
+        reportMsg.error = err.message;
+      }
+      reportor.report("transactions", reportMsg);
+    }
+  });
 }
 Transport.prototype.onPeerReady = () => {
   
@@ -833,6 +907,33 @@ Transport.prototype.onPeerReady = () => {
     } catch (e) {
       library.logger.error('Receive invalid propose', e)
     }
+  })
+  modules.peer.subscribe('transactions', (message) => {
+    if (modules.loader.syncing()) {
+      return
+    }
+    const lastBlock = modules.blocks.getLastBlock()
+    const lastSlot = slots.getSlotNumber(lastBlock.timestamp)
+    if (slots.getNextSlot() - lastSlot >= 40) {
+      console.log('Blockchain is not ready', { getNextSlot: slots.getNextSlot(), lastSlot, lastBlockHeight: lastBlock.height })
+      return
+    }
+    let transactions
+    transactions = message.body.transactions
+    try {
+      if (Buffer.isBuffer(transactions)) transactions = transactions.toString()
+      transactions = JSON.parse(transactions)
+    } catch (e) {
+        console.log('Received transaction parse error', {
+          message,
+          error: e.toString(),
+        })
+        return
+      }
+    //console.log('transactions are ================',  transactions)
+    transactions.forEach(transaction => {
+      processTxs(transaction);
+    });
   })
   modules.peer.subscribe('transaction', (message) => {
     // console.log('Receive new transaction',   JSON.stringify(message.body.transaction))
@@ -846,57 +947,21 @@ Transport.prototype.onPeerReady = () => {
       return
     }
     let transaction
+    transaction = message.body.transaction
     try {
-      transaction = message.body.transaction
       if (Buffer.isBuffer(transaction)) transaction = transaction.toString()
       transaction = JSON.parse(transaction)
-      if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
-          //console.log('hasUnconfirmedTransaction has',  transaction.id)
-          return  ;
-        }
-      if (transaction.id && __private.invalidTrsCache.has(transaction.id)) {
-       // console.log('invalidTrsCache has',  transaction.id)
-        return 
-      }
-      transaction = library.base.transaction.objectNormalize(transaction)
-      transaction.asset = transaction.asset || {}
-     // console.log('=========receive transaction ========',  JSON.stringify(transaction) )
     } catch (e) {
-      console.log('Received transaction parse error', {
-        message,
-        error: e.toString(),
-      })
-      return
-    }
-    const receiveUptime = reportor.uptime;
-    library.balancesSequence.add(function (cb) {
-      if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
-      //  console.log('hasUnconfirmedTransaction has',  transaction.id)
-        return cb('Already exists');
+        console.log('Received transaction parse error', {
+          message,
+          error: e.toString(),
+        })
+        return
       }
-     // console.log('-------Received transaction----- ' + JSON.stringify(transaction) );
-      modules.transactions.receiveTransactions([transaction], cb);
-    }, function (err, transactions) {
-      if (err) {
-       // library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
-        __private.invalidTrsCache.set(transaction.id, true)
-       // res.status(200).json({ success: false, error: err });
-      } else {
-        let reportMsg = {
-          subaction: "receive",
-          trType: transactions[0].type,
-          id: transactions[0].id,
-          timestamp: transactions[0].timestamp,
-          senderPublicKey: transactions[0].senderPublicKey,
-          duration: reportor.uptime - receiveUptime
-        };
-        if (err) {
-          reportMsg.error = err.message;
-        }
-        reportor.report("transactions", reportMsg);
-      }
-    });
-  })
+
+    processTxs(transaction)
+  }
+  )
 }
 Transport.prototype.onSignature = function (signature, broadcast) {
   if (broadcast) {
@@ -912,11 +977,16 @@ Transport.prototype.onUnconfirmedTransaction = function (transaction, broadcast)
         transaction: JSON.stringify(transaction),
       },
     }
-    self.broadcast('transaction', message)
+    __private.boardcastTrs.push(transaction);
+    if (__private.boardcastTrs.length >= MAX_BATCH_TRANSACTIONS) {
+      console.log("[transport] max boardcast tr count:", __private.boardcastTrs.length);
+      self.broadcast("transactions", packageBatchTrsForBoardcast(__private.boardcastTrs));
+      __private.boardcastTrs = [];
+    }
+   // self.broadcast('transaction', message)
     library.network.io.sockets.emit('transactions/change', {});
   }
 }
-
 Transport.prototype.onNewBlock = function (block, votes, broadcast) {
   if (broadcast) {
     var data = {
