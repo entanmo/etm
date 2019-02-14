@@ -45,8 +45,7 @@ function System(cb, scope) {
   setImmediate(cb, null, self);
 }
 System.prototype.onNewBlock = function (block, votes, broadcast) {
-
-  if( block.height%slots.roundBlocks == slots.roundBlocks - 20 ){
+  if(block.height%slots.roundBlocks == slots.roundBlocks - 80 ){
     var d = new Date();
     var fullday= d.getFullYear().toString() + (d.getMonth()+1).toString() + d.getDate().toString();
     if( __private.isBackUp == true || __private.backupDate == fullday  ){
@@ -68,18 +67,29 @@ System.prototype.onNewBlock = function (block, votes, broadcast) {
     }
 
     if(index == hours){// 0 - 23   hours
-      //shell2.cp('-f',library.config.dbName, 'data/'+library.config.dbName);
-      shell2.exec('cp -f '+library.config.dbName + ' data/'+library.config.dbName,
-      function(code, stdout, stderr) {
-      console.log('Exit code:', code);
-      // console.log('backupDb Program output:', stdout);
-       console.log('backupDb Program stderr:', stderr);
-      console.log("copy blockchain.db in system at height : "+JSON.stringify(block.height));
-      if(code == 0){
-        __private.backupDate = fullday
-        console.log("backupDb ok "+fullday + ' at hours ' + hours)
-      }
-    });
+      if(os.platform() == 'win32'){
+          shell2.exec('copy /y '+library.config.dbName + ' data/'+library.config.dbName,
+          function(code, stdout, stderr) {
+          console.log('Exit code:', code);
+          console.log('backupDb Program stderr:', stderr);
+          console.log("copy blockchain.db in system at height : "+JSON.stringify(block.height));
+          if(code == 0){
+            __private.backupDate = fullday
+            console.log("backupDb ok "+fullday + ' at hours ' + hours)
+          }
+        });
+      }else{
+        shell2.exec('cp -f '+library.config.dbName + ' data/'+library.config.dbName,
+        function(code, stdout, stderr) {
+        console.log('Exit code:', code);
+        console.log('backupDb Program stderr:', stderr);
+        console.log("copy blockchain.db in system at height : "+JSON.stringify(block.height));
+        if(code == 0){
+          __private.backupDate = fullday
+          console.log("backupDb ok "+fullday + ' at hours ' + hours)
+        }
+      });
+    }
     }
  }
 }
@@ -89,17 +99,32 @@ System.prototype.backupDb = function (cb) {
      // shell2.cp('-f','data/'+library.config.dbName, library.config.dbName);
      // console.log("backupDb");
      __private.isBackUp = true;
-      shell2.exec('cp -f '+'data/'+library.config.dbName +' '+library.config.dbName,
-      function(code, stdout, stderr) {
-      __private.isBackUp = false;
-      console.log('backupDb code:', code);
-      console.log('backupDb blockchain.db  Program stderr:', stderr);
-      if(code == 0){
-        cb(exists)
-      }else{
-        cb(false)
-      }
-    });
+
+     if(os.platform() == 'win32'){
+          shell2.exec('copy /y '+'data/'+library.config.dbName +' '+library.config.dbName,
+          function(code, stdout, stderr) {
+          __private.isBackUp = false;
+          console.log('backupDb code:', code);
+          console.log('backupDb blockchain.db  Program stderr:', stderr);
+          if(code == 0){
+            cb(exists)
+          }else{
+            cb(false)
+          }
+        });
+     }else{
+        shell2.exec('cp -f '+'data/'+library.config.dbName +' '+library.config.dbName,
+        function(code, stdout, stderr) {
+        __private.isBackUp = false;
+        console.log('backupDb code:', code);
+        console.log('backupDb blockchain.db  Program stderr:', stderr);
+        if(code == 0){
+          cb(exists)
+        }else{
+          cb(false)
+        }
+      });
+     }
     }else{
       cb(false)
     }
