@@ -122,7 +122,11 @@ const priv = {
      // .sort({ seen: -1 })
       .exec((err, nodes) => {
         if (err) return callback(err)
-
+        nodes = nodes.filter(n => {
+          const element = `${n.host}:${n.port}`
+          const selfAddress = `${library.config.publicIp}:${library.config.peerPort}`
+          return element != selfAddress
+        })
         // filter duplicated nodes
         const nodesMap = new Map()
         nodes.forEach((n) => {
