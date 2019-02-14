@@ -500,10 +500,6 @@ Transaction.prototype.apply = function (trs, block, sender, cb) {
   if (trs.blockId != genesisblock.block.id && sender.balance < amount) {
     return setImmediate(cb, "Insufficient balance: " + sender.balance);
   }
-  
-  if (trs.type === TransactionTypes.LOCK_VOTES || trs.type === TransactionTypes.UNLOCK_VOTES) {
-    return __private.types[trs.type].apply.call(this, trs, block, sender, cb);
-  }
 
   this.scope.account.merge(sender.address, {
     balance: -amount,
@@ -523,10 +519,6 @@ Transaction.prototype.undo = function (trs, block, sender, cb) {
   if (trs.type === 7) return __private.types[trs.type].undo.call(this, trs, block, sender, cb);
 
   var amount = trs.amount + trs.fee;
-  if (trs.type === TransactionTypes.LOCK_VOTES || trs.type === TransactionTypes.UNLOCK_VOTES) {
-    return __private.types[trs.type].undo.call(this, trs, block, sender, cb);
-  }
-
   this.scope.account.merge(sender.address, {
     balance: amount,
     blockId: block.id,

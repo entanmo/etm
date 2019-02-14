@@ -28,12 +28,8 @@ function LockVotes() {
 
   this.verify = function (trs, sender, cb) {
     let lockAmount = Number(trs.args[0]);
-    const amount = lockAmount + trs.fee;
     if(!Number.isSafeInteger(lockAmount) || lockAmount < constants.fixedPoint){
       return setImmediate(cb, 'Invalid lock amount!');
-    }
-    if(sender.balance < amount){
-      return setImmediate(cb, 'Not enough balance');
     }
 
     setImmediate(cb, null, trs);
@@ -48,13 +44,7 @@ function LockVotes() {
   }
 
   this.apply = function (trs, block, sender, cb) {
-    const lockAmount = Number(trs.args[0]);
-    const amount = lockAmount + trs.fee;
-
-    if(sender.balance < amount){
-      return setImmediate(cb, 'Not enough balance');
-    }
-
+    const amount = Number(trs.args[0]);
     library.base.account.merge(sender.address, {
       balance: -amount,
       u_balance: -amount,
@@ -67,21 +57,11 @@ function LockVotes() {
         return cb(err);
       }
       return cb();
-
-      /*
-      return library.dbLite.query("INSERT INTO lock_votes(address, lockAmount, originHeight, currentHeight, transactionId, state) VALUES($address, $lockAmount, $originHeight, $currentHeight, $transactionId, 1)", {
-        address: sender.address,
-        lockAmount: lockAmount,
-        originHeight: block.height,
-        currentHeight: block.height,
-        transactionId: trs.id
-      }, cb);
-      */
     });
   }
 
   this.undo = function (trs, block, sender, cb) {
-    const amount = Number(trs.args[0]) + trs.fee;
+    const amount = Number(trs.args[0]);
     library.base.account.merge(sender.address, {
       balance: amount,
       u_balance: amount,
@@ -91,6 +71,11 @@ function LockVotes() {
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
+    // check balance
+    const lockAmount = Number(trs.args[0]);
+    if (sender.u_balance < lockAmount) {
+      return setImmediate(cb, "Insufficient balance: " + sender.address)
+    }
     const key = sender.address + ":" + trs.type;
     if (library.oneoff.has(key)) {
       return setImmediate(cb, "Double submit");
