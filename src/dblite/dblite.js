@@ -258,7 +258,7 @@ class dblite {
                      if(val === 0){
                         out[fields[i]] = JSON.parse(JSON.stringify(( "0")));
                      }else{
-                        out[fields[i]] = JSON.parse(JSON.stringify((val || "")));
+                        out[fields[i]] =util.isNumber(val)?JSON.stringify(val):JSON.parse(JSON.stringify((val || "")));
                      }
                  } catch (e) {
                      out[fields[i]] = val;

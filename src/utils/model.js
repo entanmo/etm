@@ -453,7 +453,7 @@ class Model {
   }
 
   isIssuerExists(name, id, cb) {
-    var sql = 'select name from issuers where name=$name;select name from issuers where issuerId=$id'
+    var sql = 'select name from issuers where name=$name and issuerId=$id'
     var values = {
       name: name,
       id: id
