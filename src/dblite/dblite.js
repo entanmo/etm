@@ -16,6 +16,7 @@
 const Database = require('better-sqlite3');
 const LRU = require("lru-cache");
 const dbutil = require("./dbutil.js");
+const util = require("util");
 const HAS_PARAMS = /(?:\?|(?:(?:\:|\@|\$)[a-zA-Z_0-9$]+))/;
 const mp = new LRU(50000);
 class dblite {
