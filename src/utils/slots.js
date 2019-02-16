@@ -44,7 +44,7 @@ module.exports = {
 
   delegates: 101,    // 代理数量（不为101时需要同步修改gegesisBlock.json）
 
-  roundBlocks: 101 * 5,// 每轮区块的数量
+  roundBlocks: 101 * 1,// 每轮区块的数量
 
   leading: 7,        // 前导位数
 
