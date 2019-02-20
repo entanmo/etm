@@ -818,6 +818,7 @@ __private._getRandomDelegateList = function (randomDelegateList, truncDelegateLi
   }
 }
 
+// Public methods
 Delegates.prototype.getActiveDelegateKeypairs = function (height, cb) {
   self.generateDelegateList(height, function (err, delegates) {
     if (err) {
@@ -894,7 +895,35 @@ Delegates.prototype.getDelegateIndex = function (propose ,cb) {
   });
 }
 
-// Public methods
+Delegates.prototype.getMissedDelegates = function (height, stamp, cb) {
+  self.generateDelegateList(height, function (err, activeDelegates) {
+    if (err) {
+      return cb(err);
+    }
+
+    var prevHeight = height > 2 ? height - 2 : height - 1;
+    modules.blocks.getBlock({
+      'height': prevHeight
+    }, function (err, res) {
+      if (err) {
+        return cb('Get getBlock from last block height error:' + err);
+      }
+
+      let lastBlockId = res.block.id;
+      let missedDelegates = [];
+      for (let i = stamp.start + 3; i < stamp.end; i += 3) {
+        var currentSlot = slots.getSlotNumber(i);
+        var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
+        var delegateKey = activeDelegates[index];
+        missedDelegates.push(delegateKey);
+      }
+
+      // return cb(null, missedDelegates);
+      setImmediate(cb, null, missedDelegates);
+    });
+  });
+}
+
 Delegates.prototype.generateDelegateList = function (height, cb) {
   __private.getKeysSortByVote(function (err, truncDelegateList) {
     if (err) {
@@ -1179,11 +1208,17 @@ Delegates.prototype.getDelegates = function (query, cb) {
     var realLimit = Math.min(offset + limit, count);
 
     var lastBlock = modules.blocks.getLastBlock();
-		var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
+    var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
+    
+    let totalVotes = 0;
+    for (var i = 0; i < delegates.length; i++) {
+      totalVotes += delegates[i].vote;
+    }
 
     for (var i = 0; i < delegates.length; i++) {
       delegates[i].rate = i + 1;
-      delegates[i].approval = (delegates[i].vote / totalSupply) * 100;
+      totalVotes = totalVotes > 0 ? totalVotes : totalSupply;
+      delegates[i].approval = (delegates[i].vote / totalVotes) * 100;
       delegates[i].approval = Math.round(delegates[i].approval * 1e2) / 1e2;
 
       var percent = 100 - (delegates[i].missedblocks / ((delegates[i].producedblocks + delegates[i].missedblocks) / 100));
