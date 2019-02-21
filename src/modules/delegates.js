@@ -144,7 +144,7 @@ function Delegate() {
   this.apply = function (trs, block, sender, cb) {
     var data = {
       address: sender.address,
-      u_isDelegate: 0,
+      // u_isDelegate: 0,
       isDelegate: 1,
       vote: 0
     }
@@ -186,7 +186,7 @@ function Delegate() {
   this.undo = function (trs, block, sender, cb) {
     var data = {
       address: sender.address,
-      u_isDelegate: 1,
+      // u_isDelegate: 1,
       isDelegate: 0,
       vote: 0
     }
@@ -347,7 +347,7 @@ function UnDelegate() {
   this.apply = function (trs, block, sender, cb) {
     var data = {
       address: sender.address,
-      u_isDelegate: 1,
+      // u_isDelegate: 1,
       isDelegate: 2,
       // username: null,
       // u_username: sender.username,
@@ -359,7 +359,7 @@ function UnDelegate() {
   this.undo = function (trs, block, sender, cb) {
     var data = {
       address: sender.address,
-      u_isDelegate: 2,
+      // u_isDelegate: 2,
       isDelegate: 1,
       // username: sender.u_username,
       // u_username: null,
@@ -895,7 +895,7 @@ Delegates.prototype.getDelegateIndex = function (propose ,cb) {
   });
 }
 
-Delegates.prototype.getMissedDelegates = function (height, stamp, cb) {
+Delegates.prototype.getMissedDelegates = function (height, slotDiff, cb) {
   self.generateDelegateList(height, function (err, activeDelegates) {
     if (err) {
       return cb(err);
@@ -911,8 +911,8 @@ Delegates.prototype.getMissedDelegates = function (height, stamp, cb) {
 
       let lastBlockId = res.block.id;
       let missedDelegates = [];
-      for (let i = stamp.start + 3; i < stamp.end; i += 3) {
-        var currentSlot = slots.getSlotNumber(i);
+      for (let i = slotDiff.start + 1; i < slotDiff.end; i++) {
+        var currentSlot = i;
         var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
         var delegateKey = activeDelegates[index];
         missedDelegates.push(delegateKey);

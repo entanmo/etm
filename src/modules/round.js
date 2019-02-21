@@ -24,7 +24,8 @@ const BlockStatus = require("../utils/block-status");
 const VoterBonus = require("../utils/voter-bonus");
 
 // Private fields
-var modules, library, self, __private = {}, shared = {};
+var modules, library, self, __private = {},
+  shared = {};
 
 __private.loaded = false;
 
@@ -149,16 +150,16 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
       let timeDiff = block.timestamp - lastBlock.timestamp;
       //出块时间差大于3秒且小于1/3的代理人数，算作中间有人没有出块
       if (timeDiff > slots.interval && timeDiff < Math.floor(slots.interval * slots.delegates * 1 / 3)) {
-        let stamp = {
-          start: lastBlock.timestamp,
-          end: block.timestamp
+        let slotDiff = {
+          start: slots.getSlotNumber(lastBlock.timestamp),
+          end: slots.getSlotNumber(block.timestamp)
         }
-        console.log("MMMMMMMMMMMMMMMMMMMMMMMMissedBlock", block.height, lastBlock.timestamp, block.timestamp)
-        modules.delegates.getMissedDelegates(block.height, stamp, (err, missedDelegates) => {
+
+        modules.delegates.getMissedDelegates(block.height, slotDiff, (err, missedDelegates) => {
           if (err) {
             return next(err);
           }
-          console.log("MisssssssssssssssssssssssedBlock", missedDelegates)
+
           async.eachSeries(missedDelegates, (generator, cb) => {
             modules.accounts.mergeAccountAndGet({
               publicKey: generator,
@@ -263,16 +264,16 @@ Round.prototype.tick = function (block, cb) {
           let timeDiff = block.timestamp - lastBlock.timestamp;
           //出块时间差大于3秒且小于1/3的代理人数，算作中间有人没有出块
           if (timeDiff > slots.interval && timeDiff < Math.floor(slots.interval * slots.delegates * 1 / 3)) {
-            let stamp = {
-              start: lastBlock.timestamp,
-              end: block.timestamp
+            let slotDiff = {
+              start: slots.getSlotNumber(lastBlock.timestamp),
+              end: slots.getSlotNumber(block.timestamp)
             }
-            console.log("MMMMMMMMMMMMMMMMMMMMMMMMissedBlock", block.height, lastBlock.timestamp, block.timestamp)
-            modules.delegates.getMissedDelegates(block.height, stamp, (err, missedDelegates) => {
+
+            modules.delegates.getMissedDelegates(block.height, slotDiff, (err, missedDelegates) => {
               if (err) {
                 return next(err);
               }
-              console.log("MisssssssssssssssssssssssedBlock", missedDelegates)
+
               async.eachSeries(missedDelegates, (generator, cb) => {
                 modules.accounts.mergeAccountAndGet({
                   publicKey: generator,
@@ -317,12 +318,6 @@ Round.prototype.tick = function (block, cb) {
 
       let producedAvg = 1;
       async.series([
-        // function(cb){
-        //   if(block.height ===1){
-        //     return cb();
-        //   }
-        //   cb();
-        // },
         function (cb) { //绑定出块人收益
           var roundChanges = new RoundChanges(round);
 
@@ -347,8 +342,7 @@ Round.prototype.tick = function (block, cb) {
             }, next);
           }, cb);
         },
-        function (cb) {
-          // distribute club bonus
+        function (cb) { // distribute club bonus
           if (!global.featureSwitch.enableClubBonus) {
             return cb()
           }
@@ -359,11 +353,8 @@ Round.prototype.tick = function (block, cb) {
           library.balanceCache.addAssetBalance(dappId, BONUS_CURRENCY, bonus)
           library.model.updateAssetBalance(BONUS_CURRENCY, bonus, dappId, cb)
         },
-        function (cb) {
+        function (cb) { // 投票者分红
           const bonusByRound = __private.bonusByRound[round] || [];
-          const totalBonus = bonusByRound.length <= 0 ? 0 : bonusByRound.reduce((prevValue, currValue) => {
-            return prevValue + currValue;
-          }, 0);
           __private.voterBonus.commitBonus(round, bonusByRound, block)
             .then(result => {
               void(result);
@@ -372,6 +363,41 @@ Round.prototype.tick = function (block, cb) {
             .catch(error => {
               cb(error);
             });
+        },
+        function (cb) { // 改变受托人信息
+          modules.accounts.getAccounts({
+            isDelegate: 2,
+            sort: {
+              "vote": -1,
+              "publicKey": 1
+            }
+          }, function (err, delegates) {
+            if (err) {
+              return cb(err);
+            }
+            async.eachSeries(delegates, function (delegate, cb) {
+              var data = {
+                address: delegate.address,
+                // u_isDelegate: 2,
+                isDelegate: 0,
+                username: null,
+                // u_username: delegate.username,
+                vote: 0
+              }
+
+              modules.accounts.setAccountAndGet(data, (err) => {
+                if (err) {
+                  return cb(err);
+                }
+                //清除此注销受托人对应的投票人
+                library.dbLite.query("DELETE FROM mem_accounts2delegates WHERE dependentId = $dependentId", {
+                  dependentId: delegate.publicKey.toString("hex")
+                }, cb);
+              });
+            }, function (err) {
+              cb(err);
+            });
+          });
         },
         function (cb) { //计算当前代理人出块率平均值
           let totalProduce = 0;
@@ -449,33 +475,6 @@ Round.prototype.tick = function (block, cb) {
 
           });
         },
-        function (cb) { // 改变代理人信息
-          modules.accounts.getAccounts({
-            isDelegate: 2,
-            sort: {
-              "vote": -1,
-              "publicKey": 1
-            }
-          }, function (err, delegates) {
-            if (err) {
-              return cb(err);
-            }
-            async.eachSeries(delegates, function (delegate, cb) {
-              var data = {
-                address: delegate.address,
-                u_isDelegate: 2,
-                isDelegate: 0,
-                username: null,
-                u_username: delegate.username,
-                vote: 0
-              }
-
-              modules.accounts.setAccountAndGet(data, cb);
-            }, function (err) {
-              cb(err);
-            });
-          });
-        },
         function (cb) { // 更新锁仓系数
           modules.delegates.generateDelegateList(block.height + 1, function (err, roundDelegates) {
             if (err) {
@@ -504,17 +503,18 @@ Round.prototype.tick = function (block, cb) {
             });
           });
         },
-        function (callback) {
+        function (cb) { // 清除分红计算缓存
           __private.voterBonus.beginBonus(nextRound, block)
             .then(result => {
               void(result);
-              callback();
+              cb();
             })
             .catch(error => {
-              callback(error);
+              cb(error);
             });
         }
       ], function (err) {
+        // 清理缓存数据
         delete __private.feesByRound[round];
         delete __private.rewardsByRound[round];
         delete __private.delegatesByRound[round];
