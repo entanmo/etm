@@ -200,11 +200,11 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
     },
     (next) => { // 处理换轮
       if (prevRound === round && previousBlock.height !== 1) {
-        return done();
+        return next();
       }
 
       if (__private.unDelegatesByRound[round].length !== slots.roundBlocks && previousBlock.height !== 1) {
-        return done();
+        return next();
       }
       library.logger.warn('Unexpected roll back cross round', {
         round: round,
@@ -545,6 +545,11 @@ Round.prototype.roundrewardsRecovery = function (cb) {
     .catch(error => {
       return cb(error);
     });
+}
+
+Round.prototype.getRoundUsedDelegates = function (height) {
+  let round = self.calc(height);
+  return __private.delegatesByRound[round];
 }
 
 Round.prototype.sandboxApi = function (call, args, cb) {

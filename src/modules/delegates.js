@@ -663,33 +663,19 @@ __private.getKeysSortByVote = function (cb) {
 }
 
 __private.getBlockSlotData = function (slot, height, cb) {
-  self.generateDelegateList(height, function (err, activeDelegates) {
+  __private.getConsensusDelegate(height, slot, (err, selectDelegate) => {
     if (err) {
       return cb(err);
     }
 
-    var prevHeight = height > 2 ? height - 2 : height - 1;
-    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
-      if (err) {
-        return cb('Get getBlock from last block height error:' + err);
-      }
-
-      var lastBlockId = res.block.id;
-      var currentSlot = slot;
-      var lastSlot = slots.getLastSlot(currentSlot);
-
-      for (; currentSlot < lastSlot; currentSlot += 1) {
-        var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
-        var delegateKey = activeDelegates[index];
-        if (delegateKey && __private.keypairs[delegateKey]) {
-          return cb(null, {
-            time: slots.getSlotTime(currentSlot),
-            keypair: __private.keypairs[delegateKey]
-          });
-        }
-      }
-      cb("not fund delegeteKey in keypairs");
-    });
+    let delegateKey = selectDelegate.delegateKey;
+    if (delegateKey && __private.keypairs[delegateKey]) {
+      return cb(null, {
+        time: slots.getSlotTime(slot),
+        keypair: __private.keypairs[delegateKey]
+      });
+    }
+    cb("not fund delegeteKey in keypairs");
   });
 }
 
@@ -775,6 +761,53 @@ __private.loadMyDelegates = function (cb) {
   }, cb);
 }
 
+__private.getConsensusDelegate = function (height, slot, cb) {
+  self.generateDelegateList(height, function (err, activeDelegates) {
+    if (err) {
+      return cb(err);
+    }
+
+    var prevHeight = height > 2 ? height - 2 : height - 1;
+    modules.blocks.getBlock({
+      'height': prevHeight
+    }, function (err, res) {
+      if (err) {
+        return cb('Get getBlock from last block height error:' + err);
+      }
+
+      var lastBlockId = res.block.id;
+      var currentSlot = slot;
+      var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
+
+      // let delegatesByRound = modules.round.getRoundUsedDelegates(height);
+      // if(delegatesByRound && delegatesByRound.length > 0){
+      //   // console.log("RRRRRRRRRRRRRRRRRRRRRRRRRRRRoundDelegate:",delegatesByRound)
+      //   index = __private.getNoCheatIndex(index,activeDelegates, delegatesByRound);
+      // }
+      
+      let delegateKey = activeDelegates[index];
+      cb(null, {
+        index,
+        delegateKey
+      });
+    });
+  });
+}
+
+__private.getNoCheatIndex = function (index, activeDelegates, delegatesByRound) {
+  // 防止理论上超大算力作弊，控制一轮中出块的数量超过5个，超过则取下一个index
+  let delegateKey = activeDelegates[index];
+  let countProduced = delegatesByRound.filter((temp)=>{
+    return temp === delegateKey;
+  });
+
+  if (countProduced.length <= 3) {
+    return index;
+  } else {
+    __private.getNoCheatIndex((index + 1) % activeDelegates.length, activeDelegates, delegatesByRound);
+  }
+}
+
 __private._getDelegeteIndex = function (lastBlockId, slot, limit) {
   let hash = crypto.createHash('sha256').update(lastBlockId).digest('hex');
   let index = chaos(hash, slot, limit);
@@ -835,92 +868,66 @@ Delegates.prototype.getActiveDelegateKeypairs = function (height, cb) {
 }
 
 Delegates.prototype.validateProposeSlot = function (propose, cb) {
-  self.generateDelegateList(propose.height, function (err, activeDelegates) {
+  let slot = slots.getSlotNumber(propose.timestamp);
+  __private.getConsensusDelegate(propose.height, slot, (err, selectDelegate) => {
     if (err) {
       return cb(err);
     }
+
+    let delegateKey = selectDelegate.delegateKey;
+    if (delegateKey && propose.generatorPublicKey == delegateKey) {
+      return cb();
+    }
+
+    library.logger.debug(
+      "Failed to validate propose slot -- ", 
+      index, 
+      delegateKey, 
+      propose.generatorPublicKey, 
+      propose.height,
+      lastBlockId, 
+      currentSlot, 
+      activeDelegates
+    );
     
-    var prevHeight = propose.height > 2 ? propose.height - 2 : propose.height - 1;
-    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
-      if (err) {
-        return cb('Get getBlock from last block height error:' + err);
-      }
-
-      var lastBlockId = res.block.id;
-      var currentSlot = slots.getSlotNumber(propose.timestamp);
-      var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
-      var delegateKey = activeDelegates[index];
-      if (delegateKey && propose.generatorPublicKey == delegateKey) {
-        return cb();
-      }
-
-      library.logger.debug(
-        "Failed to validate propose slot -- ", 
-        index, 
-        delegateKey, 
-        propose.generatorPublicKey, 
-        propose.height,
-        lastBlockId, 
-        currentSlot, 
-        activeDelegates
-      );
-      
-      cb("Failed to validate propose slot");
-    });
+    cb("Failed to validate propose slot");
   });
 }
 
 //get Delegate index
 Delegates.prototype.getDelegateIndex = function (propose ,cb) {
-  self.generateDelegateList(propose.height, function (err, activeDelegates) {
+  let slot = slots.getSlotNumber(propose.timestamp);
+  __private.getConsensusDelegate(propose.height, slot, (err, selectDelegate) => {
     if (err) {
       return cb(err);
     }
 
-    var prevHeight = propose.height > 2 ? propose.height - 2 : propose.height - 1;
-    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
-      if (err) {
-        return cb('Get getBlock from last block height error:' + err);
-      }
-
-      var lastBlockId = res.block.id;
-      var currentSlot = slots.getSlotNumber(propose.timestamp);
-      var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
-      var delegateKey = activeDelegates[index];
-      if (delegateKey && propose.generatorPublicKey == delegateKey) {
-        return cb(null, index);
-      }
-      cb("Failed to get delegete index");
-    });
+    let delegateKey = selectDelegate.delegateKey;
+    if (delegateKey && propose.generatorPublicKey == delegateKey) {
+      return cb(null, selectDelegate.index);
+    }
+    cb("Failed to get delegete index");
   });
 }
 
 Delegates.prototype.getMissedDelegates = function (height, slotDiff, cb) {
-  self.generateDelegateList(height, function (err, activeDelegates) {
-    if (err) {
-      return cb(err);
-    }
+  let slotArr = [];
+  for (let i = slotDiff.start + 1; i < slotDiff.end; i++) {
+    slotArr.push(i);
+  }
 
-    var prevHeight = height > 2 ? height - 2 : height - 1;
-    modules.blocks.getBlock({
-      'height': prevHeight
-    }, function (err, res) {
+  let missedDelegates = [];
+  async.eachSeries(slotArr, (slot) => {
+    __private.getConsensusDelegate(height, slot, (err, selectDelegate) => {
       if (err) {
-        return cb('Get getBlock from last block height error:' + err);
+        return cb(err);
       }
 
-      let lastBlockId = res.block.id;
-      let missedDelegates = [];
-      for (let i = slotDiff.start + 1; i < slotDiff.end; i++) {
-        var currentSlot = i;
-        var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
-        var delegateKey = activeDelegates[index];
-        missedDelegates.push(delegateKey);
-      }
-
-      // return cb(null, missedDelegates);
-      setImmediate(cb, null, missedDelegates);
+      let delegateKey = selectDelegate.delegateKey;
+      missedDelegates.push(delegateKey);
     });
+  }, (err) => {
+    setImmediate(cb, err, missedDelegates);
   });
 }
 
@@ -1158,26 +1165,17 @@ Delegates.prototype.fork = function (block, cause) {
 }
 
 Delegates.prototype.validateBlockSlot = function (block, cb) {
-  self.generateDelegateList(block.height, function (err, activeDelegates) {
+  let slot = slots.getSlotNumber(block.timestamp);
+  __private.getConsensusDelegate(block.height, slot, (err, selectDelegate) => {
     if (err) {
       return cb(err);
     }
 
-    var prevHeight = block.height > 2 ? block.height - 2 : block.height - 1;
-    modules.blocks.getBlock({'height': prevHeight}, function(err, res){
-      if (err) {
-        return cb('Get getBlock from last block height error:' + err);
-      }
-
-      var lastBlockId = res.block.id;
-      var currentSlot = slots.getSlotNumber(block.timestamp);
-      var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
-      var delegateKey = activeDelegates[index];
-      if (delegateKey && block.generatorPublicKey == delegateKey) {
-        return cb();
-      }
-      cb("Failed to verify slot, expected delegate: " + delegateKey);
-    });
+    let delegateKey = selectDelegate.delegateKey;
+    if (delegateKey && block.generatorPublicKey == delegateKey) {
+      return cb();
+    }
+    cb("Failed to verify slot, expected delegate: " + delegateKey);
   });
 }
 
