@@ -714,8 +714,7 @@ __private.loop = function (cb) {
     }
 
     library.sequence.add(function generateBlock (cb) {
-      if (slots.getSlotNumber(currentBlockData.time) == slots.getSlotNumber() &&
-          modules.blocks.getLastBlock().timestamp < currentBlockData.time) {
+      if (slots.getSlotNumber(currentBlockData.time) == slots.getSlotNumber() && lastBlock.timestamp < currentBlockData.time) {
         modules.blocks.generateBlock(currentBlockData.keypair, currentBlockData.time, cb);
       } else {
         // library.logger.log('Loop', 'exit: ' + _activeDelegates[slots.getSlotNumber() % slots.delegates] + ' delegate slot');
@@ -917,7 +916,7 @@ Delegates.prototype.getMissedDelegates = function (height, slotDiff, cb) {
   }
 
   let missedDelegates = [];
-  async.eachSeries(slotArr, (slot) => {
+  async.eachSeries(slotArr, (slot, cb) => {
     __private.getConsensusDelegate(height, slot, (err, selectDelegate) => {
       if (err) {
         return cb(err);
@@ -925,6 +924,7 @@ Delegates.prototype.getMissedDelegates = function (height, slotDiff, cb) {
 
       let delegateKey = selectDelegate.delegateKey;
       missedDelegates.push(delegateKey);
+      cb();
     });
   }, (err) => {
     setImmediate(cb, err, missedDelegates);
