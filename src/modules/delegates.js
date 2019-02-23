@@ -878,6 +878,7 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
       return cb();
     }
 
+    /*
     library.logger.debug(
       "Failed to validate propose slot -- ", 
       index, 
@@ -888,6 +889,7 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
       currentSlot, 
       activeDelegates
     );
+    */
     
     cb("Failed to validate propose slot");
   });
