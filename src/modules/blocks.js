@@ -1295,7 +1295,7 @@ Blocks.prototype.loadBlocksFromPeer = function (peer, lastCommonBlockId, cb) {
       }
       const startElapse = process.uptime();
       modules.peer.request('loadblocks', params, peer, (err, body) => {
-        const endElapse = process.update();
+        const endElapse = process.uptime();
         if (err && err.code && (err.code === "ETIMEDOUT" || err.code === "ESOCKETTIMEDOUT")) {
           // timeout, so sub half of limit
           _loadBlockTimeout();
