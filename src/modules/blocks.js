@@ -130,6 +130,7 @@ const _loadBlockTimeout = () => {
   limit = Math.floor(limit / 2);    // sub half of limit per timeout
   if (limit <= 0) limit = 1;
   __private._loadBlocksLimit = limit;
+  console.log("_loadBlockTimeout:", __private._loadBlocksLimit);
 };
 
 const _loadBlockElapse = (elapse) => {
@@ -142,6 +143,7 @@ const _loadBlockElapse = (elapse) => {
     limit += kIncStep;
     if (limit > kMaxLimit) limit = kMaxLimit;
     __private._loadBlocksLimit = limit;
+    console.log("_loadBlockElapse:", __private._loadBlocksLimit);
   }
 };
 
