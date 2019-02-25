@@ -194,6 +194,10 @@ const priv = {
       })
   },
   getHealthNodes: () => {
+    if (!priv.dht) {
+      library.logger.warn('dht network is not ready')
+      return []
+    }
     var peers  = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
    
     peers = peers.filter(n => {
@@ -434,7 +438,8 @@ Peer.prototype.request = (method, params, contact, cb) => {
           library.logger.debug("bootstrap node: "+JSON.stringify(node)+" connect failed! wait for reconnect") 
         }
       }
-      return cb(`Failed to request remote peer: ${err}`)
+      library.logger.debug(`remote service timeout: ${err}`) 
+      return cb(err)
     } else if (response.statusCode !== 200) {
       library.logger.debug('remote service error', result)
       return cb(`Invalid status code: ${response.statusCode}`)

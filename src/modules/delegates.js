@@ -875,7 +875,7 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
     if (delegateKey && propose.generatorPublicKey == delegateKey) {
       return cb();
     }
-
+    
     cb("Failed to validate propose slot");
   });
 }
