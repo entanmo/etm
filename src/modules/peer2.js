@@ -194,6 +194,10 @@ const priv = {
       })
   },
   getHealthNodes: () => {
+    if (!priv.dht) {
+      library.logger.warn('dht network is not ready')
+      return []
+    }
     var peers  = priv.dht.nodes.toArray().filter(n => !priv.blackPeers.has(n.host))
    
     peers = peers.filter(n => {
