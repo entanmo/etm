@@ -798,7 +798,7 @@ __private.getNoCheatIndex = function (index, activeDelegates, delegatesByRound) 
     return temp === delegateKey;
   });
 
-  if (countProduced.length < 2) {
+  if (countProduced.length < 5) {
     return index;
   } else {
     return __private.getNoCheatIndex((index + 1) % activeDelegates.length, activeDelegates, delegatesByRound);
