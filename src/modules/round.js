@@ -235,7 +235,7 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
         previousBlock: previousBlock
       });
     }
-    cb && cb(err);
+    setImmediate(cb, err);
   });
 }
 
@@ -273,7 +273,7 @@ Round.prototype.tick = function (block, cb) {
               if (err) {
                 return next(err);
               }
-
+              // console.log("MisssssssssssssssssssssssssssssBlock",missedDelegates);
               async.eachSeries(missedDelegates, (generator, cb) => {
                 modules.accounts.mergeAccountAndGet({
                   publicKey: generator,
@@ -533,7 +533,7 @@ Round.prototype.tick = function (block, cb) {
       });
     }
 
-    cb && setImmediate(cb, err);
+    setImmediate(cb, err);
   });
 }
 
@@ -549,7 +549,7 @@ Round.prototype.roundrewardsRecovery = function (cb) {
 
 Round.prototype.getRoundUsedDelegates = function (height) {
   let round = self.calc(height);
-  return __private.delegatesByRound[round];
+  return __private.delegatesByRound[round] || [];
 }
 
 Round.prototype.sandboxApi = function (call, args, cb) {

@@ -105,8 +105,14 @@ module.exports = {
             secondSecret: {
                 type: 'string',
                 minLength: 1
+            },
+            delegates: {
+                type: 'array',
+                minLength: 1,
+                uniqueItems: true
             }
-        }
+        },
+        required: ['secret','delegates']
     },
 
     getAccount: {

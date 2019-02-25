@@ -712,9 +712,8 @@ __private.loop = function (cb) {
       library.logger.trace('Loop:', 'skipping slot');
       return setImmediate(cb);
     }
-
     library.sequence.add(function generateBlock (cb) {
-      if (slots.getSlotNumber(currentBlockData.time) == slots.getSlotNumber() && lastBlock.timestamp < currentBlockData.time) {
+      if (slots.getSlotNumber(currentBlockData.time) == slots.getSlotNumber() && modules.blocks.getLastBlock().timestamp < currentBlockData.time) {
         modules.blocks.generateBlock(currentBlockData.keypair, currentBlockData.time, cb);
       } else {
         // library.logger.log('Loop', 'exit: ' + _activeDelegates[slots.getSlotNumber() % slots.delegates] + ' delegate slot');
@@ -778,11 +777,10 @@ __private.getConsensusDelegate = function (height, slot, cb) {
       var currentSlot = slot;
       var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
 
-      // let delegatesByRound = modules.round.getRoundUsedDelegates(height);
-      // if(delegatesByRound && delegatesByRound.length > 0){
-      //   // console.log("RRRRRRRRRRRRRRRRRRRRRRRRRRRRoundDelegate:",delegatesByRound)
-      //   index = __private.getNoCheatIndex(index,activeDelegates, delegatesByRound);
-      // }
+      let delegatesByRound = modules.round.getRoundUsedDelegates(height);
+      if(delegatesByRound && delegatesByRound.length > 0){
+        index = __private.getNoCheatIndex(index,activeDelegates, delegatesByRound);
+      }
       
       let delegateKey = activeDelegates[index];
       cb(null, {
@@ -800,10 +798,10 @@ __private.getNoCheatIndex = function (index, activeDelegates, delegatesByRound) 
     return temp === delegateKey;
   });
 
-  if (countProduced.length <= 3) {
+  if (countProduced.length < 2) {
     return index;
   } else {
-    __private.getNoCheatIndex((index + 1) % activeDelegates.length, activeDelegates, delegatesByRound);
+    return __private.getNoCheatIndex((index + 1) % activeDelegates.length, activeDelegates, delegatesByRound);
   }
 }
 
@@ -878,21 +876,9 @@ Delegates.prototype.validateProposeSlot = function (propose, cb) {
       return cb();
     }
 
-    library.logger.debug(
-      "Failed to validate propose slot -- ", 
-      index, 
-      delegateKey, 
-      propose.generatorPublicKey, 
-      propose.height,
-      lastBlockId, 
-      currentSlot, 
-      activeDelegates
-    );
-    
     cb("Failed to validate propose slot");
   });
 }
-
 //get Delegate index
 Delegates.prototype.getDelegateIndex = function (propose ,cb) {
   let slot = slots.getSlotNumber(propose.timestamp);
