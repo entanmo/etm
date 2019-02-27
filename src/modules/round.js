@@ -429,7 +429,7 @@ Round.prototype.tick = function (block, cb) {
               "vote": -1,
               "publicKey": 1
             }
-          }, ["publicKey", "address"], function (err, delegates) {
+          }, function (err, delegates) {
             if (err) {
               return cb(err);
             }
@@ -459,8 +459,9 @@ Round.prototype.tick = function (block, cb) {
                   let producedblocks = delegate.producedblocks ? delegate.producedblocks : 0;
                   let missedblocks = delegate.missedblocks ? delegate.missedblocks : 0;
                   let v = __private.calcProductivity(producedblocks, producedblocks + missedblocks, producedAvg); //生产率
-
                   let votes = Math.floor(Math.pow(totalVotes, 3 / 4) * v);
+                  
+                  console.log("VVVVVVVVVVVVVVVVVVVVVVVVVVVVVotes",producedblocks , missedblocks,producedAvg,v,totalVotes,votes);
                   library.dbLite.query('update mem_accounts set vote = $vote where address = $address', {
                     address: delegate.address,
                     vote: votes
