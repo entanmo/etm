@@ -127,7 +127,7 @@ __private.listLockVotes = function (query, cb) {
             }
 
             if (rows.length <= 0) {
-                return cb(null, { trs: [], count: 0});
+                return cb(null, { trs: [], count: 0 });
             }
 
             let trs = [];
@@ -189,7 +189,7 @@ LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
         return cb(new Error("Invalid rate"));
     }
 
-    __private.listLockVotes({address: address, state: 1}, (err, result) => {
+    __private.listLockVotes({ address: address, state: 1 }, (err, result) => {
         if (err) {
             return cb(err);
         }
@@ -210,7 +210,7 @@ LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
 
             const deltaHeight = Math.ceil((blockHeight - currentHeight) * rate);
             const newHeight = currentHeight + deltaHeight;
-            library.dbLite.query("UPDATE lock_votes SET currentHeight=$currentHeight where transactionId = $transactionId and state = 1",{
+            library.dbLite.query("UPDATE lock_votes SET currentHeight=$currentHeight where transactionId = $transactionId and state = 1", {
                 currentHeight: newHeight,
                 transactionId: value.id
             }, cb);
@@ -221,13 +221,13 @@ LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
 }
 
 LockVote.prototype.refreshRoundLockVotes = function (address, blockHeight, cb) {
-    __private.listLockVotes({address: address, state: 1}, (err, result) => {
+    __private.listLockVotes({ address: address, state: 1 }, (err, result) => {
         if (err) {
             return cb(err);
         }
 
         if (result.count <= 0) {
-            return cb();
+            return cb(null, 0);
         }
 
         let totalVotes = 0;
@@ -237,7 +237,7 @@ LockVote.prototype.refreshRoundLockVotes = function (address, blockHeight, cb) {
 
         async.eachSeries(result.trs, (value, cb) => {
             const numOfVote = __private.calcNumOfVotes(value.asset, blockHeight);
-            library.dbLite.query("UPDATE lock_votes SET vote=$vote where transactionId = $transactionId and state = 1",{
+            library.dbLite.query("UPDATE lock_votes SET vote=$vote where transactionId = $transactionId and state = 1", {
                 vote: numOfVote,
                 transactionId: value.id
             }, err => {
@@ -256,20 +256,20 @@ LockVote.prototype.refreshRoundLockVotes = function (address, blockHeight, cb) {
             if (err) {
                 return cb(err);
             }
-            
+
             return cb(null, totalVotes);
         });
     });
 }
 
 LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
-    __private.listLockVotes({address: address, state: 1}, (err, result) => {
+    __private.listLockVotes({ address: address, state: 1 }, (err, result) => {
         if (err) {
             return cb(err);
         }
 
         if (result.count <= 0) {
-            return cb();
+            return cb(null, 0);
         }
 
         let totalVotes = 0;

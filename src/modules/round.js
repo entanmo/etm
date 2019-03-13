@@ -355,9 +355,13 @@ Round.prototype.tick = function (block, cb) {
         },
         function (cb) { // 投票者分红
           const bonusByRound = __private.bonusByRound[round] || [];
-          __private.voterBonus.commitBonus(round, bonusByRound, block)
+          let bonusByRoundAmount = 0;
+          bonusByRound.forEach(el => {
+            bonusByRoundAmount += el;
+          });
+          __private.voterBonus.commitBonus(round, bonusByRoundAmount, block)
             .then(result => {
-              void(result);
+              void (result);
               cb();
             })
             .catch(error => {
@@ -506,7 +510,7 @@ Round.prototype.tick = function (block, cb) {
         function (cb) { // 清除分红计算缓存
           __private.voterBonus.beginBonus(nextRound, block)
             .then(result => {
-              void(result);
+              void (result);
               cb();
             })
             .catch(error => {
@@ -571,15 +575,15 @@ Round.prototype.onBlockchainReady = function () {
   library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / " + slots.roundBlocks + " as integer) + (case when b.height % " + slots.roundBlocks + " > 0 then 1 else 0 end))) = $round", {
     round: round
   }, {
-    fees: Number,
-    rewards: Array,
-    delegates: Array
-  }, function (err, rows) {
-    __private.feesByRound[round] = rows[0].fees;
-    __private.rewardsByRound[round] = rows[0].rewards;
-    __private.delegatesByRound[round] = rows[0].delegates;
-    __private.loaded = true;
-  });
+      fees: Number,
+      rewards: Array,
+      delegates: Array
+    }, function (err, rows) {
+      __private.feesByRound[round] = rows[0].fees;
+      __private.rewardsByRound[round] = rows[0].rewards;
+      __private.delegatesByRound[round] = rows[0].delegates;
+      __private.loaded = true;
+    });
 }
 
 Round.prototype.onFinishRound = function (round) {

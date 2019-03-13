@@ -62,7 +62,7 @@ class VoterBonus {
 
     async _getVoterVote(address) {
         const results = await this._asyncListLockVote({
-            address, 
+            address,
             state: 1
         });
         let totalVotes = 0;
@@ -76,7 +76,7 @@ class VoterBonus {
         return new Promise((resolve, reject) => {
             // console.log("++++++++++++++++++++++ saveToDB:", JSON.stringify(value, null, 2));
             const base64Voters = Buffer.from(value.voters, "utf8").toString("base64");
-            library.dbLite.query("INSERT INTO mem_roundrewards(round, isTop, delegatePublicKey, voters)"+
+            library.dbLite.query("INSERT INTO mem_roundrewards(round, isTop, delegatePublicKey, voters)" +
                 "VALUES($round, $isTop, $delegatePublicKey, $voters);", {
                     round: value.round,
                     delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
@@ -94,19 +94,19 @@ class VoterBonus {
 
     async _readFromDB() {
         return new Promise((resolve, reject) => {
-            library.dbLite.query("SELECT round, isTop, delegatePublicKey, voters FROM mem_roundrewards;", 
+            library.dbLite.query("SELECT round, isTop, delegatePublicKey, voters FROM mem_roundrewards;",
                 {},
                 [
                     "round", "isTop", "delegatePublicKey", "voters"
                 ],
                 (err, rows) => {
-                if (err) {
-                    return reject(err);
-                }
+                    if (err) {
+                        return reject(err);
+                    }
 
-                // console.log("-----------------------------:", rows);
-                return resolve(rows);
-            });
+                    // console.log("-----------------------------:", rows);
+                    return resolve(rows);
+                });
         });
     }
 
@@ -119,7 +119,7 @@ class VoterBonus {
 
                 return resolve();
             });
-        });        
+        });
     }
 
     async _getDelegateVotersVotes(publicKey) {
@@ -135,7 +135,7 @@ class VoterBonus {
     }
 
     async _bonusAction(address, amount, block) {
-        return new Promise((resolve, reject) => { 
+        return new Promise((resolve, reject) => {
             modules.accounts.mergeAccountAndGet({
                 address,
                 balance: amount,
@@ -183,7 +183,7 @@ class VoterBonus {
                 isTop = true;
             }
             cache.push({
-                round: round, 
+                round: round,
                 delegatePublicKey: el,
                 isTop,
                 voters: JSON.stringify(allDelegateVoters[el])
@@ -207,7 +207,7 @@ class VoterBonus {
         const allVotersBonusAmount = Math.floor(bonusAmount / 4);
         const roundVotersBonusAmount = Math.floor(bonusAmount / 4);
         const chaosVoterBonusAmount = bonusAmount - allVotersBonusAmount - roundVotersBonusAmount;
-        const {allDelegateVoters, delegates} = this.roundCaches[round];
+        const { allDelegateVoters, delegates } = this.roundCaches[round];
         this.roundCaches[round].bonusAmount = bonusAmount;
         this.roundCaches[round].block = block;
         // console.log("commit bonus:", JSON.stringify(this.roundCaches[round], null, 2));
@@ -267,6 +267,18 @@ class VoterBonus {
         // chaos voter
         const hash = crypto.createHash("sha256").update(block.id).digest("hex");
         const chaosIndex = chaos(hash, block.height, roundDelegateVoters.length);
+        // FIXEDME: 保证不同版本，不同实现下的数据顺序一致
+        roundDelegateVoters.sort((a, b) => {
+            if (a > b) {
+                return 1;
+            }
+            if (a < b) {
+                return -1;
+            }
+
+            return 0;
+        });
+
         await this._bonusAction(roundDelegateVoters[chaosIndex], chaosVoterBonusAmount, block);
         await this._freshDB();
     }
