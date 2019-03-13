@@ -776,7 +776,7 @@ __private.getConsensusDelegate = function (height, slot, cb) {
       var lastBlockId = res.block.id;
       var currentSlot = slot;
       var index = __private._getDelegeteIndex(lastBlockId, currentSlot, activeDelegates.length);
-
+      var index2 = index;
       let delegatesByRound = modules.round.getRoundUsedDelegates(height);
       if(delegatesByRound && delegatesByRound.length > 0){
         index = __private.getNoCheatIndex(index,activeDelegates, delegatesByRound);
@@ -785,7 +785,9 @@ __private.getConsensusDelegate = function (height, slot, cb) {
       let delegateKey = activeDelegates[index];
       cb(null, {
         index,
-        delegateKey
+        index2,
+        delegateKey,
+        activeDelegates
       });
     });
   });
@@ -1161,6 +1163,7 @@ Delegates.prototype.validateBlockSlot = function (block, cb) {
     if (delegateKey && block.generatorPublicKey == delegateKey) {
       return cb();
     }
+    console.log("##############################################",block,selectDelegate);
     cb("Failed to verify slot, expected delegate: " + delegateKey);
   });
 }

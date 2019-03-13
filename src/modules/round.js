@@ -393,10 +393,30 @@ Round.prototype.tick = function (block, cb) {
                 if (err) {
                   return cb(err);
                 }
+
                 //清除此注销受托人对应的投票人
-                library.dbLite.query("DELETE FROM mem_accounts2delegates WHERE dependentId = $dependentId", {
-                  dependentId: delegate.publicKey.toString("hex")
-                }, cb);
+                library.dbLite.query("select * from mem_accounts2delegates where dependentId = $dependentId", {
+                  dependentId: delegate.publicKey
+                }, (err, data) => {
+                  if (err) {
+                    return cb(err);
+                  }
+
+                  let accounts = data;
+                  for (let i = 0; i < accounts.length; i++) {
+                    if (accounts[i].accountId && library.base.account.cache.has(accounts[i].accountId)) {
+                      // console.log("del" + 'address---' + accounts[i].accountId)
+                      library.base.account.cache.del(accounts[i].accountId);
+                    }
+                  }
+
+                  library.dbLite.query("delete from mem_accounts2delegates where dependentId = $dependentId", {
+                    dependentId: delegate.publicKey
+                  }, (err, data) => {
+                    // console.log(err,"mem_accounts2delegates======"+JSON.stringify(data))
+                    cb(err);
+                  });
+                });
               });
             }, function (err) {
               cb(err);
@@ -433,7 +453,7 @@ Round.prototype.tick = function (block, cb) {
               "vote": -1,
               "publicKey": 1
             }
-          }, ["publicKey", "address"], function (err, delegates) {
+          }, function (err, delegates) {
             if (err) {
               return cb(err);
             }
@@ -463,8 +483,9 @@ Round.prototype.tick = function (block, cb) {
                   let producedblocks = delegate.producedblocks ? delegate.producedblocks : 0;
                   let missedblocks = delegate.missedblocks ? delegate.missedblocks : 0;
                   let v = __private.calcProductivity(producedblocks, producedblocks + missedblocks, producedAvg); //生产率
-
                   let votes = Math.floor(Math.pow(totalVotes, 3 / 4) * v);
+                  
+                  console.log("VVVVVVVVVVVVVVVVVVVVVVVVVVVVVotes",producedblocks , missedblocks,producedAvg,v,totalVotes,votes);
                   library.dbLite.query('update mem_accounts set vote = $vote where address = $address', {
                     address: delegate.address,
                     vote: votes
