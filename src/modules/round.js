@@ -484,8 +484,8 @@ Round.prototype.tick = function (block, cb) {
                   let missedblocks = delegate.missedblocks ? delegate.missedblocks : 0;
                   let v = __private.calcProductivity(producedblocks, producedblocks + missedblocks, producedAvg); //生产率
                   let votes = Math.floor(Math.pow(totalVotes, 3 / 4) * v);
-                  
-                  console.log("VVVVVVVVVVVVVVVVVVVVVVVVVVVVVotes",producedblocks , missedblocks,producedAvg,v,totalVotes,votes);
+
+                  console.log("VVVVVVVVVVVVVVVVVVVVVVVVVVVVVotes", producedblocks, missedblocks, producedAvg, v, totalVotes, votes);
                   library.dbLite.query('update mem_accounts set vote = $vote where address = $address', {
                     address: delegate.address,
                     vote: votes
@@ -592,7 +592,9 @@ Round.prototype.onBlockchainReady = function () {
     console.log("delegateByRound:", JSON.stringify(__private.delegatesByRound));
   }, 4000);
   */
-  var round = self.calc(modules.blocks.getLastBlock().height);
+  const lastHeight = modules.blocks.getLastBlock().height;
+  var round = self.calc(lastHeight);
+  const startHeightByRound = round * slots.roundBlocks + 1;
   library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / " + slots.roundBlocks + " as integer) + (case when b.height % " + slots.roundBlocks + " > 0 then 1 else 0 end))) = $round", {
     round: round
   }, {
@@ -603,6 +605,15 @@ Round.prototype.onBlockchainReady = function () {
       __private.feesByRound[round] = rows[0].fees;
       __private.rewardsByRound[round] = rows[0].rewards;
       __private.delegatesByRound[round] = rows[0].delegates;
+      // recovery bonusByRound for start or restart
+      __private.bonusByRound[round] = [];
+      for (let i = startHeightByRound; i <= lastHeight; i++) {
+        if (i == 1) {
+          // Ignore genesisBlock
+          continue;
+        }
+        __private.bonusByRound[round].push(__private.blockStatus.calcDelegateVotersBonus(i));
+      }
       __private.loaded = true;
     });
 }
