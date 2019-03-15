@@ -1213,7 +1213,7 @@ Delegates.prototype.getDelegates = function (query, cb) {
 
       // var outsider = i + 1 > slots.delegates;
       // delegates[i].productivity = (!outsider) ? Math.round(percent * 1e2) / 1e2 : 0;
-      delegates[i].productivity = Math.round(percent * 1e2) / 1e2 : 0;
+      delegates[i].productivity = Math.round(percent * 1e2) / 1e2;
       
       delegates[i].forged = bignum(delegates[i].fees).plus(bignum(delegates[i].rewards)).toString();
     }
