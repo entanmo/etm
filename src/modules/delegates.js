@@ -1211,8 +1211,9 @@ Delegates.prototype.getDelegates = function (query, cb) {
       var percent = 100 - (delegates[i].missedblocks / ((delegates[i].producedblocks + delegates[i].missedblocks) / 100));
       percent = Math.abs(percent) || 0;
 
-      var outsider = i + 1 > slots.delegates;
-      delegates[i].productivity = (!outsider) ? Math.round(percent * 1e2) / 1e2 : 0;
+      // var outsider = i + 1 > slots.delegates;
+      // delegates[i].productivity = (!outsider) ? Math.round(percent * 1e2) / 1e2 : 0;
+      delegates[i].productivity = Math.round(percent * 1e2) / 1e2 : 0;
       
       delegates[i].forged = bignum(delegates[i].fees).plus(bignum(delegates[i].rewards)).toString();
     }
@@ -1303,8 +1304,9 @@ Delegates.prototype.getDelegateVoters = function (publicKey,cb) {
         }
         
         rows.forEach((row, index) => {
+          totalVotes = 0;
           if(totalVotes === 0){
-            row.weight = 100;
+            row.weight = 100/rows.length;
           }
           else{
             row.weight = votes[index] / totalVotes * 100;
