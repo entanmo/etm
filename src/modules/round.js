@@ -551,11 +551,12 @@ Round.prototype.tick = function (block, cb) {
     if (err) {
       library.logger.error("Round tick failed: " + err);
     } else {
-      let blocklog = Object.assign({}, block); //let blocklog = JSON.parse(JSON.stringify(obj1));
-      delete blocklog.transactions
+      let blockBaseInfo = Object.assign({}, block); //let blocklog = JSON.parse(JSON.stringify(obj1));
+      delete blockBaseInfo.transactions
       library.logger.debug("Round tick completed", {
-        block: blocklog
+        block: blockBaseInfo
       });
+      //modules.system.backup(blockBaseInfo)
     }
 
     setImmediate(cb, err);

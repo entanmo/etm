@@ -23,6 +23,8 @@ var slots = require('../utils/slots.js');
 var scheme = require('../scheme/loader');
 const reportor = require("../utils/kafka-reportor");
 const shell = require("shelljs");
+var os = require("os");
+var path = require('path');
 require('colors');
 
 // Private fields
@@ -43,8 +45,9 @@ function Loader(cb, scope) {
   __private.genesisBlock = __private.loadingLastBlock = library.genesisblock;
   self = this;
   self.__private = __private;
+  __private.dbPath = path.join(global.Config.baseDir, global.Config.dbName);
+  __private.backupPath =path.join(global.Config.dataDir, global.Config.dbName);
   __private.attachApi();
-
   setImmediate(cb, null, self);
 }
 
@@ -486,20 +489,10 @@ __private.loadBlockChain = function (cb) {
                       library.logger.error(err || "Encountered missing block, looks like node went down during block processing");
                       library.logger.info("Failed to verify db integrity 2");
 
-                      modules.system.backupDb(function(isbackup){
+                      modules.system.recovery(function(isbackup){
                         if(isbackup){
-                          shell.exec('rm -f '+'data/'+library.config.dbName ,
-                          function(code, stdout, stderr) {
-                          // __private.isBackUp = false;
-                           console.log('backupDb remove old db code:', code);
-                           console.log('backupDb  remove old db Program stderr:', stderr);
-                          if(code == 0){
-                            loadDelegates(count,cb);
-                          }else{
-                            library.logger.error('Failed to load blockchain', err)
-                            return process.exit(1)
-                          }
-                        });
+                          library.logger.info("recoveryed ok ");
+                          return process.exit(1);
                         }else{
                           loadDelegates(count,cb);
                         }
@@ -545,13 +538,11 @@ Loader.prototype.startSyncBlocks = function () {
       library.logger.debug('startSyncBlocks end')
       cb()
     });
-  // }, function (err) {
-  //   err && library.logger.error('loadBlocks timer:', err);
-  //   __private.syncTrigger(false);
-  //   __private.blocksToSync = 0;
-
-  //   __private.isActive = false;
-  //   library.logger.debug('startSyncBlocks end');
+  }, function (err) {
+    err && library.logger.error('loadBlocks timeout:', err);
+    __private.syncing = false
+    __private.blocksToSync = 0
+    library.logger.debug('startSyncBlocks squence timeout end');
    });
 }
 

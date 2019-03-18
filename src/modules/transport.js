@@ -983,7 +983,7 @@ Transport.prototype.onUnconfirmedTransaction = function (transaction, broadcast)
       self.broadcast("transactions", packageBatchTrsForBoardcast(__private.boardcastTrs));
       __private.boardcastTrs = [];
     }
-   // self.broadcast('transaction', message)
+    //self.broadcast('transaction', message)
     library.network.io.sockets.emit('transactions/change', {});
   }
 }
@@ -1037,8 +1037,14 @@ Transport.prototype.sendVotes = function (votes, address) {
     host: parts[0],
     port: parseInt(parts[1])+1,
   }
-  modules.peer.listPeers( function (err, peers) {
-    if (!err) {
+   modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
+          if (err) {
+            library.logger.error('send votes error', err)
+            self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+          }
+        })
+  // modules.peer.listPeers( function (err, peers) {
+  //   if (!err) {
       // const nodesMap = new Map()
       // peers.forEach((n) => {
       //   const a = `${n.host}:${n.port}`
@@ -1049,17 +1055,17 @@ Transport.prototype.sendVotes = function (votes, address) {
       // const b = `${contact.host}:${contact.port}`
      // console.log("nodesMap.has(b) == "+nodesMap.has(b))
       // if(nodesMap.has(b)){
-        modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
-          if (err) {
-            library.logger.error('send votes error', err)
-            self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
-          }
-        })
+        // modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
+        //   if (err) {
+        //     library.logger.error('send votes error', err)
+        //     self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+        //   }
+        // })
       // }else{
       //   self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
       // }
-    } 
-  });
+  //   } 
+  // });
 }
 
 Transport.prototype.onMessage = function (msg, broadcast) {
