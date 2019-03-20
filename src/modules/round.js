@@ -595,7 +595,7 @@ Round.prototype.onBlockchainReady = function () {
   */
   const lastHeight = modules.blocks.getLastBlock().height;
   var round = self.calc(lastHeight);
-  const startHeightByRound = round * slots.roundBlocks + 1;
+  const startHeightByRound = (round - 1) * slots.roundBlocks + 1;
   library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / " + slots.roundBlocks + " as integer) + (case when b.height % " + slots.roundBlocks + " > 0 then 1 else 0 end))) = $round", {
     round: round
   }, {
