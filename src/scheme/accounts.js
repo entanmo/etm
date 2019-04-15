@@ -13,6 +13,7 @@
  */
 
 'use strict';
+var slots = require('../utils/slots.js');
 
 module.exports = {
     open: {
@@ -104,8 +105,14 @@ module.exports = {
             secondSecret: {
                 type: 'string',
                 minLength: 1
+            },
+            delegates: {
+                type: 'array',
+                minLength: 1,
+                uniqueItems: true
             }
-        }
+        },
+        required: ['secret','delegates']
     },
 
     getAccount: {
@@ -127,7 +134,7 @@ module.exports = {
             votes: {
             type: 'array',
             minLength: 1,
-            maxLength: 101,
+            maxLength: slots.delegates,
             uniqueItems: true
             }
         },

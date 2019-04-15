@@ -54,8 +54,8 @@ function Vote() {
       return setImmediate(cb, "No votes sent");
     }
 
-    if (trs.asset.vote.votes && trs.asset.vote.votes.length > 33) {
-      return setImmediate(cb, "Voting limit exceeded. Maximum is 33 votes per transaction");
+    if (trs.asset.vote.votes && trs.asset.vote.votes.length > 2) {
+      return setImmediate(cb, "Voting limit exceeded. Maximum is 1 votes per transaction");
     }
 
     modules.delegates.checkDelegates(trs.senderPublicKey, trs.asset.vote.votes, function (err) {
@@ -78,11 +78,17 @@ function Vote() {
   }
 
   this.apply = function (trs, block, sender, cb) {
-    library.base.account.merge(sender.address, {
-      delegates: trs.asset.vote.votes,
-      blockId: block.id,
-      round: modules.round.calc(block.height)
-    }, cb);
+    modules.delegates.updateDelegateVotes(trs.senderPublicKey, trs.asset.vote.votes, function (err) {
+      if(err){
+        return cb(err);
+      }
+
+      library.base.account.merge(sender.address, {
+        delegates: trs.asset.vote.votes,
+        blockId: block.id,
+        round: modules.round.calc(block.height)
+      }, cb);
+    });
   }
 
   this.undo = function (trs, block, sender, cb) {
@@ -124,7 +130,7 @@ function Vote() {
         votes: {
           type: "array",
           minLength: 1,
-          maxLength: 101,
+          maxLength: slots.delegetes,
           uniqueItems: true
         }
       },
@@ -202,7 +208,9 @@ __private.attachApi = function () {
     "get /delegates/fee": "getDelegatesFee",
     "put /delegates": "addDelegates",
     "get /": "getAccount",
-    "get /new": "newAccount"
+    "get /new": "newAccount",
+    "get /effectivity": "accountOnBlockchain",
+    "get /delayOrders": "listDelayTransfer"
   });
 
   if (process.env.DEBUG && process.env.DEBUG.toUpperCase() == "TRUE") {
@@ -278,7 +286,7 @@ __private.attachApi = function () {
 __private.openAccount = function (secret, cb) {
   var hash = crypto.createHash('sha256').update(secret, 'utf8').digest();
   var keypair = ed.MakeKeypair(hash);
-  publicKey = keypair.publicKey.toString('hex')
+  var publicKey = keypair.publicKey.toString('hex')
   var address = self.generateAddressByPublicKey2(publicKey);
   self.getAccount({ address: address }, function (err, account) {
     if (err) return cb(err)
@@ -318,27 +326,28 @@ __private.openAccount2 = function (publicKey, cb) {
 
 // Public methods
 Accounts.prototype.generateAddressByPublicKey = function (publicKey) {
-  var publicKeyHash = crypto.createHash('sha256').update(publicKey, 'hex').digest();
-  var temp = new Buffer(8);
-  for (var i = 0; i < 8; i++) {
-    temp[i] = publicKeyHash[7 - i];
-  }
+  // var publicKeyHash = crypto.createHash('sha256').update(publicKey, 'hex').digest();
+  // var temp = new Buffer(8);
+  // for (var i = 0; i < 8; i++) {
+  //   temp[i] = publicKeyHash[7 - i];
+  // }
 
-  var address = bignum.fromBuffer(temp).toString();
-  if (!address) {
-    throw Error("wrong publicKey " + publicKey);
-  }
-  return address;
+  // var address = bignum.fromBuffer(temp).toString();
+  // if (!address) {
+  //   throw Error("wrong publicKey " + publicKey);
+  // }
+  // return address;
+  return addressHelper.generateBase58CheckAddress(publicKey)
 }
 
 Accounts.prototype.generateAddressByPublicKey2 = function (publicKey) {
   if (!global.featureSwitch.enableUIA) {
     return self.generateAddressByPublicKey(publicKey)
   }
-  var oldAddress = self.generateAddressByPublicKey(publicKey)
-  if (library.balanceCache.getNativeBalance(oldAddress)) {
-    return oldAddress
-  }
+  // var oldAddress = self.generateAddressByPublicKey(publicKey)
+  // if (library.balanceCache.getNativeBalance(oldAddress)) {
+  //   return oldAddress
+  // }
   return addressHelper.generateBase58CheckAddress(publicKey)
 }
 
@@ -379,7 +388,7 @@ Accounts.prototype.getAccounts = function (filter, fields, cb) {
 }
 
 Accounts.prototype.setAccountAndGet = function (data, cb) {
-  library.logger.debug('setAccountAndGet data is:',data)
+  //library.logger.debug('setAccountAndGet data is:',JSON.stringify(data))
   var address = data.address || null;
   if (address === null) {
     if (data.publicKey) {
@@ -400,11 +409,75 @@ Accounts.prototype.setAccountAndGet = function (data, cb) {
     if (err) {
       return cb(err);
     }
-    library.base.account.get({ address: address }, cb);
+     library.base.account.get({ address: address }, cb);
   });
 }
-
+Accounts.prototype.loadSenderOrUpdate = function (param, cb) {
+  if(!param.publicKey ){
+    return cb("Failed to loadSenderOrUpdate ,there is no publickey")
+   }
+  modules.accounts.loadAccount(param,function(err,data){
+    if(err){
+      cb(err)
+    }else{
+      if(data){
+        if(data.publicKey ){
+        // console.log(JSON.stringify(data.address))
+        cb(err,data)
+        }else{
+          data["publicKey"] = param.publicKey
+          library.base.account.set(data.address, { publicKey: param.publicKey }, function (err) {
+            if (err) {
+              return  setImmediate(cb, "Failed to set account publickey: " + err);
+            }
+            cb(err,data)
+          });
+        }
+      }else{
+        cb("loadAccount : can not found Account",data)
+      }
+    }
+    }
+ )
+}
+Accounts.prototype.loadOrCreate = function (param, cb) {
+  if(!param.address ){
+    return cb("Failed to loadOrCreate ,there is no address")
+   }
+  modules.accounts.loadAccount(param,function(err,data){
+    if(err){
+      cb(err)
+    }else{
+      if(data){
+        cb(null,data)
+      }else{
+        library.base.account.create(param.address,param,cb);
+      }
+    }
+    }
+ )
+}
+Accounts.prototype.loadAccount = function (data, cb) {
+  var address = data.address || null;
+  if (address === null) {
+    if (data.publicKey) {
+      address = self.generateAddressByPublicKey(data.publicKey);
+      if (!data.isGenesis && !library.balanceCache.getNativeBalance(address)) {
+        address = addressHelper.generateBase58CheckAddress(data.publicKey);
+      }
+      delete data.isGenesis;
+    } else {
+      library.logger.debug('LoadAccount error and data is:',data)
+      return cb("Missing address or public key in LoadAccount");
+    }
+  }
+  if (!address) {
+    return cb("Invalid public key");
+  }
+  library.base.account.get({ address: address }, cb);
+}
 Accounts.prototype.mergeAccountAndGet = function (data, cb) {
+  //console.log("mergeAccountAndGet obj : ----"+JSON.stringify(data))
   var address = data.address || null;
   if (address === null) {
     if (data.publicKey) {
@@ -422,7 +495,10 @@ Accounts.prototype.mergeAccountAndGet = function (data, cb) {
 Accounts.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);
 }
-
+Accounts.prototype.cleanup = function (cb) {
+  library.base.account.cache.reset();
+  cb();
+}
 // Events
 Accounts.prototype.onBind = function (scope) {
   modules = scope;
@@ -561,8 +637,8 @@ shared.getBalance = function (req, cb) {
       }
       var balance = account ? account.balance : 0;
       var unconfirmedBalance = account ? account.u_balance : 0;
-
-      cb(null, { balance: balance, unconfirmedBalance: unconfirmedBalance });
+      const totalAmount = library.delayTransferMgr.totalAmount(query.address);
+      cb(null, { balance: balance, unconfirmedBalance: unconfirmedBalance, delayAmount: totalAmount });
     });
   });
 }
@@ -648,19 +724,19 @@ shared.getDelegates = function (req, cb) {
       }
       if (account.delegates) {
         self.getAccounts({
-          isDelegate: 1,
+          isDelegate: { $gt: 0 },
           sort: { "vote": -1, "publicKey": 1 }
         }, ["username", "address", "publicKey", "vote", "missedblocks", "producedblocks"], function (err, delegates) {
           if (err) {
             return cb(err.toString());
           }
 
-          var limit = query.limit || 101;
+          var limit = query.limit || slots.delegates;
           var offset = query.offset || 0;
           var orderField = query.orderBy;
 
           orderField = orderField ? orderField.split(':') : null;
-          limit = limit > 101 ? 101 : limit;
+          limit = limit > slots.delegates ? slots.delegates : limit;
 
           var orderBy = orderField ? orderField[0] : null;
           var sortMode = orderField && orderField.length == 2 ? orderField[1] : 'asc';
@@ -696,7 +772,7 @@ shared.getDelegates = function (req, cb) {
 
 shared.getDelegatesFee = function (req, cb) {
   var query = req.body;
-  cb(null, { fee: 1 * constants.fixedPoint });
+  cb(null, { fee: 0.1 * constants.fixedPoint });
 }
 
 shared.addDelegates = function (req, cb) {
@@ -864,8 +940,14 @@ shared.getAccount = function (req, cb) {
           secondPublicKey: '',
           multisignatures: '',
           u_multisignatures: '',
-          lockHeight: 0
+          lockHeight: 0,
+          effectivity: false,
+          delayAmount: library.delayTransferMgr.totalAmount(query.address)
         }
+      } else {
+        const delayAmount = library.delayTransferMgr.totalAmount(query.address);
+        account.effectivity = true;
+        account.delayAmount = delayAmount;
       }
 
       var latestBlock = modules.blocks.getLastBlock();
@@ -880,7 +962,9 @@ shared.getAccount = function (req, cb) {
           secondPublicKey: account.secondPublicKey,
           multisignatures: account.multisignatures,
           u_multisignatures: account.u_multisignatures,
-          lockHeight: account.lockHeight
+          lockHeight: account.lockHeight,
+          effectivity: account.effectivity,
+          delayAmount: account.delayAmount
         },
         latestBlock: {
           height: latestBlock.height,
@@ -889,6 +973,74 @@ shared.getAccount = function (req, cb) {
         version: modules.peer.getVersion()
       });
     });
+  });
+}
+
+shared.accountOnBlockchain = function (req, cb) {
+  var query = req.body;
+  library.scheme.validate(query, {
+    type: "object",
+    properties: {
+      address: {
+        type: "string",
+        minLength: 1
+      }
+    },
+    required: ["address"]
+  }, function (err) {
+    if (err) {
+      return cb(err[0].message);
+    }
+    self.getAccount({ address: query.address }, function (err, account) {
+      if (err) {
+        return cb(err.toString());
+      }
+
+      return cb(null, {
+        effectivity: !!account
+      });
+    });
+  });
+}
+
+shared.listDelayTransfer = function (req, cb) {
+  const query = req.body;
+  library.scheme.validate(query, {
+    type: "object",
+    properties: {
+      mode: {
+        type: "integer"
+      },
+      address: {
+        type: "string",
+        minLength: 1
+      }
+    },
+    required: ["mode", "address"]
+  }, err => {
+    if (err) {
+      return cb(err[0].message);
+    }
+
+    const { address, mode } = query;
+    if ([0, 1].indexOf(mode) === -1) {
+      return cb("mode must in [0, 1]");
+    }
+    if (!addressHelper.isAddress(address)) {
+      return cb("Invalid address");
+    }
+    const block = modules.blocks.getLastBlock();
+    if (mode == 0) {
+      // recipientId
+      const list = library.delayTransferMgr.listByRecipientId(address);
+      return cb(null, {result: list, latestHeight: block.height});
+    } else if (mode == 1) {
+      // senderId
+      const list = library.delayTransferMgr.listBySenderId(address);
+      return cb(null, {result: list, latestHeight: block.height});
+    } else {
+      return cb("Account not found.");
+    }
   });
 }
 

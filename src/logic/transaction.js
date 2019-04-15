@@ -21,6 +21,7 @@ var ed = require('../utils/ed.js');
 var bignum = require('../utils/bignumber');
 var constants = require('../utils/constants.js');
 var slots = require('../utils/slots.js');
+const TransactionTypes = require("../utils/transaction-types");
 
 var genesisblock = null;
 
@@ -36,7 +37,7 @@ var __private = {};
 __private.types = {};
 
 function calc(height) {
-  return Math.floor(height / slots.delegates) + (height % slots.delegates > 0 ? 1 : 0);
+  return Math.floor(height / slots.roundBlocks) + (height % slots.roundBlocks > 0 ? 1 : 0);
 }
 
 // Public methods
@@ -53,7 +54,7 @@ Transaction.prototype.create = function (data) {
     throw Error("Can't find keypair");
   }
 
-  library.logger.debug('=============transaction.create', data.sender)
+ // library.logger.debug('=============transaction.create', data.sender)
   var trs = {
     type: data.type,
     amount: 0,
@@ -300,7 +301,7 @@ Transaction.prototype.verify = function (trs, sender, requester, cb) { //inherit
 
   if (global.featureSwitch.enableMoreLockTypes) {
     var lastBlock = modules.blocks.getLastBlock()
-    var isLockedType = ([0, 6, 7, 8, 9, 10, 13, 14].indexOf(trs.type) !== -1)
+    var isLockedType = ([0, 6, 7, 8, 9, 10, 13, 14, 101, 102].indexOf(trs.type) !== -1)
     if (sender.lockHeight && lastBlock && lastBlock.height + 1 <= sender.lockHeight && isLockedType) {
       return cb('Account is locked')
     }
@@ -383,7 +384,7 @@ Transaction.prototype.verify = function (trs, sender, requester, cb) { //inherit
 
   if (trs.signatures && trs.type !== 7) {
     for (var d = 0; d < trs.signatures.length; d++) {
-      verify = false;
+      var verify = false;
 
       for (var s = 0; s < multisignatures.length; s++) {
         if (trs.requesterPublicKey && multisignatures[s] == trs.requesterPublicKey) {
@@ -492,10 +493,10 @@ Transaction.prototype.apply = function (trs, block, sender, cb) {
     return setImmediate(cb, "Transaction is not ready: " + trs.id);
   }
 
-  if (trs.type === 7) return __private.types[trs.type].apply.call(this, trs, block, sender, cb);
-
+  if (trs.type === TransactionTypes.OUT_TRANSFER) return __private.types[trs.type].apply.call(this, trs, block, sender, cb);
+  
   var amount = trs.amount + trs.fee;
-
+  
   if (trs.blockId != genesisblock.block.id && sender.balance < amount) {
     return setImmediate(cb, "Insufficient balance: " + sender.balance);
   }
@@ -518,7 +519,6 @@ Transaction.prototype.undo = function (trs, block, sender, cb) {
   if (trs.type === 7) return __private.types[trs.type].undo.call(this, trs, block, sender, cb);
 
   var amount = trs.amount + trs.fee;
-
   this.scope.account.merge(sender.address, {
     balance: amount,
     blockId: block.id,
@@ -533,7 +533,7 @@ Transaction.prototype.applyUnconfirmed = function (trs, sender, requester, cb) {
   if (typeof requester === 'function') {
     cb = requester;
   }
-
+  //console.log("applyUnconfirmed:"+JSON.stringify(trs))
   if (!__private.types[trs.type]) {
     return setImmediate(cb, "Unknown transaction type " + trs.type);
   }

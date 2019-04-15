@@ -14,6 +14,7 @@
 
 'use strict';
 
+const path = require("path");
 var assert = require("assert");
 var crypto = require("crypto");
 var ByteBuffer = require("bytebuffer");
@@ -22,12 +23,18 @@ var ip = require('ip');
 var bignum = require('../utils/bignumber');
 var slots = require('../utils/slots.js');
 
+const reportor = require("../utils/kafka-reportor");
+
+const Miner = require("entanmo-miner");
+
 function Consensus(scope, cb) {
   this.scope = scope;
   this.pendingBlock = null;
   this.pendingVotes = null;
   this.votesKeySet = {};
+  this.minerInst = new Miner(path.resolve(__dirname, "../../config/miner-cfg.json"));
   cb && setImmediate(cb, null, this);
+
 }
 
 Consensus.prototype.createVotes = function (keypairs, block) {
@@ -35,6 +42,7 @@ Consensus.prototype.createVotes = function (keypairs, block) {
   var votes = {
     height: block.height,
     id: block.id,
+    timestamp:block.timestamp,
     signatures: []
   };
   keypairs.forEach(function (el) {
@@ -63,7 +71,9 @@ Consensus.prototype.getVoteHash = function (height, id) {
   if (global.featureSwitch.enableLongId) {
     bytes.writeString(id)
   } else {
-    var idBytes = bignum(id).toBuffer({ size: 8 });
+    var idBytes = bignum(id).toBuffer({
+      size: 8
+    });
     for (var i = 0; i < 8; i++) {
       bytes.writeByte(idBytes[i]);
     }
@@ -118,7 +128,8 @@ Consensus.prototype.addPendingVotes = function (votes) {
         this.pendingVotes = {
           height: votes.height,
           id: votes.id,
-          signatures: []
+          signatures: [],
+          timestamp:votes.timestamp
         };
       }
       this.pendingVotes.signatures.push(item);
@@ -127,7 +138,7 @@ Consensus.prototype.addPendingVotes = function (votes) {
   return this.pendingVotes;
 }
 
-Consensus.prototype.createPropose = function (keypair, block, address) {
+Consensus.prototype.createPropose = function (keypair, block, address, cb) {
   assert(keypair.publicKey.toString("hex") == block.generatorPublicKey);
   var propose = {
     height: block.height,
@@ -136,20 +147,90 @@ Consensus.prototype.createPropose = function (keypair, block, address) {
     generatorPublicKey: block.generatorPublicKey,
     address: address
   };
-  var hash = this.getProposeHash(propose);
-  propose.hash = hash.toString("hex");
-  propose.signature = ed.Sign(hash, keypair).toString("hex");
-  return propose;
+
+  this.pow(propose, (err, pow) => {
+    if (err) {
+      return cb(err);
+    }
+
+    propose.hash = pow.hash;
+    propose.signature = ed.Sign(Buffer.from(propose.hash, 'hex'), keypair).toString('hex');
+    propose.nonce = pow.nonce;
+
+    cb(null, propose);
+  });
 }
 
-Consensus.prototype.getProposeHash  = function (propose) {
+Consensus.prototype.pow = function (propose, cb) {
+  const self = this;
+  var hash = this.getProposeHash(propose).toString('hex');
+  this.getAddressIndex(propose, (err, target) => {
+    if (err) {
+      reportor.report("PoW", {
+        subaction: "index",
+        id: propose.id,
+        height: propose.height,
+        timestamp: propose.timestamp,
+        hash: hash,
+        error: `get target index error(${err})`
+      });
+      return cb(err);
+    }
+
+    const powUptime = reportor.uptime;
+    self.minerInst.mint({
+      src: hash,
+      difficulty: target,
+      timeout: slots.powTimeOut * 1000
+    }, (err, result) => {
+      if (err) {
+        // pow failure that error or timeout
+        reportor.report("PoW", {
+          subaction: "calc",
+          id: propose.id,
+          height: propose.height,
+          timestamp: propose.timestamp,
+          hash: hash,
+          target: target,
+          duration: reportor.uptime - powUptime,
+          error: err.message
+        });
+        global.library.logger.log(`PoW failure: ${err.message}`);
+        return cb(err.message);
+      }
+
+      // pow success
+      reportor.report("PoW", {
+        subaction: "calc",
+        id: propose.id,
+        height: propose.height,
+        timestamp: propose.timestamp,
+        hash: hash,
+        target: target,
+        pow: result.hash,
+        nonce: result.nonce,
+        duration: reportor.uptime - powUptime
+      });
+      global.library.logger.log(`PoW success: hash(${result.hash}), nonce(${result.nonce}), duration(${reportor.uptime - powUptime} milliseconds)`);
+      cb(null, {
+        hash: result.hash,
+        nonce: result.nonce
+      });
+    });
+  });
+}
+
+
+Consensus.prototype.getProposeHash = function (propose) {
   var bytes = new ByteBuffer();
   bytes.writeLong(propose.height);
 
   if (global.featureSwitch.enableLongId) {
     bytes.writeString(propose.id)
   } else {
-    var idBytes = bignum(propose.id).toBuffer({ size: 8 });
+    var idBytes = bignum(propose.id).toBuffer({
+      size: 8
+    });
     for (var i = 0; i < 8; i++) {
       bytes.writeByte(idBytes[i]);
     }
@@ -184,7 +265,7 @@ Consensus.prototype.normalizeVotes = function (votes) {
       signatures: {
         type: "array",
         minLength: 1,
-        maxLength: 101
+        maxLength: slots.delegates
       }
     },
     required: ["height", "id", "signatures"]
@@ -196,21 +277,83 @@ Consensus.prototype.normalizeVotes = function (votes) {
 }
 
 Consensus.prototype.acceptPropose = function (propose, cb) {
-  var hash = this.getProposeHash(propose);
-  if (propose.hash != hash.toString("hex")) {
-    return setImmediate(cb, "Propose hash is not correct");
-  }
-  try {
-    var signature = new Buffer(propose.signature, "hex");
-    var publicKey = new Buffer(propose.generatorPublicKey, "hex");
-    if (ed.Verify(hash, signature, publicKey)) {
-      return setImmediate(cb);
-    } else {
-      return setImmediate(cb, "Vefify signature failed");
+  this.verifyPOW(propose, (err, ok) => {
+    if (err) {
+      return setImmediate(cb, err);
     }
-  } catch (e) {
-    return setImmediate(cb, "Verify signature exception: " + e.toString());
-  }
+
+    if (!ok) {
+      return setImmediate(cb, "Verify porpose powHash failed.");
+    }
+
+    try {
+      var signature = new Buffer(propose.signature, "hex");
+      var publicKey = new Buffer(propose.generatorPublicKey, "hex");
+      if (ed.Verify(Buffer.from(propose.hash, 'hex'), signature, publicKey)) {
+        return setImmediate(cb);
+      } else {
+        return setImmediate(cb, "Vefify signature failed");
+      }
+    } catch (e) {
+      return setImmediate(cb, "Verify signature exception: " + e.toString());
+    }
+  });
+}
+
+Consensus.prototype.verifyPOW = function (propose, cb) {
+  var hash = this.getProposeHash(propose).toString('hex');
+  this.getAddressIndex(propose, (err, target) => {
+    if (err) {
+      return cb(err);
+    }
+
+    // var src = hash + propose.nonce.toString();
+    // var sha256Result = crypto.createHash('sha256').update(src).digest('hex');
+    const entanmoPoWVerifier = (hash, nonce) => {
+      const src = hash + nonce.toString();
+      const buf = crypto.createHash("sha256").update(src).digest();
+      for (let i = 0; i < slots.leading; i++) {
+        const v = buf.readUInt8(i);
+        const r = v & 0x77;
+        buf.writeUInt8(r, i);
+      }
+      return buf.toString("hex");
+    }
+
+    const proposePoWHashConvert = (hexPoWHash) => {
+      const buf = Buffer.from(hexPoWHash, "hex");
+      for (let i = 0; i < slots.leading; i++) {
+        const v = buf.readUInt8(i);
+        const r = v & 0x77;
+        buf.writeUInt8(r, i);
+      }
+      return buf.toString("hex");
+    }
+
+    const sha256Result = entanmoPoWVerifier(hash, propose.nonce);
+    global.library.logger.log(`verifyPoW: ${propose.hash}, ${propose.nonce}`);
+    const proposePoWResult = proposePoWHashConvert(propose.hash);
+    global.library.logger.log(`verify: sha256Result: ${sha256Result}, proposeResult: ${proposePoWResult}, target: ${target}`);
+    if (sha256Result === proposePoWResult && sha256Result.indexOf(target) === 0) {
+      return cb(null, true);
+    }
+    return cb(null, false);
+  });
+}
+
+Consensus.prototype.getAddressIndex = function (propose, cb) {
+  global.library.modules['delegates'].getDelegateIndex(propose, function (err, index) {
+    if (err) {
+      return cb(err);
+    }
+
+    if (index < 0) {
+      return cb(new Error('Failed to get address index.'));
+    }
+    index = index % (Math.pow(2, slots.leading) - 1);
+    var strIndex = index.toString(2).padStart(slots.leading, '0');
+    cb(null, strIndex);
+  });
 }
 
 module.exports = Consensus;

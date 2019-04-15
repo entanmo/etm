@@ -22,8 +22,11 @@ var EventEmitter = require('events');
 var async = require('async');
 var z_schema = require('z-schema');
 var ip = require('ip');
-var Sequence = require('./utils/sequence.js');
+var Sequence = require('./utils/sequence2.js');
 var slots = require('./utils/slots.js');
+var natUpnp = require('nat-upnp');
+const SyncTime = require("./utils/sync-time");
+const DelayTransferMgr = require("./utils/delay-transfer-manager");
 
 function getPublicIp() {
     var publicIp = null;
@@ -45,6 +48,45 @@ function getPublicIp() {
     return publicIp;
 }
 
+function portMapping(publicPort, privatePort) {
+  var client = natUpnp.createClient();
+  client.portMapping({
+    public: publicPort,
+    private: privatePort,
+  }, function (err) {
+    if(err){
+      console.log('UPnP port Mapping Error:', err);
+    }
+  });
+}
+
+function scheduleUPNP(upnp, upnpPort, cb) {
+  if (!upnp) {
+    return cb();
+  }
+
+  // enable upnp 
+  var client = natUpnp.createClient();
+  client.portMapping({
+    public: upnpPort,
+    private: upnpPort,
+  }, function (err) {
+    if (err) {
+      console.log(`UPNP(${upnpPort}, ${upnpPort}) Failure.......`);
+      return cb();
+    }
+
+    setTimeout(function nextUpnp() {
+      client.portMapping({
+        public: upnpPort,
+        private: upnpPort
+      });
+
+      setTimeout(nextUpnp, 60 * 1000);
+    }, 60 * 1000);
+    cb();
+  });
+}
 /*
 const moduleNames = [
   'server',
@@ -86,14 +128,17 @@ const config = {
     'transport': './modules/transport.js',
     'loader': './modules/loader.js',
     'system': './modules/system.js',
-    'peer': './modules/peer.js',
+    'peer': './modules/peer2.js',
+    'dappPeer': './modules/dappPeer.js',
     'delegates': './modules/delegates.js',
     'round': './modules/round.js',
     'multisignatures': './modules/multisignatures.js',
     'uia': './modules/uia.js',
     'dapps': './modules/dapps.js',
     'sql': './modules/sql.js',
-    'blocks': './modules/blocks.js'
+    'blocks': './modules/blocks.js',
+    'p2phelper': './modules/p2phelper.js',
+    'lockvote': './modules/lockvote.js',
   },
 
   api: {
@@ -106,9 +151,17 @@ module.exports = function setup(options, done) {
     var dbFile = options.dbFile;
     var appConfig = options.appConfig;
     var genesisblock = options.genesisblock;
-  
+
+    // portMapping(appConfig.port,appConfig.port);
+
+    scheduleUPNP(appConfig.upnp, appConfig.port, () => {    
     if (!appConfig.publicIp) {
       appConfig.publicIp = getPublicIp();
+    }
+    else{
+      if (appConfig.checkpriip && ip.isPrivate(appConfig.publicIp)) {
+        appConfig.publicIp = null;
+        }
     }
     
     async.auto({
@@ -119,6 +172,14 @@ module.exports = function setup(options, done) {
       logger: function (cb) {
         cb(null, options.logger);
       },
+
+      synctime: function (cb) {
+        const synctimeInst = new SyncTime({
+          setTimeout: 1000,
+          clockSyncRefresh: 10 * 60 * 1000
+        }, cb);
+        void (synctimeInst);
+      },  
   
       genesisblock: function (cb) {
         cb(null, {
@@ -189,7 +250,7 @@ module.exports = function setup(options, done) {
         });
   
         z_schema.registerFormat('listDelegates', function (obj) {
-          obj.limit = 101;
+          obj.limit = slots.delegates;
           return true;
         });
   
@@ -246,7 +307,7 @@ module.exports = function setup(options, done) {
           https_io: https_io
         });
       }],
-  
+     
       dbSequence: ["logger", function (scope, cb) {
         var sequence = new Sequence({
           name: "db",
@@ -275,6 +336,11 @@ module.exports = function setup(options, done) {
           }
         });
         cb(null, sequence);
+      }],
+
+      delayTransferMgr: ["logger", function (scope, cb) {
+        const delayTransferMgr = new DelayTransferMgr();
+        cb(null, delayTransferMgr);
       }],
   
       connect: ['config', 'genesisblock', 'logger', 'network', function (scope, cb) {
@@ -314,7 +380,7 @@ module.exports = function setup(options, done) {
           var parts = req.url.split('/');
           var ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   
-          scope.logger.debug(req.method + " " + req.url + " from " + ip);
+         scope.logger.trace(req.method + " " + req.url + " from " + ip);
   
           /* Instruct browser to deny display of <frame>, <iframe> regardless of origin.
            *
@@ -407,12 +473,14 @@ module.exports = function setup(options, done) {
         }
         cb(null, new Bus)
       },
-  
+      // dbLite: function (cb) {
+      //   var dbLite = require('./utils/dblite-helper.js');
+      //    dbLite.connect(dbFile, cb);
+      // },
       dbLite: function (cb) {
-        var dbLite = require('./utils/dblite-helper.js');
+        var dbLite = require('./utils/dblite-helper2.js');
         dbLite.connect(dbFile, cb);
       },
-  
       oneoff: function (cb) {
         cb(null, new Map)
       },
@@ -463,7 +531,7 @@ module.exports = function setup(options, done) {
         }, cb);
       }],
   
-      modules: ['network', 'connect', 'config', 'logger', 'bus', 'sequence', 'dbSequence', 'balancesSequence', 'dbLite', 'base', 'oneoff', 'balanceCache', 'model', function (scope, cb) {
+      modules: ['network', 'connect', 'config', 'logger', "synctime", 'bus', 'sequence', 'dbSequence', 'balancesSequence', 'dbLite', 'base', 'oneoff', 'balanceCache', 'model', function (scope, cb) {
         global.library = scope
         var tasks = {};
         /*
@@ -524,5 +592,6 @@ module.exports = function setup(options, done) {
           cb();
       }],
     }, done);
+  });
 };
 

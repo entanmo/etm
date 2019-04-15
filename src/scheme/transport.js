@@ -13,6 +13,7 @@
  */
 
 'use strict';
+var slots = require('../utils/slots.js');
 
 module.exports = {
     sanitize_port: {
@@ -94,7 +95,7 @@ module.exports = {
           signatures: {
             type: "array",
             minLength: 1,
-            maxLength: 101,
+            maxLength: slots.delegates,
           }
         },
         required: ["height", "id", "signatures"]

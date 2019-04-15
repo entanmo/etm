@@ -46,13 +46,27 @@ module.exports = function init(options) {
         });
         fs.writeFileSync(appConfigFile, JSON.stringify(appConfig, null, 2), "utf8");
     }
+    
+    // if(!(appConfig.forging && appConfig.forging.secret && Array.isArray(appConfig.forging.secret) && appConfig.forging.secret.length < 2)){
+    //     console.log('secret error,the length needs to be less than or equal to 1');
+    //     return;
+    // }
 
     appConfig.version = version;
     appConfig.baseDir = baseDir;
     appConfig.buildVersion = 'development';
     appConfig.netVersion = process.env.NET_VERSION || 'localnet';
     appConfig.publicDir = path.join(baseDir, 'public', 'dist');
-    appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps')
+    appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps');
+    appConfig.dbName = 'blockchain.db';
+    if(program.dataDir){
+        appConfig.dataDir =  path.join(baseDir, program.dataDir);
+    }else{
+        appConfig.dataDir =  path.join(baseDir, 'data');
+    }
+    appConfig.upnp = program.upnp;
+    appConfig.acquireip = program.acquireip;
+    appConfig.checkpriip = program.checkpriip;
 
     global.Config = appConfig;
 
@@ -120,8 +134,8 @@ module.exports = function init(options) {
     }
 
     var logger = new Logger({
-        filename: path.join(baseDir, 'logs', 'debug.log'),
-        echo: program.deamon ? null : appConfig.logLevel,
+        filename: path.join(baseDir, 'logs', 'etm.log'),
+        echo: program.daemon ? null : appConfig.logLevel,
         errorLevel: appConfig.logLevel
     });
 
@@ -141,9 +155,17 @@ module.exports = function init(options) {
 
     global.featureSwitch = {}
     global.state = {}
+    
+    global.featureSwitch.enableLongId = true
+    global.featureSwitch.enable1_3_0 = true
+    global.featureSwitch.enableClubBonus = (!!global.state.clubInfo)
+    global.featureSwitch.enableMoreLockTypes = true
+    global.featureSwitch.enableLockReset = true
+    global.featureSwitch.enableUIA = true
+
 
     return {
-        dbFile: program.blockchain || path.join(baseDir, 'blockchain.db'),
+        dbFile: program.blockchain || path.join(baseDir, appConfig.dbName),
         appConfig: appConfig,
         genesisblock: genesisblock,
         logger: logger,

@@ -25,6 +25,11 @@ var TransactionTypes = require('../utils/transaction-types.js');
 var sandboxHelper = require('../utils/sandbox.js');
 var addressHelper = require('../utils/address.js');
 var scheme = require('../scheme/transactions');
+const reportor = require("../utils/kafka-reportor");
+
+const LockVotes = require("../logic/lock_votes");
+const UnlockVotes = require("../logic/unlock_votes");
+const DelayTransfer = require("../logic/delay-transfer");
 
 var genesisblock = null;
 // Private fields
@@ -78,10 +83,10 @@ function Transfer() {
   }
 
   this.apply = function (trs, block, sender, cb) {
-    modules.accounts.setAccountAndGet({ address: trs.recipientId }, function (err, recipient) {
-      if (err) {
-        return cb(err);
-      }
+    modules.accounts.loadOrCreate({ address: trs.recipientId }, function (err, recipient) {
+     if (err) {
+       return cb(err);
+     }
 
       modules.accounts.mergeAccountAndGet({
         address: trs.recipientId,
@@ -355,6 +360,7 @@ function Transactions(cb, scope) {
   library.base.transaction.attachAssetType(TransactionTypes.SEND, new Transfer());
   library.base.transaction.attachAssetType(TransactionTypes.STORAGE, new Storage());
   library.base.transaction.attachAssetType(TransactionTypes.LOCK, new Lock());
+  library.base.transaction.attachAssetType(TransactionTypes.DELAY_TRANSFER, new DelayTransfer());
 
   setImmediate(cb, null, self);
 }
@@ -373,7 +379,9 @@ __private.attachApi = function () {
     "get /get": "getTransaction",
     "get /unconfirmed/get": "getUnconfirmedTransaction",
     "get /unconfirmed": "getUnconfirmedTransactions",
-    "put /": "addTransactions"
+    "put /": "addTransactions",
+    "put /batch": "addBatchTransations",
+    "put /delay": "addDelayTransactions",
   });
 
   router.use(function (req, res, next) {
@@ -554,7 +562,7 @@ __private.addUnconfirmedTransaction = function (transaction, sender, cb) {
     var index = __private.unconfirmedTransactions.length - 1;
     __private.unconfirmedTransactionsIdIndex[transaction.id] = index;
     __private.unconfirmedNumber++;
-
+    //console.log("unconfirmedNumber --- "+__private.unconfirmedNumber)
     setImmediate(cb);
   });
 }
@@ -616,8 +624,8 @@ Transactions.prototype.processUnconfirmedTransaction = function (transaction, br
     return cb("Transaction " + transaction.id + " already exists, ignoring...");
   }
 
-  library.logger.debug('------------before setAccountAndGet', transaction)
-  modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, function (err, sender) {
+  //library.logger.debug('------------before setAccountAndGet', JSON.stringify(transaction))
+  modules.accounts.loadSenderOrUpdate({ publicKey: transaction.senderPublicKey }, function (err, sender) {
     function done(err) {
       if (err) {
         return cb(err);
@@ -637,7 +645,6 @@ Transactions.prototype.processUnconfirmedTransaction = function (transaction, br
     if (err) {
       return done(err);
     }
-
     if (transaction.requesterPublicKey && sender && sender.multisignatures && sender.multisignatures.length) {
       modules.accounts.getAccount({ publicKey: transaction.requesterPublicKey }, function (err, requester) {
         if (err) {
@@ -672,7 +679,7 @@ Transactions.prototype.applyUnconfirmedList = function (ids, cb) {
   async.eachSeries(ids, function (id, cb) {
     var transaction = self.getUnconfirmedTransaction(id);
     modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, function (err, sender) {
-      if (err) {
+   if (err) {
         self.removeUnconfirmedTransaction(id);
         return setImmediate(cb);
       }
@@ -741,7 +748,7 @@ Transactions.prototype.undoUnconfirmed = function (transaction, cb) {
 }
 
 Transactions.prototype.receiveTransactions = function (transactions, cb) {
-  if (__private.unconfirmedNumber > constants.maxTxsPerBlock) {
+  if (__private.unconfirmedNumber  + transactions.length > constants.maxTxsCache) {
     setImmediate(cb, "Too many transactions");
     return;
   }
@@ -751,6 +758,7 @@ Transactions.prototype.receiveTransactions = function (transactions, cb) {
     cb(err, transactions);
   });
 }
+
 
 Transactions.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);
@@ -944,6 +952,7 @@ shared.getUnconfirmedTransactions = function (req, cb) {
 
 shared.addTransactions = function (req, cb) {
   var body = req.body;
+  const addUptime = reportor.uptime;
   library.scheme.validate(body, /*{
     type: "object",
     properties: {
@@ -993,7 +1002,7 @@ shared.addTransactions = function (req, cb) {
         return cb("Invalid passphrase");
       }
     }
-
+    
     var query = { address: body.recipientId };
 
     library.balancesSequence.add(function (cb) {
@@ -1067,9 +1076,9 @@ shared.addTransactions = function (req, cb) {
             });
           });
         } else {
-          library.logger.debug('publicKey is: ', keypair.publicKey.toString('hex'))
+         // library.logger.debug('publicKey is: ', keypair.publicKey.toString('hex'))
           modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-            library.logger.debug('after getAccount =============', account)
+           // library.logger.debug('after getAccount =============', account.address)
             if (err) {
               return cb(err.toString());
             }
@@ -1101,6 +1110,7 @@ shared.addTransactions = function (req, cb) {
             } catch (e) {
               return cb(e.toString());
             }
+
             modules.transactions.receiveTransactions([transaction], cb);
           });
         }
@@ -1109,10 +1119,268 @@ shared.addTransactions = function (req, cb) {
       if (err) {
         return cb(err.toString());
       }
-
+      reportor.report("transactions", {
+        subaction: "add",
+        trType: TransactionTypes.SEND,
+        id: transaction[0].id,
+        timestamp: transaction[0].timestamp,
+        senderPublicKey: transaction[0].senderPublicKey,
+        duration: reportor.uptime - addUptime
+      });
       cb(null, { transactionId: transaction[0].id });
     });
   });
+}
+
+shared.addDelayTransactions = function (req, cb) {
+  var body = req.body;
+  const addUptime = reportor.uptime;
+  library.scheme.validate(body, /* {
+    type: "object",
+    properties: {
+      secret: {
+        type: "string",
+        minLength: 1,
+        maxLength: 100
+      },
+      amount: {
+        type: "integer",
+        minimum: 1,
+        maximum: constants.totalAmount
+      },
+      recipientId: {
+        type: "string",
+        minLength: 1
+      },
+      publicKey: {
+        type: "string",
+        format: "publicKey"
+      },
+      secondSecret: {
+        type: "string",
+        minLength: 1,
+        maxLength: 100
+      },
+      multisigAccountPublicKey: {
+        type: "string",
+        format: "publicKey"
+      },
+      message: {
+        type: "string",
+        maxLength: 256
+      }
+    },
+    required: ["secret", "amount", "recipientId"]
+  }*/ scheme.addDelayTransactions, function (err) {
+    if (err) {
+      return cb(err[0].message + ': ' + err[0].path);
+    }
+
+    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+    var keypair = ed.MakeKeypair(hash);
+
+    if (body.publicKey) {
+      if (keypair.publicKey.toString('hex') != body.publicKey) {
+        return cb("Invalid passphrase");
+      }
+    }
+    
+    var query = { address: body.recipientId };
+
+    library.balancesSequence.add(function (cb) {
+      modules.accounts.getAccount(query, function (err, recipient) {
+        if (err) {
+          return cb(err.toString());
+        }
+
+        var recipientId = recipient ? recipient.address : body.recipientId;
+        if (!recipientId) {
+          return cb("Recipient not found");
+        }
+
+        if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
+          modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
+            if (err) {
+              return cb(err.toString());
+            }
+
+            if (!account) {
+              return cb("Multisignature account not found");
+            }
+
+            if (!account.multisignatures || !account.multisignatures) {
+              return cb("Account does not have multisignatures enabled");
+            }
+
+            if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
+              return cb("Account does not belong to multisignature group");
+            }
+
+            modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+              if (err) {
+                return cb(err.toString());
+              }
+
+              if (!requester || !requester.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              if (requester.secondSignature && !body.secondSecret) {
+                return cb("Invalid second passphrase");
+              }
+
+              if (requester.publicKey == account.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              var secondKeypair = null;
+
+              if (requester.secondSignature) {
+                var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+                secondKeypair = ed.MakeKeypair(secondHash);
+              }
+
+              try {
+                var transaction = library.base.transaction.create({
+                  type: TransactionTypes.DELAY_TRANSFER,
+                  amount: body.amount,
+                  sender: account,
+                  recipientId: recipientId,
+                  expired: body.expired,
+                  keypair: keypair,
+                  requester: keypair,
+                  secondKeypair: secondKeypair,
+                  message: body.message,
+                  args: body.args
+                });
+              } catch (e) {
+                return cb(e.toString());
+              }
+              modules.transactions.receiveTransactions([transaction], cb);
+            });
+          });
+        } else {
+         // library.logger.debug('publicKey is: ', keypair.publicKey.toString('hex'))
+          modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+           // library.logger.debug('after getAccount =============', account.address)
+            if (err) {
+              return cb(err.toString());
+            }
+            if (!account) {
+              return cb("Account not found");
+            }
+
+            if (account.secondSignature && !body.secondSecret) {
+              return cb("Invalid second passphrase");
+            }
+
+            var secondKeypair = null;
+
+            if (account.secondSignature) {
+              var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+              secondKeypair = ed.MakeKeypair(secondHash);
+            }
+
+            try {
+              var transaction = library.base.transaction.create({
+                type: TransactionTypes.DELAY_TRANSFER,
+                amount: body.amount,
+                sender: account,
+                recipientId: recipientId,
+                keypair: keypair,
+                secondKeypair: secondKeypair,
+                message: body.message,
+                args: body.args
+              });
+            } catch (e) {
+              return cb(e.toString());
+            }
+
+            modules.transactions.receiveTransactions([transaction], cb);
+          });
+        }
+      });
+    }, function (err, transaction) {
+      if (err) {
+        return cb(err.toString());
+      }
+      reportor.report("transactions", {
+        subaction: "add",
+        trType: TransactionTypes.DELAY_TRANSFER,
+        id: transaction[0].id,
+        timestamp: transaction[0].timestamp,
+        senderPublicKey: transaction[0].senderPublicKey,
+        duration: reportor.uptime - addUptime
+      });
+      cb(null, { transactionId: transaction[0].id });
+    });
+  });
+}
+
+shared.addBatchTransations = (req, cb) => {
+  if (!req.body || !req.body.transactions) {
+    return cb('Invalid params')
+  }
+   const trs = req.body.transactions
+   let transactions =[]
+
+
+    async.eachSeries(trs, function (t, next) {
+      var hash = crypto.createHash('sha256').update(t.secret, 'utf8').digest();
+      var keypair = ed.MakeKeypair(hash);
+  
+      if (t.publicKey) {
+        if (keypair.publicKey.toString('hex') != t.publicKey) {
+          return cb("Invalid passphrase");
+        }
+      }
+      modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+        // library.logger.debug('after getAccount =============', account.address)
+         if (err) {
+           return cb(err.toString());
+         }
+         if (!account) {
+           return cb("Account not found");
+         }
+
+         if (account.secondSignature && !body.secondSecret) {
+           return cb("Invalid second passphrase");
+         }
+
+         var secondKeypair = null;
+
+         if (account.secondSignature) {
+           var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+           secondKeypair = ed.MakeKeypair(secondHash);
+         }
+
+         try {
+           var transaction = library.base.transaction.create({
+             type: TransactionTypes.SEND,
+             amount: t.amount,
+             sender: account,
+             recipientId: t.recipientId,
+             keypair: keypair,
+             secondKeypair: secondKeypair,
+             message: t.message
+           });
+         } catch (e) {
+           return cb(e.toString());
+         }
+
+         transactions.push(transaction)
+         next();
+       });
+    }, function (err) {
+     // console.log(JSON.stringify(transactions))
+      modules.transactions.receiveTransactions(transactions,  function (err, transaction) {
+        if (err) {
+          return cb(err.toString());
+        }
+        return  cb(null, transactions);
+      });
+    });
+
 }
 
 shared.putStorage = function (req, cb) {
@@ -1334,6 +1602,7 @@ shared.getStorage = function (req, cb) {
       });
   });
 }
+
 
 // Export
 module.exports = Transactions;

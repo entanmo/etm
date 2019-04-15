@@ -27,6 +27,9 @@ var sandboxHelper = require('../utils/sandbox.js');
 var LimitCache = require('../utils/limit-cache.js');
 var shell = require('../utils/shell.js');
 var scheme = require('../scheme/transport');
+var ByteBuffer = require("bytebuffer");
+
+const reportor = require("../utils/kafka-reportor");
 
 // Private fields
 var modules, library, self, __private = {}, shared = {};
@@ -34,7 +37,12 @@ var modules, library, self, __private = {}, shared = {};
 __private.headers = {};
 __private.loaded = false;
 __private.messages = {};
-__private.invalidTrsCache = new LimitCache()
+__private.invalidTrsCache = new LimitCache();
+__private.votesCache = new LimitCache();
+const MAX_BATCH_TRANSACTIONS = 100;
+const DETECT_INTERVAL = 3000;
+__private.boardcastTrs = [];
+
 
 // Constructor
 function Transport(cb, scope) {
@@ -50,10 +58,10 @@ function Transport(cb, scope) {
 __private.attachApi = function () {
   var router = new Router();
 
-  router.use(function (req, res, next) {
-    if (modules && __private.loaded && !modules.loader.syncing()) return next();
-    res.status(500).send({ success: false, error: "Blockchain is loading" });
-  });
+  // router.use(function (req, res, next) {
+  //   if (modules && __private.loaded && !modules.loader.syncing()) return next();
+  //   res.status(500).send({ success: false, error: "Blockchain is loading" });
+  // });
 
   router.use(function (req, res, next) {
     var peerIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -64,24 +72,7 @@ __private.attachApi = function () {
 
     req.headers['port'] = parseInt(req.headers['port']);
 
-    req.sanitize(req.headers, /*{
-      type: "object",
-      properties: {
-        os: {
-          type: "string",
-          maxLength: 64
-        },
-        'magic': {
-          type: 'string',
-          maxLength: 8
-        },
-        'version': {
-          type: 'string',
-          maxLength: 11
-        }
-      },
-      required: ['magic', 'version']
-    }*/ scheme.sanitize_port, function (err, report, headers) {
+    req.sanitize(req.headers,  scheme.sanitize_port, function (err, report, headers) {
       if (err) return next(err);
       if (!report.isValid) return res.status(500).send({ success: false, error: report.issues });
 
@@ -113,7 +104,7 @@ __private.attachApi = function () {
 
       if (peer.port && peer.port > 0 && peer.port <= 65535) {
         if (modules.peer.isCompatible(peer.version)) {
-          peer.version && modules.peer.update(peer);
+          peer.version && modules.dappPeer.update(peer);
         } else {
           return res.status(500).send({
             success: false,
@@ -129,33 +120,17 @@ __private.attachApi = function () {
 
   router.get('/list', function (req, res) {
     res.set(__private.headers);
-    modules.peer.listWithDApp({ limit: 100 }, function (err, peers) {
+    modules.dappPeer.listWithDApp({ limit: 100 }, function (err, peers) {
       return res.status(200).json({ peers: !err ? peers : [] });
     })
   });
 
-  router.get("/blocks/common", function (req, res, next) {
+  router.post("/commonBlock", function (req, res, next) {
     res.set(__private.headers);
-
-    req.sanitize(req.query, /*{
-      type: "object",
-      properties: {
-        max: {
-          type: 'integer'
-        },
-        min: {
-          type: 'integer'
-        },
-        ids: {
-          type: 'string',
-          format: 'splitarray'
-        }
-      },
-      required: ['max', 'min', 'ids']
-    }*/ scheme.sanitize_blocks_common, function (err, report, query) {
+    const { body } = req
+    req.sanitize(body,  scheme.sanitize_blocks_common, function (err, report, query) {
       if (err) return next(err);
       if (!report.isValid) return res.json({ success: false, error: report.issue });
-
 
       var max = query.max;
       var min = query.min;
@@ -165,28 +140,14 @@ __private.attachApi = function () {
       });
 
       if (!escapedIds.length) {
-        report = library.scheme.validate(req.headers, /*{
-          type: "object",
-          properties: {
-            port: {
-              type: "integer",
-              minimum: 1,
-              maximum: 65535
-            },
-            magic: {
-              type: "string",
-              maxLength: 8
-            }
-          },
-          required: ['port', 'magic']
-        }*/ scheme.headers);
+        report = library.scheme.validate(req.headers, scheme.headers);
 
         var peerIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         var peerStr = peerIp ? peerIp + ":" + (isNaN(parseInt(req.headers['port'])) ? 'unkwnown' : parseInt(req.headers['port'])) : 'unknown';
         library.logger.log('Invalid common block request, ban 60 min', peerStr);
 
         if (report) {
-          modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
+         // modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
         }
 
         return res.json({ success: false, error: "Invalid block id sequence" });
@@ -211,16 +172,14 @@ __private.attachApi = function () {
     });
   });
 
-  router.get("/blocks", function (req, res) {
+  router.post("/loadblocks", function (req, res) {
     res.set(__private.headers);
-
-    req.sanitize(req.query, /*{
-      type: 'object',
-      properties: { lastBlockId: { type: 'string' } }
-    }*/ scheme.sanitize_blocks, function (err, report, query) {
+    const { body } = req
+   
+    req.sanitize(body,  scheme.sanitize_blocks, function (err, report, query) {
       if (err) return next(err);
       if (!report.isValid) return res.json({ success: false, error: report.issues });
-
+      //console.log("/loadblocks  query.lastBlockId====="+ query.lastBlockId)
       // Get 1400+ blocks with all data (joins) from provided block id
       var blocksLimit = 200;
       if (query.limit) {
@@ -253,6 +212,7 @@ __private.attachApi = function () {
     if (typeof req.body.votes == 'string') {
       req.body.votes = library.protobuf.decodeBlockVotes(new Buffer(req.body.votes, 'base64'));
     }
+    //library.logger.log('receive block or votes object  : ' + JSON.stringify(req.body.block));
     try {
       var block = library.base.block.objectNormalize(req.body.block);
       var votes = library.base.consensus.normalizeVotes(req.body.votes);
@@ -261,7 +221,7 @@ __private.attachApi = function () {
       library.logger.log('Block ' + (block ? block.id : 'null') + ' is not valid, ban 60 min', peerStr);
 
       if (peerIp && req.headers['port'] > 0 && req.headers['port'] < 65536) {
-        modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
+      //  modules.peer.state(ip.toLong(peerIp), parseInt(req.headers['port']), 0, 3600);
       }
 
       return res.sendStatus(200);
@@ -274,30 +234,13 @@ __private.attachApi = function () {
 
   router.post("/votes", function (req, res) {
     res.set(__private.headers);
-
-    library.scheme.validate(req.body, /*{
-      type: "object",
-      properties: {
-        height: {
-          type: "integer",
-          minimum: 1
-        },
-        id: {
-          type: "string",
-          maxLength: 64,
-        },
-        signatures: {
-          type: "array",
-          minLength: 1,
-          maxLength: 101,
-        }
-      },
-      required: ["height", "id", "signatures"]
-    }*/ scheme.votes, function (err) {
+  
+    library.scheme.validate(req.body.votes,  scheme.votes, function (err) {
+      //console.log("receiveVotes err"+JSON.stringify(req.body.votes,))
       if (err) {
         return res.status(200).json({ success: false, error: "Schema validation error" });
       }
-      library.bus.message('receiveVotes', req.body);
+      library.bus.message('receiveVotes', req.body.votes);
       res.sendStatus(200);
     });
   });
@@ -307,38 +250,7 @@ __private.attachApi = function () {
     if (typeof req.body.propose == 'string') {
       req.body.propose = library.protobuf.decodeBlockPropose(new Buffer(req.body.propose, 'base64'));
     }
-    library.scheme.validate(req.body.propose, /*{
-      type: "object",
-      properties: {
-        height: {
-          type: "integer",
-          minimum: 1
-        },
-        id: {
-          type: "string",
-          maxLength: 64,
-        },
-        timestamp: {
-          type: "integer"
-        },
-        generatorPublicKey: {
-          type: "string",
-          format: "publicKey"
-        },
-        address: {
-          type: "string"
-        },
-        hash: {
-          type: "string",
-          format: "hex"
-        },
-        signature: {
-          type: "string",
-          format: "signature"
-        }
-      },
-      required: ["height", "id", "timestamp", "generatorPublicKey", "address", "hash", "signature"]
-    }*/ scheme.propose, function (err) {
+    library.scheme.validate(req.body.propose,  scheme.propose, function (err) {
       if (err) {
         return res.status(200).json({ success: false, error: "Schema validation error" });
       }
@@ -402,18 +314,46 @@ __private.attachApi = function () {
       return res.status(200).json({ success: true, signatures: signatures });
     });
   });
+  router.post('/getSignatures', function (req, res) {
+    res.set(__private.headers);
 
+    var unconfirmedList = modules.transactions.getUnconfirmedTransactionList();
+    var signatures = [];
+
+    async.eachSeries(unconfirmedList, function (trs, cb) {
+      if (trs.signatures && trs.signatures.length) {
+        signatures.push({
+          transaction: trs.id,
+          signatures: trs.signatures
+        });
+      }
+
+      setImmediate(cb);
+    }, function () {
+      return res.status(200).json({signatures: signatures });
+    });
+  });
   router.get("/transactions", function (req, res) {
     res.set(__private.headers);
     // Need to process headers from peer
     res.status(200).json({ transactions: modules.transactions.getUnconfirmedTransactionList() });
   });
-
+  router.post('/getUnconfirmedTransactions', (req, res) => {
+    res.status(200).json({ transactions: modules.transactions.getUnconfirmedTransactionList() });
+   // res.send({ transactions: modules.transactions.getUnconfirmedTransactionList() })
+  })
+  
   router.post("/transactions", function (req, res) {
+    if (modules.loader.syncing()) {
+      return res.status(500).send({
+        success: false,
+        error: 'Blockchain is syncing',
+      })
+    }
     var lastBlock = modules.blocks.getLastBlock();
     var lastSlot = slots.getSlotNumber(lastBlock.timestamp);
-    if (slots.getNextSlot() - lastSlot >= 12) {
-      library.logger.error("OS INFO", shell.getInfo())
+    if (slots.getNextSlot() - lastSlot >= 40) {
+     // library.logger.error("OS INFO", shell.getInfo())
       library.logger.error("Blockchain is not ready", {getNextSlot:slots.getNextSlot(),lastSlot:lastSlot,lastBlockHeight:lastBlock.height})
       return res.status(200).json({ success: false, error: "Blockchain is not ready" });
     }
@@ -447,6 +387,7 @@ __private.attachApi = function () {
       return res.status(200).json({ success: false, error: "Already processed transaction" + transaction.id });
     }
 
+    const receiveUptime = reportor.uptime;
     library.balancesSequence.add(function (cb) {
       if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
         return cb('Already exists');
@@ -459,7 +400,22 @@ __private.attachApi = function () {
         __private.invalidTrsCache.set(transaction.id, true)
         res.status(200).json({ success: false, error: err });
       } else {
-        res.status(200).json({ success: true, transactionId: transactions[0].id });
+        let reportMsg = {
+          subaction: "receive",
+          trType: transactions[0].type,
+          id: transactions[0].id,
+          timestamp: transactions[0].timestamp,
+          senderPublicKey: transactions[0].senderPublicKey,
+          duration: reportor.uptime - receiveUptime
+        };
+        if (err) {
+          reportMsg.error = err.message;
+        }
+        reportor.report("transactions", reportMsg);
+        res.status(200).json({
+          success: true,
+          transactionId: transactions[0].id
+        });
       }
     });
   });
@@ -470,6 +426,11 @@ __private.attachApi = function () {
       height: modules.blocks.getLastBlock().height
     });
   });
+  router.post('/getHeight', (req, res) => {
+    res.send({
+      height: modules.blocks.getLastBlock().height,
+    })
+  })
 
   router.post("/dapp/message", function (req, res) {
     res.set(__private.headers);
@@ -564,7 +525,60 @@ __private.attachApi = function () {
     });
   });
 
+  router.post('/p2p/ipChanged', function (req, res) {
+    const body = req.body;
+
+    //modules.peer.state(ip.toLong(body.ip), parseInt(body.port), 2);
+    modules.peer.addPeer(body.ip,body.port)
+    res.sendStatus(200);
+  });
+
+  router.post('/p2p/heartBeat', function (req, res) {
+    const body = req.body;
+    
+    res.sendStatus(200);
+  })
+
+  router.post('/vote/forward', function (req, res) {
+    const body = req.body;
+    var votes = body.votes;
+
+    // 当前签名是否已经收到过
+
+    var votesId = self.getVotesId(votes);
+    /*
+    if (__private.votesCache[votesId]) {
+      return res.sendStatus(200);
+    }
+    __private.votesCache[votesId] = true;
+    */
+    if (__private.votesCache.has(votesId.toString('hex'))) {
+      return res.sendStatus(200);
+    }
+    __private.votesCache.set(votesId.toString('hex'), true);
+    
+    // 当前签名的块是否是链的下一个块
+    var lastBlock = library.modules.blocks.getLastBlock();
+    if(!lastBlock || lastBlock.height + 1 != votes.height){
+      library.logger.debug(`/vote/forward get from ${body.address}, but is in invalid height(${votes.height}, ${lastBlock.height})`);
+      return res.sendStatus(200);
+    }
+
+    /*
+    // 是否超出出块时间
+    var curTimestamp = slots.getTime();
+    if(body.votes.timestamp && curTimestamp - body.votes.timestamp < slots.interval){
+      self.sendVotes(body.votes, body.address);
+    }
+    */
+    library.logger.debug(`/vote/forward forward sendVotes(${votesId.toString('hex')}) from ${body.address}`);
+    self.sendVotes(body.votes, body.address);
+    
+    res.sendStatus(200);
+  })
+
   router.use(function (req, res, next) {
+    //library.logger.error(req.url+"11111111111111111");
     res.status(500).send({ success: false, error: "API endpoint not found" });
   });
 
@@ -588,9 +602,25 @@ __private.hashsum = function (obj) {
   return bignum.fromBuffer(temp).toString();
 }
 
-Transport.prototype.broadcast = function (config, options, cb) {
+Transport.prototype.broadcast = (topic, message, recursive) => {
+  modules.peer.publish(topic, message, recursive)
+}
+Transport.prototype.broadcastByPost = function ( options, cb) {
+  modules.peer.listPeers( function (err, peers) {
+    if (!err) {
+      //console.log("listPeers:"+JSON.stringify(peers))
+      async.eachLimit(peers, 5, function (peer, cb) {
+        modules.peer.request(options.api, options.data, peer, cb)//peer, options);
+      //  setImmediate(cb);
+      })
+    } else {
+      cb && setImmediate(cb, err);
+    }
+  });
+}
+Transport.prototype.dappBroadcast = function (config, options, cb) {
   config.limit = 20;
-  modules.peer.list(config, function (err, peers) {
+  modules.dappPeer.list(config, function (err, peers) {
     if (!err) {
       async.eachLimit(peers, 5, function (peer, cb) {
         self.getFromPeer(peer, options);
@@ -604,7 +634,6 @@ Transport.prototype.broadcast = function (config, options, cb) {
     }
   });
 }
-
 Transport.prototype.getFromRandomPeer = function (config, options, cb) {
   if (typeof options == 'function') {
     cb = options;
@@ -612,12 +641,12 @@ Transport.prototype.getFromRandomPeer = function (config, options, cb) {
     config = {};
   }
   config.limit = 1;
-  modules.peer.list(config, function (err, peers) {
+  modules.dappPeer.list(config, function (err, peers) {
     if (!err && peers.length) {
       var peer = peers[0];
       self.getFromPeer(peer, options, cb);
     } else {
-      modules.peer.reset()
+      modules.dappPeer.reset()
       return cb(err || "No peers in db");
     }
   });
@@ -626,7 +655,7 @@ Transport.prototype.getFromRandomPeer = function (config, options, cb) {
   // }, function (err, results) {
   //   cb(err, results)
   // });
-}
+} 
 
 /**
  * Send request to selected peer
@@ -643,6 +672,7 @@ Transport.prototype.getFromRandomPeer = function (config, options, cb) {
  *  // Process request
  * });
  */
+
 Transport.prototype.getFromPeer = function (peer, options, cb) {
   var url;
   if (options.api) {
@@ -662,7 +692,7 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     json: true,
     headers: extend({}, __private.headers, options.headers),
     timeout: library.config.peers.options.timeout,
-    forever: true
+    forever: false
   };
   if (Object.prototype.toString.call(options.data) === "[object Object]" || util.isArray(options.data)) {
     req.json = options.data;
@@ -670,6 +700,10 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     req.body = options.data;
   }
 
+  if(options.changeReqTimeout){
+    req.timeout = library.config.peers.options.pingTimeout;
+  }
+  
   return request(req, function (err, response, body) {
     if (err || response.statusCode != 200) {
       library.logger.debug('Request', {
@@ -681,14 +715,14 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
       if (peer) {
         // TODO use ban instead of remove
         if (err && (err.code == "ETIMEDOUT" || err.code == "ESOCKETTIMEDOUT" || err.code == "ECONNREFUSED")) {
-          modules.peer.remove(peer.ip, peer.port, function (err) {
+          modules.dappPeer.remove(peer.ip, peer.port, function (err) {
             if (!err) {
               library.logger.info('Removing peer ' + req.method + ' ' + req.url)
             }
           });
         } else {
           if (!options.not_ban) {
-            modules.peer.state(peer.ip, peer.port, 0, 600, function (err) {
+            modules.dappPeer.state(peer.ip, peer.port, 0, 600, function (err) {
               if (!err) {
                 library.logger.info('Ban 10 min ' + req.method + ' ' + req.url);
               }
@@ -702,29 +736,7 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
 
     response.headers['port'] = parseInt(response.headers['port']);
 
-    var report = library.scheme.validate(response.headers, /*{
-      type: "object",
-      properties: {
-        os: {
-          type: "string",
-          maxLength: 64
-        },
-        port: {
-          type: "integer",
-          minimum: 1,
-          maximum: 65535
-        },
-        'magic': {
-          type: "string",
-          maxLength: 8
-        },
-        version: {
-          type: "string",
-          maxLength: 11
-        }
-      },
-      required: ['port', 'magic', 'version']
-    }*/ scheme.getFromPeer);
+    var report = library.scheme.validate(response.headers,  scheme.getFromPeer);
 
     if (!report) {
       return cb && cb(null, { body: body, peer: peer });
@@ -733,16 +745,16 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
     var port = response.headers['port'];
     var version = response.headers['version'];
     if (port > 0 && port <= 65535 && version == library.config.version) {
-      modules.peer.update({
+      modules.dappPeer.update({
         ip: peer.ip,
         port: port,
         state: 2,
         os: response.headers['os'],
         version: version
       });
-    } else if (!modules.peer.isCompatible(version)) {
+    } else if (!modules.dappPeer.isCompatible(version)) {
       library.logger.debug("Remove uncompatible peer " + peer.ip, version);
-      modules.peer.remove(peer.ip, port);
+      modules.dappPeer.remove(peer.ip, port);
     }
 
     cb && cb(null, { body: body, peer: peer });
@@ -752,6 +764,53 @@ Transport.prototype.getFromPeer = function (peer, options, cb) {
 Transport.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);
 }
+
+Transport.prototype.getVotesId = function (votes) {
+  var bytes = new ByteBuffer();
+  // height
+  bytes.writeLong(votes.height);
+
+  // id
+  if (global.featureSwitch.enableLongId) {
+    bytes.writeString(votes.id)
+  } else {
+    var idBytes = bignum(votes.id).toBuffer({
+      size: 8
+    });
+    for (var i = 0; i < 8; i++) {
+      bytes.writeByte(idBytes[i]);
+    }
+  }
+
+  // timestamp
+  bytes.writeInt(votes.timestamp);
+
+  // signatures
+  for (var j = 0; j < votes.signatures.length; j++) {
+    if (global.featureSwitch.enableLongId) {
+      bytes.writeString(votes.signatures[j].key);
+      bytes.writeString(votes.signatures[j].sig);
+    } else {
+      var idBytesKey = bignum(votes.signatures[j].key).toBuffer({
+        size: 8
+      });
+      for (var i = 0; i < 8; i++) {
+        bytes.writeByte(idBytesKey[i]);
+      }
+
+      var idBytesSig = bignum(votes.signatures[j].sig).toBuffer({
+        size: 8
+      });
+      for (var i = 0; i < 8; i++) {
+        bytes.writeByte(idBytesSig[i]);
+      }
+    }
+  }
+
+  bytes.flip();
+  return crypto.createHash('sha256').update(bytes.toBuffer()).digest();
+}
+
 
 // Events
 Transport.prototype.onBind = function (scope) {
@@ -767,42 +826,190 @@ Transport.prototype.onBind = function (scope) {
 
 Transport.prototype.onBlockchainReady = function () {
   __private.loaded = true;
+  setImmediate(function tick() {
+    console.log("[transport] 3s boardcast tr count:", __private.boardcastTrs.length);
+    if (__private.boardcastTrs.length > 0) {
+      let message = packageBatchTrsForBoardcast(__private.boardcastTrs)
+      //console.log("boardcast transactions:", JSON.stringify(message)); 
+      modules.peer.publish("transactions", message)
+      //self.boardcast("transactions", message);
+      __private.boardcastTrs = [];
+    }
+    setTimeout(tick, DETECT_INTERVAL);
+  });
 }
+function packageBatchTrsForBoardcast(trs) {
+  // TODO: return package batch transactions
+  const m = {
+    body: {
+      transactions: JSON.stringify(trs),
+    },
+  }
+  return m
+}
+function processTxs(transaction){
+  try {
+    
+    if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
+        //console.log('hasUnconfirmedTransaction has',  transaction.id)
+        return  ;
+      }
+    if (transaction.id && __private.invalidTrsCache.has(transaction.id)) {
+     // console.log('invalidTrsCache has',  transaction.id)
+      return 
+    }
+    transaction = library.base.transaction.objectNormalize(transaction)
+    transaction.asset = transaction.asset || {}
+   // console.log('=========receive transaction ========',  JSON.stringify(transaction) )
+  } catch (e) {
+    console.log('Received transaction parse error', {
+      transaction,
+      error: e.toString(),
+    })
+    return
+  }
+  const receiveUptime = reportor.uptime;
+  library.balancesSequence.add(function (cb) {
+    if (modules.transactions.hasUnconfirmedTransaction(transaction)) {
+    //  console.log('hasUnconfirmedTransaction has',  transaction.id)
+      return cb('Already exists');
+    }
+   // console.log('-------Received transaction----- ' + JSON.stringify(transaction) );
+    modules.transactions.receiveTransactions([transaction], cb);
+  }, function (err, transactions) {
+    if (err) {
+     // library.logger.warn('Receive invalid transaction,id is ' + transaction.id, err);
+      __private.invalidTrsCache.set(transaction.id, true)
+     // res.status(200).json({ success: false, error: err });
+    } else {
+      let reportMsg = {
+        subaction: "receive",
+        trType: transactions[0].type,
+        id: transactions[0].id,
+        timestamp: transactions[0].timestamp,
+        senderPublicKey: transactions[0].senderPublicKey,
+        duration: reportor.uptime - receiveUptime
+      };
+      if (err) {
+        reportMsg.error = err.message;
+      }
+      reportor.report("transactions", reportMsg);
+    }
+  });
+}
+Transport.prototype.onPeerReady = () => {
+  
+  modules.peer.subscribe('propose', (message,peer) => {
+    try {
+      const propose = library.protobuf.decodeBlockPropose(message.body.propose)
+     // library.logger.debug('receive Propose address '+ propose.address +" from "+JSON.stringify(peer))
+      library.bus.message('receivePropose', propose)
+    } catch (e) {
+      library.logger.error('Receive invalid propose', e)
+    }
+  })
+  modules.peer.subscribe('transactions', (message) => {
+    if (modules.loader.syncing()) {
+      return
+    }
+    const lastBlock = modules.blocks.getLastBlock()
+    const lastSlot = slots.getSlotNumber(lastBlock.timestamp)
+    if (slots.getNextSlot() - lastSlot >= 40) {
+      console.log('Blockchain is not ready', { getNextSlot: slots.getNextSlot(), lastSlot, lastBlockHeight: lastBlock.height })
+      return
+    }
+    let transactions
+    transactions = message.body.transactions
+    try {
+      if (Buffer.isBuffer(transactions)) transactions = transactions.toString()
+      transactions = JSON.parse(transactions)
+    } catch (e) {
+        console.log('Received transaction parse error', {
+          message,
+          error: e.toString(),
+        })
+        return
+      }
+    //console.log('transactions are ================',  transactions)
+    transactions.forEach(transaction => {
+      processTxs(transaction);
+    });
+  })
+  modules.peer.subscribe('transaction', (message) => {
+    // console.log('Receive new transaction',   JSON.stringify(message.body.transaction))
+    if (modules.loader.syncing()) {
+      return
+    }
+    const lastBlock = modules.blocks.getLastBlock()
+    const lastSlot = slots.getSlotNumber(lastBlock.timestamp)
+    if (slots.getNextSlot() - lastSlot >= 40) {
+      console.log('Blockchain is not ready', { getNextSlot: slots.getNextSlot(), lastSlot, lastBlockHeight: lastBlock.height })
+      return
+    }
+    let transaction
+    transaction = message.body.transaction
+    try {
+      if (Buffer.isBuffer(transaction)) transaction = transaction.toString()
+      transaction = JSON.parse(transaction)
+    } catch (e) {
+        console.log('Received transaction parse error', {
+          message,
+          error: e.toString(),
+        })
+        return
+      }
 
+    processTxs(transaction)
+  }
+  )
+}
 Transport.prototype.onSignature = function (signature, broadcast) {
   if (broadcast) {
-    self.broadcast({}, { api: '/signatures', data: { signature: signature }, method: "POST" });
+    self.broadcastByPost( { api: 'signatures', data: { signature: signature }, method: "POST" });
     library.network.io.sockets.emit('signature/change', {});
   }
 }
 
 Transport.prototype.onUnconfirmedTransaction = function (transaction, broadcast) {
   if (broadcast) {
-    var data = {
-      transaction: library.protobuf.encodeTransaction(transaction).toString('base64')
-    };
-    self.broadcast({}, { api: '/transactions', data: data, method: "POST" });
+    const message = {
+      body: {
+        transaction: JSON.stringify(transaction),
+      },
+    }
+    __private.boardcastTrs.push(transaction);
+    if (__private.boardcastTrs.length >= MAX_BATCH_TRANSACTIONS) {
+      console.log("[transport] max boardcast tr count:", __private.boardcastTrs.length);
+      self.broadcast("transactions", packageBatchTrsForBoardcast(__private.boardcastTrs));
+      __private.boardcastTrs = [];
+    }
+    //self.broadcast('transaction', message)
     library.network.io.sockets.emit('transactions/change', {});
   }
 }
-
 Transport.prototype.onNewBlock = function (block, votes, broadcast) {
   if (broadcast) {
     var data = {
       block: library.protobuf.encodeBlock(block).toString('base64'),
       votes: library.protobuf.encodeBlockVotes(votes).toString('base64'),
     };
-    self.broadcast({}, { api: '/blocks', data: data, method: "POST" });
-    library.network.io.sockets.emit('blocks/change', {});
+   self.broadcastByPost({ api: 'blocks', data: data, method: "POST" });
+   
+  library.network.io.sockets.emit('blocks/change', {height: block.height});
+
+    // __private.votesCache = {};// 清除签名缓存
   }
 }
 
 Transport.prototype.onNewPropose = function (propose, broadcast) {
   if (broadcast) {
-    var data = {
-      propose: library.protobuf.encodeBlockPropose(propose).toString('base64')
-    };
-    self.broadcast({}, { api: '/propose', data: data, method: "POST" });
+    const message = {
+      body: {
+        propose: library.protobuf.encodeBlockPropose(propose)
+      },
+    }
+    self.broadcast('propose', message)
+   // self.broadcast({}, { api: '/propose', data: data, method: "POST" });
   }
 }
 
@@ -811,21 +1018,59 @@ Transport.prototype.onDappReady = function (dappId, broadcast) {
     var data = {
       dappId: dappId
     }
-    self.broadcast({}, { api: '/dappReady', data: data, method: "POST" })
+    self.dappBroadcast( { api: '/dappReady', data: data, method: "POST" })
   }
 }
 
+Transport.prototype.onPublicIpChanged = function (ip, port, broadcast) {
+  if (broadcast) {
+    const data = {
+      ip: ip,
+      port: port
+    };
+    self.broadcastByPost({api: 'p2p/ipChanged', data: data, method: "POST"});
+  }
+}
 Transport.prototype.sendVotes = function (votes, address) {
-  self.getFromPeer({ address: address }, {
-    api: '/votes',
-    data: votes,
-    method: "POST"
-  });
+  const parts = address.split(':')
+  const contact = {
+    host: parts[0],
+    port: parseInt(parts[1])+1,
+  }
+   modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
+          if (err) {
+            library.logger.error('send votes error', err)
+            self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+          }
+        })
+  // modules.peer.listPeers( function (err, peers) {
+  //   if (!err) {
+      // const nodesMap = new Map()
+      // peers.forEach((n) => {
+      //   const a = `${n.host}:${n.port}`
+      //  // console.log(" a in nodesMap == "+a );
+      //   if (!nodesMap.has(a)) nodesMap.set(a, n)
+      // })
+      
+      // const b = `${contact.host}:${contact.port}`
+     // console.log("nodesMap.has(b) == "+nodesMap.has(b))
+      // if(nodesMap.has(b)){
+        // modules.peer.proposeRequest('votes', { votes }, contact, (err) => {
+        //   if (err) {
+        //     library.logger.error('send votes error', err)
+        //     self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+        //   }
+        // })
+      // }else{
+      //   self.broadcastByPost({api: 'vote/forward', data: {votes:votes,address: address}, method: "POST"})
+      // }
+  //   } 
+  // });
 }
 
 Transport.prototype.onMessage = function (msg, broadcast) {
   if (broadcast) {
-    self.broadcast({ dappId: msg.dappId }, { api: '/dapp/message', data: msg, method: "POST" });
+    self.dappBroadcast({ dappId: msg.dappId }, { api: '/dapp/message', data: msg, method: "POST" });
   }
 }
 
@@ -839,7 +1084,7 @@ shared.message = function (msg, cb) {
   msg.timestamp = (new Date()).getTime();
   msg.hash = __private.hashsum(msg.body, msg.timestamp);
 
-  self.broadcast({ dappId: msg.dappId }, { api: '/dapp/message', data: msg, method: "POST" });
+  self.dappBroadcast({ dappId: msg.dappId }, { api: '/dapp/message', data: msg, method: "POST" });
   library.network.io.sockets.emit("dapps/" + msg.dappId, {});
   cb(null, {});
 }

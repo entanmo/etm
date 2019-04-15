@@ -21,6 +21,7 @@ const NORMAL_PREFIX = 'A' // A
 
 module.exports = {
   isAddress: function (address) {
+    /*
     if (typeof address !== 'string') {
       return false
     }
@@ -33,6 +34,8 @@ module.exports = {
       }
     }
     return true
+    */
+    return this.isBase58CheckAddress(address);
   },
 
   isBase58CheckAddress: function (address) {

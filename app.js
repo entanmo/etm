@@ -19,7 +19,7 @@ var assert = require('assert');
 var program = require('commander');
 var async = require('async');
 var fs = require('fs');
-
+var path = require('path');
 var init = require('./src/init');
 var setup = require('./src/setup');
 var packageJson = require('./package.json');
@@ -63,7 +63,14 @@ function main() {
     .option('-e, --execute <path>', 'exe')
     .option('--dapps <dir>', 'DApps directory')
     .option('--base <dir>', 'Base directory')
+    .option('--dataDir <dir>', 'Data directory')
+    .option('--no-upnp', "Disable unpn feature")
+    .option('--no-acquireip', "Disable acquire ip feature")
+    .option('--no-checkpriip', "Disable check private ip type")
+    .option("--reportKafka", "Flag - enable to report performance information to kafka")
     .parse(process.argv);
+
+  global.reportKafka = program.reportKafka;
 
   const options = {
     program: program,
@@ -92,6 +99,10 @@ function main() {
       if (program.execute) {
         // only for debug use
         // require(path.resolve(program.execute))(scope);
+      }
+
+      if (!scope.config.acquireip && scope.config.publicIp == null) {
+        scope.logger.warn('Acquire ip is disable, But public ip is not config.');
       }
 
       scope.bus.message('bind', scope.modules);

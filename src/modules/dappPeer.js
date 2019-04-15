@@ -30,7 +30,7 @@ require('array.prototype.find'); // Old node fix
 var modules, library, self, __private = {}, shared = {};
 
 // Constructor
-function Peer(cb, scope) {
+function DappPeer(cb, scope) {
   library = scope;
   self = this;
   self.__private = __private;
@@ -41,29 +41,7 @@ function Peer(cb, scope) {
 
 // Private methods
 __private.attachApi = function () {
-  var router = new Router();
-
-  router.use(function (req, res, next) {
-    if (modules) return next();
-    res.status(500).send({success: false, error: "Blockchain is loading"});
-  });
-
-  router.map(shared, {
-    "get /": "getPeers",
-    "get /version": "version",
-    "get /get": "getPeer"
-  });
-
-  router.use(function (req, res) {
-    res.status(500).send({success: false, error: "API endpoint not found"});
-  });
-
-  library.network.app.use('/api/peers', router);
-  library.network.app.use(function (err, req, res, next) {
-    if (!err) return next();
-    library.logger.error(req.url, err.toString());
-    res.status(500).send({success: false, error: err.toString()});
-  });
+  
 }
 
 __private.updatePeerList = function (cb) {
@@ -243,7 +221,7 @@ __private.getByFilter = function (filter, cb) {
 }
 
 // Public methods
-Peer.prototype.list = function (options, cb) {
+DappPeer.prototype.list = function (options, cb) {
   options.limit = options.limit || 100;
 
   library.dbLite.query("select p.ip, p.port, p.state, p.os, p.version from peers p " + (options.dappId ? " inner join peers_dapp pd on p.id = pd.peerId and pd.dappId = $dappId " : "") + " where p.state > 0 ORDER BY RANDOM() LIMIT $limit", options, {
@@ -257,7 +235,7 @@ Peer.prototype.list = function (options, cb) {
   });
 }
 
-Peer.prototype.listWithDApp = function (options, cb) {
+DappPeer.prototype.listWithDApp = function (options, cb) {
   options.limit = options.limit || 100;
 
   // library.dbLite.query("select p.ip, p.port, p.state, p.os, p.version from peers p " + (options.dappId ? " inner join peers_dapp pd on p.id = pd.peerId and pd.dappId = $dappId " : "") + " where p.state > 0 ORDER BY RANDOM() LIMIT $limit", options, {
@@ -272,27 +250,8 @@ Peer.prototype.listWithDApp = function (options, cb) {
   });
 }
 
-Peer.prototype.heartbeat = function (pip, port, cb) {
-  const isFrozenList = library.config.peers.list.find(function (peer) {
-    return peer.ip == ip.fromLong(pip) && peer.port == port;
-  });
-  if (isFrozenList !== undefined) return cb && cb();
 
-  library.dbLite.query("SELECT * FROM peers WHERE ip = $ip AND port = $port AND state = 0;", {
-    ip: pip,
-    port: port,
-  }, function (err, rows) {
-    if (err) {
-      return cb && cb();
-    }
-    if (rows.length) {
-      self.state(pip, port, 1);
-    }
-    cb && cb();
-  });
-}
-
-Peer.prototype.reset = function (cb) {
+DappPeer.prototype.reset = function (cb) {
   library.dbLite.query('update peers set state = 2', function (err) {
     if (cb) return cb(err)
     if (err) {
@@ -301,7 +260,7 @@ Peer.prototype.reset = function (cb) {
   })
 }
 
-Peer.prototype.state = function (pip, port, state, timeoutSeconds, cb) {
+DappPeer.prototype.state = function (pip, port, state, timeoutSeconds, cb) {
   var isFrozenList = library.config.peers.list.find(function (peer) {
     return peer.ip == ip.fromLong(pip) && peer.port == port;
   });
@@ -324,7 +283,7 @@ Peer.prototype.state = function (pip, port, state, timeoutSeconds, cb) {
   });
 }
 
-Peer.prototype.remove = function (pip, port, cb) {
+DappPeer.prototype.remove = function (pip, port, cb) {
   var isFrozenList = library.config.peers.list.find(function (peer) {
     return peer.ip == ip.fromLong(pip) && peer.port == port;
   });
@@ -339,7 +298,7 @@ Peer.prototype.remove = function (pip, port, cb) {
   });
 }
 
-Peer.prototype.addDapp = function (config, cb) {
+DappPeer.prototype.addDapp = function (config, cb) {
   library.dbLite.query("SELECT id from peers where ip = $ip and port = $port", {
     ip: config.ip,
     port: config.port
@@ -359,7 +318,7 @@ Peer.prototype.addDapp = function (config, cb) {
   });
 }
 
-Peer.prototype.update = function (peer, cb) {
+DappPeer.prototype.update = function (peer, cb) {
   if (!peer.ip || !peer.port) {
     cb && cb();
     return;
@@ -395,7 +354,7 @@ Peer.prototype.update = function (peer, cb) {
   })
 }
 
-Peer.prototype.getVersion = function () {
+DappPeer.prototype.getVersion = function () {
   return {
     version: library.config.version,
     build: library.config.buildVersion,
@@ -403,7 +362,7 @@ Peer.prototype.getVersion = function () {
   };
 }
 
-Peer.prototype.isCompatible = function (version) {
+DappPeer.prototype.isCompatible = function (version) {
   var nums = version.split('.').map(Number);
   if (nums.length != 3) {
     return true;
@@ -425,20 +384,20 @@ Peer.prototype.isCompatible = function (version) {
   return true;
 }
 
-Peer.prototype.sandboxApi = function (call, args, cb) {
+DappPeer.prototype.sandboxApi = function (call, args, cb) {
   sandboxHelper.callMethod(shared, call, args, cb);
 }
 
 // Events
-Peer.prototype.onBind = function (scope) {
+DappPeer.prototype.onBind = function (scope) {
   modules = scope;
 }
 
-Peer.prototype.onBlockchainReady = function () {
+DappPeer.prototype.onBlockchainReady = function () {
   async.eachSeries(library.config.peers.list, function (peer, cb) {
     library.dbLite.query("INSERT OR IGNORE INTO peers(ip, port, state) VALUES($ip, $port, $state)", {
       ip: ip.toLong(peer.ip),
-      port: peer.port,
+      port: Number(peer.port)-1,
       state: 2
     }, cb);
   }, function (err) {
@@ -450,7 +409,7 @@ Peer.prototype.onBlockchainReady = function () {
       if (count) {
         __private.updatePeerList(function (err) {
           err && library.logger.error('updatePeerList', err);
-          library.bus.message('peerReady');
+        //  library.bus.message('peerReady');
         })
         library.logger.info('Peers ready, stored ' + count);
       } else {
@@ -460,131 +419,22 @@ Peer.prototype.onBlockchainReady = function () {
   });
 }
 
-Peer.prototype.onPeerReady = function () {
-  setImmediate(function nextUpdatePeerList() {
-    __private.updatePeerList(function (err) {
-      err && library.logger.error('updatePeerList timer', err);
-      setTimeout(nextUpdatePeerList, 60 * 1000);
-    })
-  });
+// DappPeer.prototype.onPeerReady = function () {
+//   setImmediate(function nextUpdatePeerList() {
+//     __private.updatePeerList(function (err) {
+//       err && library.logger.error('updatePeerList timer', err);
+//       setTimeout(nextUpdatePeerList, 60 * 1000);
+//     })
+//   });
 
-  setImmediate(function nextBanManager() {
-    __private.banManager(function (err) {
-      err && library.logger.error('banManager timer', err);
-      setTimeout(nextBanManager, 65 * 1000)
-    });
-  });
-}
+//   setImmediate(function nextBanManager() {
+//     __private.banManager(function (err) {
+//       err && library.logger.error('banManager timer', err);
+//       setTimeout(nextBanManager, 65 * 1000)
+//     });
+//   });
+// }
 
-// Shared
-shared.getPeers = function (req, cb) {
-  var query = req.body;
-  library.scheme.validate(query, /*{
-    type: "object",
-    properties: {
-      state: {
-        type: "integer",
-        minimum: 0,
-        maximum: 3
-      },
-      os: {
-        type: "string"
-      },
-      version: {
-        type: "string"
-      },
-      limit: {
-        type: "integer",
-        minimum: 0,
-        maximum: 100
-      },
-      orderBy: {
-        type: "string"
-      },
-      offset: {
-        type: "integer",
-        minimum: 0
-      },
-      port: {
-        type: "integer",
-        minimum: 1,
-        maximum: 65535
-      }
-    }
-  }*/ scheme.getPeers, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    if (query.limit < 0 || query.limit > 100) {
-      return cb("Invalid limit. Maximum is 100");
-    }
-
-    __private.getByFilter(query, function (err, peers) {
-      if (err) {
-        return cb("Peer not found");
-      }
-
-      for (var i = 0; i < peers.length; i++) {
-        peers[i].ip = ip.fromLong(peers[i].ip);
-      }
-      library.dbLite.query("select count(1) from peers", function (err, count) {
-        if (err) {
-          return cb("Can not get peers count");
-        }
-        cb(null, {peers: peers, totalCount: count[0]});
-      });
-    });
-  });
-}
-
-shared.getPeer = function (req, cb) {
-  var query = req.body;
-  library.scheme.validate(query, /*{
-    type: "object",
-    properties: {
-      ip: {
-        type: "string",
-        minLength: 1
-      },
-      port: {
-        type: "integer",
-        minimum: 0,
-        maximum: 65535
-      }
-    },
-    required: ['ip', 'port']
-  }*/ scheme.getPeer, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    __private.getByFilter({
-      ip: query.ip,
-      port: query.port
-    }, function (err, peers) {
-      if (err) {
-        return cb("Peer not found");
-      }
-
-      var peer = peers.length ? peers[0] : null;
-
-      if (peer) {
-        peer.ip = ip.fromLong(peer.ip);
-      }
-
-      cb(null, {peer: peer || {}});
-    });
-  });
-}
-
-shared.version = function (req, cb) {
-  cb(null, {
-    version: library.config.version,
-    build: library.config.buildVersion,
-    net: library.config.netVersion
-  });
-}
 
 // Export
-module.exports = Peer;
+module.exports = DappPeer;

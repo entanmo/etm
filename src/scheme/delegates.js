@@ -13,6 +13,7 @@
  */
 
 'use strict';
+var slots = require('../utils/slots.js');
 
 module.exports = {
     delegate: {
@@ -112,7 +113,7 @@ module.exports = {
             limit: {
                 type: "integer",
                 minimum: 0,
-                maximum: 101
+                maximum: slots.delegates
             },
             offset: {
                 type: "integer",
@@ -157,6 +158,28 @@ module.exports = {
         username: {
             type: "string"
         }
+        },
+        required: ["secret"]
+    },
+
+    delDelegate: {
+        id: 'delegates.delDelegate',
+        type: "object",
+        properties: {
+            secret: {
+                type: "string",
+                minLength: 1,
+                maxLength: 100
+            },
+            publicKey: {
+                type: "string",
+                format: "publicKey"
+            },
+            secondSecret: {
+                type: "string",
+                minLength: 1,
+                maxLength: 100
+            },
         },
         required: ["secret"]
     }

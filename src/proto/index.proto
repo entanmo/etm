@@ -153,12 +153,15 @@ message BlockPropose {
   required string address = 5;
   required bytes hash = 6;
   required bytes signature = 7;
+  required int64 nonce = 8;
+  // required bytes powHash = 9;
 }
 
 message BlockVotes {
   required int64 height = 1;
   required string id = 2;
   repeated BlockVoteSignature signatures = 3;
+  required int32 timestamp = 4;
 }
 
 message BlockVoteSignature {
