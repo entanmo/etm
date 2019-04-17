@@ -24,6 +24,8 @@ var addressHelper = require('../utils/address.js');
 var slots = require("../utils/slots");
 const _ = require("lodash");
 
+const MAX_BACKUP_ROUND = 10;
+
 const LockVotes = require("../logic/lock_votes");
 const UnlockVotes = require("../logic/unlock_votes");
 
@@ -184,7 +186,57 @@ LockVote.prototype.getLockVote = function (id, cb) {
     __private.getLockVote(id, cb);
 }
 
-LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
+LockVote.prototype.unupdateLockVotes = function (address, blockHeight, type, cb) {
+    __private.listLockVotes({ address: address, state: 1 }, (err, result) => {
+        if (err) return cb(err);
+
+        if (result.count <= 0) return cb();
+
+        async.eachSeries(result.trs, (value, cb) => {
+            library.dbLite.query("SELECT old, new FROM lock_votes_backup WHERE transactionId=$transactionId AND type=$type AND change=$change AND status=1", {
+                transactionId: value.id,
+                change: blockHeight,
+                type
+            }, { old: Number, new: Number }, (err, rows) => {
+                if (err) return cb(err);
+
+                if (rows.length > 1) {
+                    return cb(new Error("more than one record exists~"));
+                }
+                if (rows.length == 1) {
+                    const oldHeight = rows[0].old;
+                    library.dbLite.query("UPDATE lock_votes SET currentHeight=$currentHeight WHERE transactionId=$transactionId AND state=1", {
+                        transactionId: value.id,
+                        currentHeight: oldHeight
+                    }, err => {
+                        if (err) return cb(err);
+
+                        library.dbLite.query("UPDATE lock_votes_backup SET status=0 WHERE transactionId=$transactionId AND type=$type AND change=$change", {
+                            transactionId: value.id,
+                            change: blockHeight,
+                            type
+                        }, cb);
+                    });
+                } else {
+                    if (value.asset.originHeight == blockHeight) {
+                        return library.dbLite.query("UPDATE lock_votes SET currentHeight=$currentHeight WHERE transactionId=$transactionId AND state=1", {
+                            transactionId: value.id,
+                            currentHeight: value.asset.originHeight
+                        }, cb);
+                    }
+
+                    return cb();
+                }
+            });
+        }, err => {
+            return cb(err);
+        });
+    });
+}
+/**
+ * @param type - 操作类型； 0 -- block action, 1 -- round action
+ */
+LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, type, cb) {
     if (rate < 0 || rate > 1) {
         return cb(new Error("Invalid rate"));
     }
@@ -213,7 +265,42 @@ LockVote.prototype.updateLockVotes = function (address, blockHeight, rate, cb) {
             library.dbLite.query("UPDATE lock_votes SET currentHeight=$currentHeight where transactionId = $transactionId and state = 1", {
                 currentHeight: newHeight,
                 transactionId: value.id
-            }, cb);
+            }, (err, rows) => {
+                if (err) {
+                    return cb(err);
+                }
+
+                // backup 
+                library.dbLite.query("SELECT transactionId FROM lock_votes_backup WHERE transactionId=$transactionId AND change=$change AND type=$type", {
+                    transactionId: value.id,
+                    change: blockHeight,
+                    type
+                }, { transactionId: String }, (err, rows) => {
+                    if (err) {
+                        return cb(err);
+                    }
+
+                    if (rows.length > 0) {
+                        /// exists
+                        library.dbLite.query("UPDATE lock_votes_backup SET old=$old, new=$new, status=1 WHERE transactionId=$transactionId AND change=$change AND type=$type", {
+                            transactionId: value.id,
+                            change: blockHeight,
+                            old: info.currentHeight,
+                            new: newHeight,
+                            type,
+                        }, cb);
+                    } else {
+                        /// not exists
+                        library.dbLite.query("INSERT INTO lock_votes_backup(transactionId, old, new, change, type, status) VALUES($transactionId, $old, $new, $change, $type, 1)", {
+                            transactionId: value.id,
+                            change: blockHeight,
+                            old: info.currentHeight,
+                            new: newHeight,
+                            type
+                        }, cb);
+                    }
+                });
+            });
         }, (err) => {
             return cb(err);
         });
@@ -227,10 +314,11 @@ LockVote.prototype.refreshRoundLockVotes = function (address, blockHeight, cb) {
         }
 
         if (result.count <= 0) {
-            return cb(null, 0);
+            return cb(null, { totalVotes: 0, lockvoteChanges: [] });
         }
 
         let totalVotes = 0;
+        const lockvoteChanges = [];
 
         // 将延迟到账的金额加入到总票数里面
         totalVotes += library.delayTransferMgr.totalAmount(address);
@@ -245,6 +333,7 @@ LockVote.prototype.refreshRoundLockVotes = function (address, blockHeight, cb) {
                     return cb(err);
                 }
 
+                lockvoteChanges.push({ transactionId: value.id, vote: numOfVote });
                 totalVotes += numOfVote;
                 cb();
             });
@@ -257,7 +346,7 @@ LockVote.prototype.refreshRoundLockVotes = function (address, blockHeight, cb) {
                 return cb(err);
             }
 
-            return cb(null, totalVotes);
+            return cb(null, { totalVotes, lockvoteChanges });
         });
     });
 }
@@ -286,6 +375,14 @@ LockVote.prototype.calcLockVotes = function (address, blockHeight, cb) {
             }
             return cb(null, totalVotes);
         });
+    });
+}
+
+LockVote.prototype.flushBackupByRound = function (round, cb) {
+    library.dbLite.query("DELETE FROM lock_votes_backup WHERE change < $change", {
+        change: (round - MAX_BACKUP_ROUND) * slots.roundBlocks
+    }, (err, rows) => {
+        return cb(err);
     });
 }
 

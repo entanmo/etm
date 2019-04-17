@@ -27,6 +27,11 @@ const reportor = require("../utils/kafka-reportor");
 
 const Miner = require("entanmo-miner");
 
+function ConsensusState(diffTimestamp) {
+  const interval = slots.roundBlocks * slots.interval;
+  return interval > diffTimestamp ? 2 / 3 : 1 / 2;
+}
+
 function Consensus(scope, cb) {
   this.scope = scope;
   this.pendingBlock = null;
@@ -42,7 +47,7 @@ Consensus.prototype.createVotes = function (keypairs, block) {
   var votes = {
     height: block.height,
     id: block.id,
-    timestamp:block.timestamp,
+    timestamp: block.timestamp,
     signatures: []
   };
   keypairs.forEach(function (el) {
@@ -82,8 +87,9 @@ Consensus.prototype.getVoteHash = function (height, id) {
   return crypto.createHash('sha256').update(bytes.toBuffer()).digest();
 }
 
-Consensus.prototype.hasEnoughVotes = function (votes) {
-  return votes && votes.signatures && votes.signatures.length > slots.delegates * 2 / 3;
+Consensus.prototype.hasEnoughVotes = function (votes, diffTimestamp = 0) {
+  // return votes && votes.signatures && votes.signatures.length > slots.delegates * 2 / 3;
+  return votes && votes.signatures && votes.signatures.length > slots.delegates * ConsensusState(diffTimestamp);
 }
 
 Consensus.prototype.hasEnoughVotesRemote = function (votes) {
@@ -129,7 +135,7 @@ Consensus.prototype.addPendingVotes = function (votes) {
           height: votes.height,
           id: votes.id,
           signatures: [],
-          timestamp:votes.timestamp
+          timestamp: votes.timestamp
         };
       }
       this.pendingVotes.signatures.push(item);

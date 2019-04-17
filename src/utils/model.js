@@ -112,20 +112,20 @@ class Model {
           'a.issuerName': 'i.name'
         }
       }, {
-          type: 'inner',
-          table: 'trs',
-          alias: 't',
-          on: {
-            'a.transactionId': 't.id'
-          }
-        }, {
-          type: 'inner',
-          table: 'blocks',
-          alias: 'b',
-          on: {
-            't.blockId': 'b.id'
-          }
-        }],
+        type: 'inner',
+        table: 'trs',
+        alias: 't',
+        on: {
+          'a.transactionId': 't.id'
+        }
+      }, {
+        type: 'inner',
+        table: 'blocks',
+        alias: 'b',
+        on: {
+          't.blockId': 'b.id'
+        }
+      }],
       fields: [
         { 'a.name': 'name' },
         { 'a.desc': 'desc' },
@@ -438,24 +438,24 @@ class Model {
 
   checkAcl(table, currency, senderId, recipientId, cb) {
     var sqls = []
-   // if (!!senderId) sqls.push('select address from $table where address=$senderId and currency=$currency')
-   // if (!!recipientId) sqls.push('select address from $table where address=$recipientId and currency=$currency')
+    // if (!!senderId) sqls.push('select address from $table where address=$senderId and currency=$currency')
+    // if (!!recipientId) sqls.push('select address from $table where address=$recipientId and currency=$currency')
     var values = {
       //table: table,
       senderId: senderId,
       recipientId: recipientId,
       currency: currency
     }
-    var sql= 'select address from  '+table+  ' where address = $senderId or address = $recipientId and currency = $currency'
+    var sql = 'select address from  ' + table + ' where address = $senderId or address = $recipientId and currency = $currency'
     //console.log(sqls + JSON.stringify(values))
-      // this.dbLite.query(sqls.join(';'), values, function (err, res) {
-      //   if (err) return cb(err)
-      //   cb(null, res.length != 0)
-      // })
-      this.dbLite.query(sql, values, function (err, res) {
-        if (err) return cb(err)
-        cb(null, res.length != 0)
-      })
+    // this.dbLite.query(sqls.join(';'), values, function (err, res) {
+    //   if (err) return cb(err)
+    //   cb(null, res.length != 0)
+    // })
+    this.dbLite.query(sql, values, function (err, res) {
+      if (err) return cb(err)
+      cb(null, res.length != 0)
+    })
   }
 
   isIssuerExists(name, id, cb) {
@@ -481,6 +481,59 @@ class Model {
       balance: String
     }
     this.dbLite.query(sql.query, sql.values, fieldConv, cb)
+  }
+
+  getAllAppliedDelayTransfer(blockHeight, cb) {
+    const returnResults = [];
+    const sql = jsonSql.build({
+      type: "select",
+      table: "delay_transfer",
+      fields: ["expired", "transactionId"],
+      condition: { state: 1, expired: blockHeight }
+    });
+    const fieldConv = {
+      expired: Number,
+      transactionId: String
+    };
+    this.dbLite.query(sql.query, sql.values, fieldConv, (err, results) => {
+      if (err) {
+        return cb(err);
+      }
+
+      async.eachSeries(results, (value, cb) => {
+        const { transactionId, expired } = value;
+        const sql = jsonSql.build({
+          type: "select",
+          table: "trs",
+          fields: ["senderId", "recipientId", "amount"],
+          condition: { id: transactionId }
+        });
+        const fieldConv = {
+          senderId: String,
+          recipientId: String,
+          amount: Number
+        };
+        this.dbLite.query(sql.query, sql.values, fieldConv, (err, results) => {
+          if (err && results.length <= 0) {
+            return cb(err);
+          }
+          const { senderId, recipientId, amount } = results[0];
+          returnResults.push({
+            transactionId,
+            senderId,
+            recipientId,
+            amount,
+            expired
+          });
+          return cb();
+        });
+      }, err => {
+        if (err) {
+          return cb(err);
+        }
+        return cb(null, returnResults);
+      });
+    });
   }
 
   getAllDelayTransfer(cb) {
@@ -534,7 +587,7 @@ class Model {
         }
 
         return cb(null, returnResults);
-      });      
+      });
     });
   }
 

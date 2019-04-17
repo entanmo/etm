@@ -13,74 +13,71 @@ class VoterBonus {
         // }, 5000);
     }
 
-    async _asyncGetAccounts(filter, fields) {
+    async getAccountsAsync(filter, fields) {
         return new Promise((resolve, reject) => {
-            modules.accounts.getAccounts(filter, fields, (err, allDelegates) => {
+            modules.accounts.getAccounts(filter, fields, (err, accounts) => {
                 if (err) {
                     return reject(err);
                 }
 
-                return resolve(allDelegates);
+                return resolve(accounts);
             });
         });
     }
 
-    async _asyncGenerateDelegateList(height) {
+    async genDelegatesAsync(height) {
         return new Promise((resolve, reject) => {
-            modules.delegates.generateDelegateList(height, (err, roundDelegates) => {
+            modules.delegates.generateDelegateList(height, (err, delegates) => {
                 if (err) {
                     return reject(err);
                 }
 
-                return resolve(roundDelegates);
+                return resolve(delegates);
             });
         });
     }
 
-    async _asyncGetDelegateVoters(publicKey) {
+    async getVotersAsync(publicKey) {
         return new Promise((resolve, reject) => {
             modules.delegates.getDelegateVoters(publicKey, (err, voters) => {
                 if (err) {
                     return reject(err);
                 }
+
                 return resolve(voters);
-            })
-        })
+            });
+        });
     }
 
-    async _asyncListLockVote(query) {
+
+    async listLockvotesAsync(query) {
         return new Promise((resolve, reject) => {
             modules.lockvote.listLockVotes(query, (err, results) => {
                 if (err) {
                     return reject(err);
                 }
-
                 return resolve(results);
             });
         });
     }
 
-    async _getVoterVote(address) {
-        const results = await this._asyncListLockVote({
-            address,
-            state: 1
-        });
-        let totalVotes = 0;
+    async getVoterVoteAsync(address) {
+        const results = await this.listLockvotesAsync({ address, state: 1 });
+        let totalvotes = 0;
         for (let el of results.trs) {
-            totalVotes += el.asset.vote;
+            totalvotes += el.asset.vote;
         }
-        return totalVotes;
+        return totalvotes;
     }
 
-    async _saveToDB(value) {
+    async save(value) {
         return new Promise((resolve, reject) => {
             // console.log("++++++++++++++++++++++ saveToDB:", JSON.stringify(value, null, 2));
             const base64Voters = Buffer.from(value.voters, "utf8").toString("base64");
-            library.dbLite.query("INSERT INTO mem_roundrewards(round, isTop, delegatePublicKey, voters)" +
-                "VALUES($round, $isTop, $delegatePublicKey, $voters);", {
+            library.dbLite.query("INSERT INTO mem_roundrewards(round, delegatePublicKey, voters)" +
+                "VALUES($round, $delegatePublicKey, $voters);", {
                     round: value.round,
                     delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
-                    isTop: value.isTop ? 1 : 0,
                     voters: base64Voters
                 }, err => {
                     if (err) {
@@ -92,12 +89,12 @@ class VoterBonus {
         });
     }
 
-    async _readFromDB() {
+    async load() {
         return new Promise((resolve, reject) => {
-            library.dbLite.query("SELECT round, isTop, delegatePublicKey, voters FROM mem_roundrewards;",
+            library.dbLite.query("SELECT round, delegatePublicKey, voters FROM mem_roundrewards",
                 {},
                 [
-                    "round", "isTop", "delegatePublicKey", "voters"
+                    "round", "delegatePublicKey", "voters"
                 ],
                 (err, rows) => {
                     if (err) {
@@ -110,7 +107,7 @@ class VoterBonus {
         });
     }
 
-    async _freshDB() {
+    async flush() {
         return new Promise((resolve, reject) => {
             library.dbLite.query("DELETE FROM mem_roundrewards;", {}, err => {
                 if (err) {
@@ -122,26 +119,15 @@ class VoterBonus {
         });
     }
 
-    async _getDelegateVotersVotes(publicKey) {
-        const votes = {};
-        const voters = await this._asyncGetDelegateVoters(publicKey);
-        for (let account of voters.accounts) {
-            const vote = await this._getVoterVote(account.address);
-            votes[account.address] = votes[account.address] || 0;
-            votes[account.address] += vote;
-        }
-
-        return votes;
-    }
-
-    async _bonusAction(address, amount, block) {
+    async applyBonus(address, amount, block) {
         return new Promise((resolve, reject) => {
             modules.accounts.mergeAccountAndGet({
                 address,
                 balance: amount,
                 u_balance: amount,
                 blockId: block.id,
-                round: modules.round.calc(block.height)
+                round: modules.round.calc(block.height),
+                bonus: amount
             }, err => {
                 if (err) {
                     return reject(err);
@@ -152,123 +138,106 @@ class VoterBonus {
         });
     }
 
-    async _allDelegatesVoters() {
-        const allDelegates = await this._asyncGetAccounts({
-            isDelegate: 1,
-            sort: {
-                vote: -1,
-                publicKey: -1
-            }
-        }, ["publicKey", "address"]);
-        const allVoters = {};
-        for (let delegate of allDelegates) {
-            const votes = await this._getDelegateVotersVotes(delegate.publicKey);
-            allVoters[delegate.publicKey] = votes;
+    async rollbackBeginBonus(round, caches) {
+        this.roundCaches[round] = caches;
+        const { voters } = caches;
+        const newCaches = [];
+        Object.keys(voters).forEach(el => {
+            newCaches.push({
+                round: round,
+                delegatePublicKey: el,
+                voters: JSON.stringify(voters[el])
+            });
+        });
+        for (let c of newCaches) {
+            await this.save(c);
         }
-        return allVoters;
+
+        return this.roundCaches[round];
     }
 
     async beginBonus(round, block) {
         // console.log("begin bonus:", round, block.height);
-        this.roundCaches[round] = this.roundCaches[round] || {};
-        this.roundCaches[round].allDelegateVoters = await this._allDelegatesVoters();
-        this.roundCaches[round].delegates = await this._asyncGenerateDelegateList(block.height);
-
-        // TODO Cache
-        const { allDelegateVoters, delegates } = this.roundCaches[round];
-        const cache = [];
-        Object.keys(allDelegateVoters).forEach(el => {
-            let isTop = false;
-            if (delegates.includes(el)) {
-                isTop = true;
+        const delegates = await this.genDelegatesAsync(block.height);
+        const voters = {};
+        for (let delegate of delegates) {
+            const vs = await this.getVotersAsync(delegate);
+            const vvs = {};
+            for (let account of vs.accounts) {
+                const vote = await this.getVoterVoteAsync(account.address);
+                vvs[account.address] = vvs[account.address] || 0;
+                vvs[account.address] += vote; // Math.floor(Math.pow(vote, 0.75));
             }
-            cache.push({
-                round: round,
-                delegatePublicKey: el,
-                isTop,
-                voters: JSON.stringify(allDelegateVoters[el])
-            });
-        });
-        // save to db
-        // console.log("___________________ cache: ", JSON.stringify(cache, null, 2));
-        for (let i = 0; i < cache.length; i++) {
-            await this._saveToDB(cache[i]);
+            for (let account of vs.accounts) {
+                if (vvs[account.address]) {
+                    const vote = vvs[account.address];
+                    vvs[account.address] = Math.floor(Math.pow(vote, 0.75));
+                }
+            }
+            voters[delegate] = vvs;
         }
 
-        // console.log("begin bonus:", JSON.stringify(this.roundCaches[round], null, 2));
+        this.roundCaches[round] = this.roundCaches[round] || {};
+        this.roundCaches[round].delegates = delegates;
+        this.roundCaches[round].voters = voters;
+
+        const caches = [];
+        Object.keys(voters).forEach(el => {
+            caches.push({
+                round: round,
+                delegatePublicKey: el,
+                isTop: true,
+                voters: JSON.stringify(voters[el])
+            });
+        });
+        for (let c of caches) {
+            await this.save(c);
+        }
+
+        return this.roundCaches[round];
     }
 
     async commitBonus(round, bonusAmount, block) {
         // console.log("commit bonus:", round, bonusAmount, block.height);
         if (this.roundCaches[round] == null) {
+            console.log("commitBonus null commit");
             return;
         }
-
-        const allVotersBonusAmount = Math.floor(bonusAmount / 4);
-        const roundVotersBonusAmount = Math.floor(bonusAmount / 4);
-        const chaosVoterBonusAmount = bonusAmount - allVotersBonusAmount - roundVotersBonusAmount;
-        const { allDelegateVoters, delegates } = this.roundCaches[round];
         this.roundCaches[round].bonusAmount = bonusAmount;
-        this.roundCaches[round].block = block;
-        // console.log("commit bonus:", JSON.stringify(this.roundCaches[round], null, 2));
+        this.roundCaches[round].block = { id: block.id, height: block.height };
 
+        const voterBonusAmount = Math.floor(bonusAmount / 2);
+        const chaosBonusAmount = bonusAmount - voterBonusAmount;
+        const { delegates, voters } = this.roundCaches[round];
 
-        // calc total votes
-        // total voters
-        // delegate voters
-        let totalVotes = 0;
-        const allVoters = {};
-        const topDelegateVoters = {};
-        const roundDelegateVoters = [];
-        Object.keys(allDelegateVoters).forEach(delegatePublicKey => {
-            const voters = allDelegateVoters[delegatePublicKey];
-            let isTop = delegates.includes(delegatePublicKey);
-            if (isTop) {
-                topDelegateVoters[delegatePublicKey] = voters;
-            }
-            Object.keys(voters).forEach(voterAddress => {
-                const vote = voters[voterAddress];
-                totalVotes += vote;
-                allVoters[voterAddress] = allVoters[voterAddress] || 0;
-                allVoters[voterAddress] += vote;
-                if (isTop && !roundDelegateVoters.includes(voterAddress)) {
-                    roundDelegateVoters.push(voterAddress);
+        const results = [];
+        // delegate bonus
+        const dba = Math.floor(voterBonusAmount / slots.delegates);
+        for (let delegate of delegates) {
+            const vs = voters[delegate];
+            if (vs == null) continue;
+            const addresses = Object.keys(vs);
+            let totalvotes = 0;
+            addresses.forEach(el => {
+                totalvotes += vs[el];
+            });
+
+            for (let i = 0; i < addresses.length; i++) {
+                const el = addresses[i];
+                const v = vs[el];
+                const amount = Math.floor(v / totalvotes * dba);
+                if (amount > 0) {
+                    await this.applyBonus(el, amount, block);
+                    /// TODO
+                    results.push({ address: el, amount, block: { height: block.height, id: block.id } });
                 }
-            });
-        });
-
-        // all voters bonus
-        const allVoterKeys = Object.keys(allVoters);
-        for (let i = 0; i < allVoterKeys.length; i++) {
-            const el = allVoterKeys[i];
-            const amount = Math.floor(allVoters[el] / totalVotes * allVotersBonusAmount);
-            await this._bonusAction(el, amount, block);
-        }
-
-        // round voters
-        const singleDelegateVoterBonusAmount = Math.floor(roundVotersBonusAmount / slots.delegates);
-        const delegateKeys = Object.keys(topDelegateVoters);
-        for (let i = 0; i < delegateKeys.length; i++) {
-            const voters = topDelegateVoters[delegateKeys[i]];
-
-            const voterKeys = Object.keys(voters);
-            let delegateTotalVotes = 0;
-            voterKeys.forEach(el => {
-                delegateTotalVotes += voters[el];
-            });
-            for (let i = 0; i < voterKeys.length; i++) {
-                const address = voterKeys[i];
-                const voterVote = voters[address];
-                const amount = Math.floor(voterVote / delegateTotalVotes * singleDelegateVoterBonusAmount);
-                await this._bonusAction(address, amount, block);
             }
         }
-
-        // chaos voter
+        // delegae chaos
         const hash = crypto.createHash("sha256").update(block.id).digest("hex");
-        const chaosIndex = chaos(hash, block.height, roundDelegateVoters.length);
-        // FIXEDME: 保证不同版本，不同实现下的数据顺序一致
-        roundDelegateVoters.sort((a, b) => {
+        const chaosIndex = chaos(hash, block.height, delegates.length);
+        const sortedDelegates = [].concat(...delegates);
+        sortedDelegates.sort((a, b) => {
             if (a > b) {
                 return 1;
             }
@@ -278,34 +247,48 @@ class VoterBonus {
 
             return 0;
         });
+        const chaosDelegate = sortedDelegates[chaosIndex];
+        const vs = voters[chaosDelegate];
+        if (vs) {
+            const addresses = Object.keys(vs);
+            let totalvotes = 0;
+            addresses.forEach(el => {
+                totalvotes += vs[el];
+            });
+            for (let i = 0; i < addresses.length; i++) {
+                const el = addresses[i];
+                const v = vs[el];
+                const amount = Math.floor(v / totalvotes * chaosBonusAmount);
+                if (amount > 0) {
+                    await this.applyBonus(el, amount, block);
+                    /// TODO
+                    results.push({ address: el, amount, block: { height: block.height, id: block.id } });
+                }
+            }
+        }
+        await this.flush();
 
-        await this._bonusAction(roundDelegateVoters[chaosIndex], chaosVoterBonusAmount, block);
-        await this._freshDB();
+        return results;
     }
 
     async recovery() {
-        const data = await this._readFromDB();
+        const data = await this.load();
 
-        // TODO
         let cacheRound = null;
-        let allDelegateVoters = {};
+        let voters = {};
         let delegates = [];
         for (let i = 0; i < data.length; i++) {
-            let { round, isTop, delegatePublicKey, voters } = data[i];
+            let { round, delegatePublicKey, voters: delegateVoters } = data[i];
             cacheRound = round;
             delegatePublicKey = delegatePublicKey.toString("hex");
-            voters = JSON.parse(Buffer.from(voters, "base64").toString());
-            if (isTop) {
-                delegates.push(delegatePublicKey);
-            }
-            allDelegateVoters[delegatePublicKey] = voters;
+            delegates.push(delegatePublicKey);
+            let vs = JSON.parse(Buffer.from(delegateVoters, "base64").toString());
+            voters[delegatePublicKey] = vs;
         }
 
         this.roundCaches[cacheRound] = this.roundCaches[cacheRound] || {};
-        this.roundCaches[cacheRound].allDelegateVoters = allDelegateVoters;
         this.roundCaches[cacheRound].delegates = delegates;
-
-        // console.log("==========================:", JSON.stringify(this.roundCaches[cacheRound], null, 2));
+        this.roundCaches[cacheRound].voters = voters;
     }
 }
 

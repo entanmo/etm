@@ -23,6 +23,8 @@ const reportor = require("../utils/kafka-reportor");
 const BlockStatus = require("../utils/block-status");
 const VoterBonus = require("../utils/voter-bonus");
 
+const RollbackHelper = require("../utils/rollback-helper");
+
 // Private fields
 var modules, library, self, __private = {},
   shared = {};
@@ -40,6 +42,19 @@ __private.unDelegatesByRound = {};
 
 __private.blockStatus = new BlockStatus();
 __private.voterBonus = new VoterBonus();
+
+/// 保存当前轮的奖励信息
+__private.rewardsRollback = new RollbackHelper("rewards");
+/// 保存当前轮的分红结果
+__private.commitbonusRollback = new RollbackHelper("commitbonus");
+/// 保存当前轮的注销代理人信息
+__private.undelegatesRollback = new RollbackHelper("undelegates");
+/// 保存下一轮的分红信息
+__private.beginbonusRollback = new RollbackHelper("beginbonus");
+/// 保存下一轮的代理人与投票人票数信息
+__private.roundVotesRollback = new RollbackHelper("round-votes");
+/// 保存下一轮的投票人锁仓信息
+__private.lockvoteRollback = new RollbackHelper("voter-lockvote");
 
 const CLUB_BONUS_RATIO = 0.2
 
@@ -137,13 +152,285 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
   let prevRound = self.calc(previousBlock.height);
 
   async.series([
-    (next) => { //剔除出块人
-      modules.accounts.mergeAccountAndGet({
-        publicKey: block.generatorPublicKey,
-        producedblocks: -1,
-        blockId: block.id,
-        round: round
-      }, next);
+    (next) => { //更新缓存
+      __private.feesByRound[round] = (__private.feesByRound[round] || 0);
+      __private.feesByRound[round] -= block.totalFee;
+      __private.unFeesByRound[round] = (__private.unFeesByRound[round] || 0)
+      __private.unFeesByRound[round] += block.totalFee
+
+      __private.rewardsByRound[round] = (__private.rewardsByRound[round] || []);
+      let removedReward = __private.rewardsByRound[round].pop()
+      __private.unRewardsByRound[round] = (__private.unRewardsByRound[round] || [])
+      __private.unRewardsByRound[round].push(removedReward)
+
+      __private.delegatesByRound[round] = __private.delegatesByRound[round] || [];
+      let removedDelegate = __private.delegatesByRound[round].pop()
+      __private.unDelegatesByRound[round] = (__private.unDelegatesByRound[round] || [])
+      __private.unDelegatesByRound[round].push(removedDelegate)
+
+      __private.bonusByRound[round] = (__private.bonusByRound[round] || []);
+      let removeBonus = __private.bonusByRound[round].pop();
+      __private.unbonusByRound[round] = (__private.unbonusByRound[round] || []);
+      __private.unbonusByRound[round].push(removeBonus);
+
+      next();
+    },
+    // (next) => { // 处理换轮
+    //   if (prevRound === round && previousBlock.height !== 1) {
+    //     return next();
+    //   }
+
+    //   if (__private.unDelegatesByRound[round].length !== slots.roundBlocks && previousBlock.height !== 1) {
+    //     return next();
+    //   }
+    //   library.logger.warn('Unexpected roll back cross round', {
+    //     round: round,
+    //     prevRound: prevRound,
+    //     block: block,
+    //     previousBlock: previousBlock
+    //   });
+
+    //   reportor.report("nodejs", {
+    //     subaction: "exit",
+    //     data: {
+    //       method: "backwardTick",
+    //       reason: "unexpected roll back cross round",
+    //       round: round,
+    //       prevRound: prevRound,
+    //       block: block,
+    //       previousBlock: previousBlock
+    //     }
+    //   });
+    //   process.exit(1);
+    // },
+    (next) => { // 回退逻辑
+      // rollback
+      if (block.height % slots.roundBlocks !== 0) {
+        return next();
+      }
+      if (block.height === 1) return next();
+
+      async.series([
+        next => {
+          // 分红原始数据回退
+          (async () => {
+            const beginbonus = await __private.beginbonusRollback.unapplyRound(round, false);
+            if (beginbonus == null) {
+              await __private.beginbonusRollback.unapplyRound(round + 1, true);
+              /// rollback v2
+              throw new Error("beginbonus has no backup data.");
+              /// end rollback v2
+              // return;
+            }
+            await __private.voterBonus.rollbackBeginBonus(round, beginbonus);
+            await __private.beginbonusRollback.unapplyRound(round + 1, true);
+          })()
+            .then(() => next())
+            .catch(error => next(error));
+        },
+        next => {
+          // 锁仓系统
+          (async () => {
+            const lockvotes = await __private.lockvoteRollback.unapplyRound(round, false);
+            if (lockvotes == null) {
+              await __private.lockvoteRollback.unapplyRound(round, true);
+              /// rollback v2
+              throw new Error("lockvotes has no backup data.");
+              /// end rollback v2
+              // return; 
+            }
+            await new Promise((resolve, reject) => {
+              // for (let lockvote of lockvotes) {
+              //   const { address, height } = lockvote;
+              //   /// TODO: 锁仓数据回退
+              //   modules.lockvote.unupdateLockVotes(address, height, 1, )
+              // }
+              // // TODO
+              // resolve();
+
+              async.eachSeries(lockvotes, (value, cb) => {
+                const { address, height } = value;
+                modules.lockvote.unupdateLockVotes(address, height, 1, cb);
+              }, err => {
+                if (err) return reject(err);
+
+                modules.lockvote.flushBackupByRound(round, err => err ? reject(err) : resolve());
+              });
+            });
+            await __private.lockvoteRollback.unapplyRound(round, true);
+          })()
+            .then(() => next())
+            .catch(error => next(error));
+        },
+        next => {
+          // delegate票数
+          (async () => {
+            const undoRoundVotes = await __private.roundVotesRollback.unapplyRound(round, false);
+            if (undoRoundVotes == null) {
+              await __private.roundVotesRollback.unapplyRound(round + 1, true);
+              /// rollback v2
+              throw new Error("roundVotes has no backup data.");
+              /// end rollback v2
+              // return;
+            }
+            await new Promise((resolve, reject) => {
+              const { delegates, voters } = undoRoundVotes;
+              async.series([
+                next => {
+                  async.eachSeries(voters, (voterVote, cb) => {
+                    library.dbLite.query("UPDATE lock_votes SET vote=$vote where transactionId = $transactionId", {
+                      vote: voterVote.vote,
+                      transactionId: voterVote.transactionId
+                    }, err => {
+                      cb(err);
+                    });
+                  }, err => {
+                    next(err);
+                  });
+                },
+                next => {
+                  async.eachSeries(delegates, (delegatevote, cb) => {
+                    library.dbLite.query("UPDATE mem_accounts SET vote = $vote WHERE address = $address", {
+                      address: delegatevote.address,
+                      vote: delegatevote.vote
+                    }, cb);
+                  }, err => {
+                    next(err);
+                  });
+                }
+              ], err => {
+                return err ? reject(err) : resolve();
+              });
+            });
+            await __private.roundVotesRollback.unapplyRound(round + 1, true);
+          })()
+            .then(() => next())
+            .catch(error => next(error));
+        },
+        next => {
+          // delegate注销
+          (async () => {
+            const undoUndelegates = await __private.undelegatesRollback.unapplyRound(round, false);
+            if (undoUndelegates == null) {
+              await __private.undelegatesRollback.unapplyRound(round, true);
+              /// rollback v2
+              throw new Error("undelegates has no backup data.");
+              /// end rollback v2
+              // return;
+            }
+            await new Promise((resolve, reject) => {
+              async.eachSeries(undoUndelegates.reverse(), (undelegate, cb) => {
+                async.series([
+                  next => {
+                    // 投票信息
+                    async.eachSeries(undelegate.voters.reverse(), (accountId, cb) => {
+                      if (library.base.account.cache.has(accountId)) {
+                        // console.log("del" + 'address---' + accounts[i].accountId)
+                        library.base.account.cache.del(accountId);
+                      }
+                      library.dbLite.query("INSERT OR IGNORE INTO mem_accounts2delegates(accountId, dependentId) VALUES($accountId, $dependentId)", {
+                        accountId,
+                        dependentId: undelegate.delegate.publicKey
+                      }, (err, data) => {
+                        void data;
+                        cb(err);
+                      });
+                    }, err => {
+                      next(err);
+                    });
+                  },
+                  next => {
+                    // 代理人信息
+                    const data = {
+                      address: undelegate.delegate.address,
+                      // u_isDelegate: 2,
+                      isDelegate: 2,
+                      username: undelegate.delegate.username,
+                      // u_username: delegate.username,
+                      vote: undelegate.delegate.vote
+                    };
+                    modules.accounts.setAccountAndGet(data, (err) => {
+                      next(err);
+                    });
+                  }
+                ], err => {
+                  cb(err);
+                });
+              }, err => {
+                return err ? reject(err) : resolve();
+              });
+            });
+            await __private.undelegatesRollback.unapplyRound(round, true);
+          })()
+            .then(() => next())
+            .catch(error => next(error));
+        },
+        next => {
+          // 分红
+          (async () => {
+            const undoBonus = await __private.commitbonusRollback.unapplyRound(round, false);
+            if (undoBonus == null) {
+              await __private.commitbonusRollback.unapplyRound(round, true);
+              /// rollback v2
+              throw new Error("commitbonus has no backup data.");
+              /// end rollback v2
+              // return;
+            }
+            await new Promise((resolve, reject) => {
+              async.eachSeries(undoBonus.reverse(), (bonus, cb) => {
+                modules.accounts.mergeAccountAndGet({
+                  address: bonus.address,
+                  balance: -bonus.amount,
+                  u_balance: -bonus.amount,
+                  blockId: block.id,
+                  round: round,
+                  bonus: -bonus.amount
+                }, cb);
+              }, err => {
+                return err ? reject(err) : resolve();
+              });
+            });
+            await __private.commitbonusRollback.unapplyRound(round, true);
+          })()
+            .then(() => next())
+            .catch(error => next(error));
+        },
+        next => {
+          // 奖励
+          (async () => {
+            const undoRewards = await __private.rewardsRollback.unapplyRound(round, false);
+            if (undoRewards == null) {
+              await __private.rewardsRollback.unapplyRound(round, true);
+              /// rollback v2
+              throw new Error("rewards has no backup data.")
+              /// end rollback v2
+              // return;
+            }
+            await new Promise((resolve, reject) => {
+              async.eachSeries(undoRewards.reverse(), (reward, cb) => {
+                modules.accounts.mergeAccountAndGet({
+                  publicKey: reward.publicKey,
+                  balance: -reward.balance,
+                  u_balance: -reward.u_balance,
+                  blockId: block.id,
+                  round: round,
+                  fees: -reward.fees,
+                  rewards: -reward.rewards
+                }, cb);
+              }, err => {
+                return err ? reject(err) : resolve();
+              });
+            });
+            await __private.rewardsRollback.unapplyRound(round, true);
+          })()
+            .then(() => next())
+            .catch(error => next(error));
+        },
+
+      ], err => {
+        setImmediate(next, err);
+      });
+      /// end rollback
     },
     (next) => { //剔除未出块人
       let lastBlock = previousBlock;
@@ -175,57 +462,14 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
         next();
       }
     },
-    (next) => { //更新缓存
-      __private.feesByRound[round] = (__private.feesByRound[round] || 0);
-      __private.feesByRound[round] -= block.totalFee;
-      __private.unFeesByRound[round] = (__private.unFeesByRound[round] || 0)
-      __private.unFeesByRound[round] += block.totalFee
-
-      __private.rewardsByRound[round] = (__private.rewardsByRound[round] || []);
-      let removedReward = __private.rewardsByRound[round].pop()
-      __private.unRewardsByRound[round] = (__private.unRewardsByRound[round] || [])
-      __private.unRewardsByRound[round].push(removedReward)
-
-      __private.delegatesByRound[round] = __private.delegatesByRound[round] || [];
-      let removedDelegate = __private.delegatesByRound[round].pop()
-      __private.unDelegatesByRound[round] = (__private.unDelegatesByRound[round] || [])
-      __private.unDelegatesByRound[round].push(removedDelegate)
-
-      __private.bonusByRound[round] = (__private.bonusByRound[round] || []);
-      let removeBonus = __private.bonusByRound[round].pop();
-      __private.unbonusByRound[round] = (__private.unbonusByRound[round] || []);
-      __private.unbonusByRound[round].push(removeBonus);
-
-      next();
+    (next) => { //剔除出块人
+      modules.accounts.mergeAccountAndGet({
+        publicKey: block.generatorPublicKey,
+        producedblocks: -1,
+        blockId: block.id,
+        round: round
+      }, next);
     },
-    (next) => { // 处理换轮
-      if (prevRound === round && previousBlock.height !== 1) {
-        return next();
-      }
-
-      if (__private.unDelegatesByRound[round].length !== slots.roundBlocks && previousBlock.height !== 1) {
-        return next();
-      }
-      library.logger.warn('Unexpected roll back cross round', {
-        round: round,
-        prevRound: prevRound,
-        block: block,
-        previousBlock: previousBlock
-      });
-
-      reportor.report("nodejs", {
-        subaction: "exit",
-        data: {
-          method: "backwardTick",
-          reason: "unexpected roll back cross round",
-          round: round,
-          prevRound: prevRound,
-          block: block,
-          previousBlock: previousBlock
-        }
-      });
-      process.exit(1);
-    }
   ], (err) => {
     if (err) {
       library.logger.error("Round backward tick failed: " + err);
@@ -242,6 +486,8 @@ Round.prototype.backwardTick = function (block, previousBlock, cb) {
 Round.prototype.tick = function (block, cb) {
   let round = self.calc(block.height);
   let nextRound = self.calc(block.height + 1);
+
+  __private.rollbackFlag = false;
 
   async.series([
     (next) => { //合并出块人
@@ -317,6 +563,21 @@ Round.prototype.tick = function (block, cb) {
       }
 
       let producedAvg = 1;
+
+      /// rollback
+      /// 奖励
+      let rewardsRollback = [];
+      /// 分红
+      let beginbonusRollback = null;
+      let commitbonusRollback = [];
+      /// 注销代理人
+      let undelegatesRollback = [];
+      /// 代理人票数
+      let delegatesVoteRollback = [];
+      let voterVoteRollback = [];
+      /// 锁仓数据变更
+      let lockvotesRollback = [];
+      /// end rollback
       async.series([
         function (cb) { //绑定出块人收益
           var roundChanges = new RoundChanges(round);
@@ -331,6 +592,17 @@ Round.prototype.tick = function (block, cb) {
               changeFees += changes.feesRemaining;
             }
 
+            /// rollback
+            rewardsRollback.push({
+              publicKey: delegate,
+              balance: changeBalance,
+              u_balance: changeBalance,
+              blockId: block.id,
+              round: round,
+              fees: changeFees,
+              rewards: changeRewards
+            });
+            /// end rollback
             modules.accounts.mergeAccountAndGet({
               publicKey: delegate,
               balance: changeBalance,
@@ -361,10 +633,16 @@ Round.prototype.tick = function (block, cb) {
           });
           __private.voterBonus.commitBonus(round, bonusByRoundAmount, block)
             .then(result => {
-              void (result);
+              // void (result);
+
+              /// rollback
+              commitbonusRollback = result || [];
+              console.log("commitBonus:", block.height, result);
+              /// end rollback
               cb();
             })
             .catch(error => {
+              console.log("commitBonus error:", error);
               cb(error);
             });
         },
@@ -379,6 +657,7 @@ Round.prototype.tick = function (block, cb) {
             if (err) {
               return cb(err);
             }
+
             async.eachSeries(delegates, function (delegate, cb) {
               var data = {
                 address: delegate.address,
@@ -389,6 +668,17 @@ Round.prototype.tick = function (block, cb) {
                 vote: 0
               }
 
+              /// rollback
+              const undelegate = {
+                delegate: {
+                  address: delegate.address,
+                  publicKey: delegate.publicKey,
+                  username: delegate.username,
+                  vote: delegate.vote ? delegate.vote : 0
+                },
+                voters: []
+              };
+              /// end rollback
               modules.accounts.setAccountAndGet(data, (err) => {
                 if (err) {
                   return cb(err);
@@ -404,6 +694,11 @@ Round.prototype.tick = function (block, cb) {
 
                   let accounts = data;
                   for (let i = 0; i < accounts.length; i++) {
+                    /// rollback
+                    if (accounts[i].accountId) {
+                      undelegate.voters.push(accounts[i].accountId);
+                    }
+                    /// end rollback
                     if (accounts[i].accountId && library.base.account.cache.has(accounts[i].accountId)) {
                       // console.log("del" + 'address---' + accounts[i].accountId)
                       library.base.account.cache.del(accounts[i].accountId);
@@ -414,11 +709,21 @@ Round.prototype.tick = function (block, cb) {
                     dependentId: delegate.publicKey
                   }, (err, data) => {
                     // console.log(err,"mem_accounts2delegates======"+JSON.stringify(data))
+                    /// rollback
+                    if (!err) {
+                      undelegatesRollback.push(undelegate);
+                    }
+                    /// end rollback
                     cb(err);
                   });
                 });
               });
             }, function (err) {
+              /// rollback
+              if (err) {
+                undelegatesRollback = [];
+              }
+              /// end rollback
               cb(err);
             });
           });
@@ -440,7 +745,6 @@ Round.prototype.tick = function (block, cb) {
               return cb(err);
             }
             producedAvg = (totalProduce / __private.delegatesByRound[round].length).toFixed(2);
-
             cb();
           });
         },
@@ -467,12 +771,14 @@ Round.prototype.tick = function (block, cb) {
 
                 let totalVotes = 0;
                 async.eachSeries(voters.accounts, function (voter, cb) {
-                  modules.lockvote.refreshRoundLockVotes(voter.address, block.height, function (err, votes) {
+                  modules.lockvote.refreshRoundLockVotes(voter.address, block.height, function (err, roundLockvoteInfo) {
                     if (err) {
                       return cb(err);
                     }
 
+                    const { totalVotes: votes, lockvoteChanges } = roundLockvoteInfo;
                     totalVotes += votes;
+                    voterVoteRollback = voterVoteRollback.concat(lockvoteChanges)
                     cb();
                   });
                 }, function (err) {
@@ -485,6 +791,9 @@ Round.prototype.tick = function (block, cb) {
                   let v = __private.calcProductivity(producedblocks, producedblocks + missedblocks, producedAvg); //生产率
                   let votes = Math.floor(Math.pow(totalVotes, 3 / 4) * v);
 
+                  /// rollback
+                  delegatesVoteRollback.push({ address: delegate.address, vote: votes });
+                  /// end rollback
                   console.log("VVVVVVVVVVVVVVVVVVVVVVVVVVVVVotes", producedblocks, missedblocks, producedAvg, v, totalVotes, votes);
                   library.dbLite.query('update mem_accounts set vote = $vote where address = $address', {
                     address: delegate.address,
@@ -514,7 +823,8 @@ Round.prototype.tick = function (block, cb) {
                 }
 
                 async.eachSeries(voters.accounts, function (voter, cb) {
-                  modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, function (err) {
+                  lockvotesRollback.push({ address: voter.address, height: block.height });
+                  modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, 1, function (err) {
 
                     return cb(err);
                   });
@@ -531,7 +841,7 @@ Round.prototype.tick = function (block, cb) {
         function (cb) { // 清除分红计算缓存
           __private.voterBonus.beginBonus(nextRound, block)
             .then(result => {
-              void (result);
+              beginbonusRollback = result;
               cb();
             })
             .catch(error => {
@@ -540,16 +850,27 @@ Round.prototype.tick = function (block, cb) {
         }
       ], function (err) {
         // 清理缓存数据
-        delete __private.feesByRound[round];
-        delete __private.rewardsByRound[round];
-        delete __private.delegatesByRound[round];
+        // delete __private.feesByRound[round];
+        // delete __private.rewardsByRound[round];
+        // delete __private.delegatesByRound[round];
+
+        /// FIXEDME: 排除创世块轮
+        if (block.height > 1) {
+          __private.rewardsRollback.applyRound(round, rewardsRollback);
+          __private.commitbonusRollback.applyRound(round, commitbonusRollback);
+          __private.undelegatesRollback.applyRound(round, undelegatesRollback);
+          __private.lockvoteRollback.applyRound(round, lockvotesRollback);
+
+          __private.roundVotesRollback.applyRound(round + 1, { delegates: delegatesVoteRollback, voters: voterVoteRollback });
+          __private.beginbonusRollback.applyRound(round + 1, beginbonusRollback);
+        }
 
         next(err);
       });
     }
   ], (err) => {
     if (err) {
-      library.logger.error("Round tick failed: " + err);
+      library.logger.error("Round tick failed: ", err);
     } else {
       let blockBaseInfo = Object.assign({}, block); //let blocklog = JSON.parse(JSON.stringify(obj1));
       delete blockBaseInfo.transactions

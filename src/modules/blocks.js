@@ -451,32 +451,86 @@ __private.popLastBlock = function (oldLastBlock, callback) {
         return done(err || 'previousBlock is null');
       }
       previousBlock = previousBlock[0];
-      var transactions = library.base.block.sortTransactions(oldLastBlock);
-      async.eachSeries(transactions.reverse(), function (transaction, nextTr) {
-        async.series([
-          function (next) {
-            modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
-              if (err) {
-                return next(err);
-              }
-              library.logger.info('undo transacton', JSON.stringify(transaction));
-              modules.transactions.undo(transaction, oldLastBlock, sender, next);
-            });
-          }, function (next) {
-            modules.transactions.undoUnconfirmed(transaction, next);
-          }
-        ], nextTr);
-      }, function (err) {
-        modules.round.backwardTick(oldLastBlock, previousBlock, function () {
-          __private.deleteBlock(oldLastBlock.id, function (err) {
-            if (err) {
-              return done(err);
-            }
 
-            done(null, previousBlock);
+      const transactions = library.base.block.sortTransactions(oldLastBlock);
+      async.series([
+        next => {
+          // round backwardTick
+          modules.round.backwardTick(oldLastBlock, previousBlock, err => {
+            next(err);
           });
-        });
+        },
+        next => {
+          // delay transfer
+          library.delayTransferMgr.backwardTick(oldLastBlock)
+            .then(() => {
+              next();
+            })
+            .catch(error => {
+              next(error);
+            });
+        },
+        next => {
+          // delete block
+          __private.deleteBlock(oldLastBlock.id, err => {
+            next(err);
+          });
+        },
+        next => {
+          // transactions
+          async.eachSeries(transactions.reverse(), (transaction, nextTr) => {
+            async.series([
+              next => {
+                modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, (err, sender) => {
+                  if (err) {
+                    return next(err);
+                  }
+                  library.logger.info("undo transaction", JSON.stringify(transaction));
+                  modules.transactions.undo(transaction, oldLastBlock, sender, next);
+                });
+              },
+              next => {
+                modules.transactions.undoUnconfirmed(transaction, next);
+              }
+            ], nextTr);
+          }, err => {
+            next(err);
+          });
+        }
+      ], err => {
+        if (err) {
+          return done(err);
+        }
+
+        done(null, previousBlock);
       });
+
+      // var transactions = library.base.block.sortTransactions(oldLastBlock);
+      // async.eachSeries(transactions.reverse(), function (transaction, nextTr) {
+      //   async.series([
+      //     function (next) {
+      //       modules.accounts.getAccount({ publicKey: transaction.senderPublicKey }, function (err, sender) {
+      //         if (err) {
+      //           return next(err);
+      //         }
+      //         library.logger.info('undo transacton', JSON.stringify(transaction));
+      //         modules.transactions.undo(transaction, oldLastBlock, sender, next);
+      //       });
+      //     }, function (next) {
+      //       modules.transactions.undoUnconfirmed(transaction, next);
+      //     }
+      //   ], nextTr);
+      // }, function (err) {
+      //   modules.round.backwardTick(oldLastBlock, previousBlock, function () {
+      //     __private.deleteBlock(oldLastBlock.id, function (err) {
+      //       if (err) {
+      //         return done(err);
+      //       }
+
+      //       done(null, previousBlock);
+      //     });
+      //   });
+      // });
     });
   }, function (err, previousBlock) {
     callback(err, previousBlock);
@@ -603,6 +657,7 @@ Blocks.prototype.getCommonBlock = function (peer, height, cb) {
           min: data.firstHeight,
           ids: data.ids,
         }
+        lastBlockHeight = data.firstHeight;
         modules.peer.request('commonBlock', params, peer, (err2, ret) => {
           if (err2 || ret.error) {
             return next(err2 || ret.error.toString());
@@ -1495,7 +1550,7 @@ Blocks.prototype.generateBlock = function (keypair, timestamp, cb) {
         assert(activeKeypairs && activeKeypairs.length > 0, "Active keypairs should not be empty");
         library.logger.info("get active delegate keypairs len: " + activeKeypairs.length);
         var localVotes = library.base.consensus.createVotes(activeKeypairs, block);
-        if (library.base.consensus.hasEnoughVotes(localVotes)) {
+        if (library.base.consensus.hasEnoughVotes(localVotes, block.timestamp - self.getLastBlock().timestamp)) {
           self.processBlock(block, localVotes, true, true, false, function (err) {
             if (err) {
               return next("Failed to process confirmed block height: " + height + " id: " + id + " error: " + err);
@@ -1725,7 +1780,8 @@ Blocks.prototype.onReceiveVotes = function (votes) {
     if (totalVotes && totalVotes.signatures) {
       library.logger.debug("receive new votes, total votes number " + totalVotes.signatures.length);
     }
-    if (library.base.consensus.hasEnoughVotes(totalVotes)) {
+    const diffTimestamp = totalVotes ? totalVotes.timestamp - self.getLastBlock().timestamp : 0;
+    if (library.base.consensus.hasEnoughVotes(totalVotes, diffTimestamp)) {
       var block = library.base.consensus.getPendingBlock();
       var height = block.height;
       var id = block.id;

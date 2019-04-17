@@ -1,5 +1,7 @@
 "use strict";
 
+const async = require("async");
+
 /**
  * 延迟到账交易管理器
  * 
@@ -25,7 +27,7 @@ class DelayTransferManager {
     showLog() {
         const logs = [];
         const entries = this.delayTransferCaches.entries();
-        for (let [ _, value ] of entries) {
+        for (let [_, value] of entries) {
             logs.push(value);
         }
         console.log(JSON.stringify(logs, null, 2));
@@ -148,6 +150,33 @@ class DelayTransferManager {
         this.commitCaches = new Array();
     }
 
+    async backwardTick(block) {
+        const self = this;
+        return new Promise((resolve, reject) => {
+            library.model.getAllAppliedDelayTransfer(block.height, (err, results) => {
+                if (err) {
+                    return reject(err);
+                }
+
+                async.eachSeries(results, (delayTransfer, cb) => {
+                    let { transactionId, senderId, recipientId, amount, expired } = delayTransfer;
+                    const key = transactionId;
+                    const data = { transactionId, senderId, recipientId, amount, expired };
+                    this.delayTransferUnaction(key, data, block)
+                        .then(() => {
+                            self.addDelayTransfer(key, data);
+                            cb();
+                        })
+                        .catch(error => {
+                            cb(error);
+                        });
+                }, err => {
+                    return err ? reject(err) : resolve();
+                });
+            });
+        });
+    }
+
     /**
      * 新块产生时，用于处理延迟提交交易
      * @method
@@ -172,7 +201,7 @@ class DelayTransferManager {
             }
             console.log("blockTick:", JSON.stringify(logKeys, null, 2));
         }
-        
+
         const keys = this.delayTransferCaches.keys();
         for (let key of keys) {
             const data = this.delayTransferCaches.get(key);
@@ -205,6 +234,36 @@ class DelayTransferManager {
         return new Promise((resolve, reject) => {
             library.dbLite.query(
                 "UPDATE delay_transfer SET state=1 WHERE transactionId=$transactionId", {
+                    transactionId: key
+                }, err => {
+                    if (err) {
+                        return reject(err);
+                    }
+
+                    library.modules.accounts.setAccountAndGet({
+                        address: data.recipientId
+                    }, (err, recipient) => {
+                        if (err) {
+                            return reject(err);
+                        }
+
+                        library.modules.accounts.mergeAccountAndGet({
+                            address: recipient.address,
+                            balance: data.amount,
+                            u_balance: data.amount,
+                            blockId: block.id,
+                            round: library.modules.round.calc(block.height)
+                        }, err => {
+                            return err ? reject(err) : resolve();
+                        });
+                    });
+                });
+        });
+    }
+
+    async delayTransferUnaction(key, data, block) {
+        return new Promise((resolve, reject) => {
+            library.dbLite.query("UPDATE delay_transfer SET state = 1 WHERE transactiondId=$transactionId", {
                 transactionId: key
             }, err => {
                 if (err) {
@@ -220,8 +279,8 @@ class DelayTransferManager {
 
                     library.modules.accounts.mergeAccountAndGet({
                         address: recipient.address,
-                        balance: data.amount,
-                        u_balance: data.amount,
+                        balance: -data.amount,
+                        u_balance: -data.amount,
                         blockId: block.id,
                         round: library.modules.round.calc(block.height)
                     }, err => {

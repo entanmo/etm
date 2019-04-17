@@ -79,7 +79,7 @@ function Vote() {
 
   this.apply = function (trs, block, sender, cb) {
     modules.delegates.updateDelegateVotes(trs.senderPublicKey, trs.asset.vote.votes, function (err) {
-      if(err){
+      if (err) {
         return cb(err);
       }
 
@@ -96,11 +96,15 @@ function Vote() {
 
     var votesInvert = Diff.reverse(trs.asset.vote.votes);
 
-    library.base.account.merge(sender.address, {
-      delegates: votesInvert,
-      blockId: block.id,
-      round: modules.round.calc(block.height)
-    }, cb);
+    modules.delegates.unupdateDelegateVotes(trs.senderPublicKey, votesInvert, err => {
+      if (err) return cb(err);
+
+      library.base.account.merge(sender.address, {
+        delegates: votesInvert,
+        blockId: block.id,
+        round: modules.round.calc(block.height)
+      }, cb);
+    });
   }
 
   this.applyUnconfirmed = function (trs, sender, cb) {
@@ -234,38 +238,38 @@ __private.attachApi = function () {
         }
       }
     }*/ scheme.top, function (err, report, query) {
-      if (err) return next(err);
-      if (!report.isValid) return res.json({ success: false, error: report.issues });
-      if (!query.limit) {
-        query.limit = 100;
-      }
-      self.getAccounts({
-        sort: {
-          balance: -1
-        },
-        offset: query.offset,
-        limit: query.limit
-      }, function (err, raw) {
-        if (err) {
-          return res.json({ success: false, error: err.toString() });
+        if (err) return next(err);
+        if (!report.isValid) return res.json({ success: false, error: report.issues });
+        if (!query.limit) {
+          query.limit = 100;
         }
-        var accounts = raw.map(function (fullAccount) {
-          return {
-            address: fullAccount.address,
-            balance: fullAccount.balance,
-            publicKey: fullAccount.publicKey
+        self.getAccounts({
+          sort: {
+            balance: -1
+          },
+          offset: query.offset,
+          limit: query.limit
+        }, function (err, raw) {
+          if (err) {
+            return res.json({ success: false, error: err.toString() });
           }
-        });
+          var accounts = raw.map(function (fullAccount) {
+            return {
+              address: fullAccount.address,
+              balance: fullAccount.balance,
+              publicKey: fullAccount.publicKey
+            }
+          });
 
-        res.json({ success: true, accounts: accounts });
+          res.json({ success: true, accounts: accounts });
+        })
       })
-    })
   });
 
   router.get('/count', function (req, res) {
     library.dbLite.query('select count(*) from mem_accounts', { 'count': Number }, function (err, rows) {
       if (err || !rows) {
-        return res.status(500).send({success: false, error: 'Database error'})
+        return res.status(500).send({ success: false, error: 'Database error' })
       }
       return res.json({ success: true, count: rows[0].count });
     })
@@ -299,7 +303,8 @@ __private.openAccount = function (secret, cb) {
       secondSignature: '',
       secondPublicKey: '',
       multisignatures: '',
-      u_multisignatures: ''
+      u_multisignatures: '',
+      bonus: 0
     }
     return cb(null, account)
   });
@@ -318,7 +323,8 @@ __private.openAccount2 = function (publicKey, cb) {
       secondSignature: '',
       secondPublicKey: '',
       multisignatures: '',
-      u_multisignatures: ''
+      u_multisignatures: '',
+      bonus: 0
     }
     return cb(null, account)
   });
@@ -352,14 +358,14 @@ Accounts.prototype.generateAddressByPublicKey2 = function (publicKey) {
 }
 
 Accounts.prototype.getAccount = function (filter, fields, cb) {
-  library.logger.trace('Accounts.prototype.getAccount ',filter)
+  library.logger.trace('Accounts.prototype.getAccount ', filter)
   if (typeof fields === 'function') {
     cb = fields
   }
   var publicKey = filter.publicKey
 
   if (filter.address && !addressHelper.isAddress(filter.address)) {
-      return cb('Invalid address getAccount');
+    return cb('Invalid address getAccount');
   }
 
   if (filter.publicKey) {
@@ -398,7 +404,7 @@ Accounts.prototype.setAccountAndGet = function (data, cb) {
       }
       delete data.isGenesis;
     } else {
-      library.logger.debug('setAccountAndGet error and data is:',data)
+      library.logger.debug('setAccountAndGet error and data is:', data)
       return cb("Missing address or public key in setAccountAndGet");
     }
   }
@@ -409,53 +415,53 @@ Accounts.prototype.setAccountAndGet = function (data, cb) {
     if (err) {
       return cb(err);
     }
-     library.base.account.get({ address: address }, cb);
+    library.base.account.get({ address: address }, cb);
   });
 }
 Accounts.prototype.loadSenderOrUpdate = function (param, cb) {
-  if(!param.publicKey ){
+  if (!param.publicKey) {
     return cb("Failed to loadSenderOrUpdate ,there is no publickey")
-   }
-  modules.accounts.loadAccount(param,function(err,data){
-    if(err){
+  }
+  modules.accounts.loadAccount(param, function (err, data) {
+    if (err) {
       cb(err)
-    }else{
-      if(data){
-        if(data.publicKey ){
-        // console.log(JSON.stringify(data.address))
-        cb(err,data)
-        }else{
+    } else {
+      if (data) {
+        if (data.publicKey) {
+          // console.log(JSON.stringify(data.address))
+          cb(err, data)
+        } else {
           data["publicKey"] = param.publicKey
           library.base.account.set(data.address, { publicKey: param.publicKey }, function (err) {
             if (err) {
-              return  setImmediate(cb, "Failed to set account publickey: " + err);
+              return setImmediate(cb, "Failed to set account publickey: " + err);
             }
-            cb(err,data)
+            cb(err, data)
           });
         }
-      }else{
-        cb("loadAccount : can not found Account",data)
+      } else {
+        cb("loadAccount : can not found Account", data)
       }
     }
-    }
- )
+  }
+  )
 }
 Accounts.prototype.loadOrCreate = function (param, cb) {
-  if(!param.address ){
+  if (!param.address) {
     return cb("Failed to loadOrCreate ,there is no address")
-   }
-  modules.accounts.loadAccount(param,function(err,data){
-    if(err){
+  }
+  modules.accounts.loadAccount(param, function (err, data) {
+    if (err) {
       cb(err)
-    }else{
-      if(data){
-        cb(null,data)
-      }else{
-        library.base.account.create(param.address,param,cb);
+    } else {
+      if (data) {
+        cb(null, data)
+      } else {
+        library.base.account.create(param.address, param, cb);
       }
     }
-    }
- )
+  }
+  )
 }
 Accounts.prototype.loadAccount = function (data, cb) {
   var address = data.address || null;
@@ -467,7 +473,7 @@ Accounts.prototype.loadAccount = function (data, cb) {
       }
       delete data.isGenesis;
     } else {
-      library.logger.debug('LoadAccount error and data is:',data)
+      library.logger.debug('LoadAccount error and data is:', data)
       return cb("Missing address or public key in LoadAccount");
     }
   }
@@ -510,7 +516,7 @@ shared.newAccount = function (req, cb) {
   var ent = Number(req.body.ent)
   if ([128, 256, 384].indexOf(ent) === -1) {
     ent = 128
-  } 
+  }
   var secret = new Mnemonic(ent).toString();
   var keypair = ed.MakeKeypair(crypto.createHash('sha256').update(secret, 'utf8').digest());
   var address = self.generateAddressByPublicKey2(keypair.publicKey)
@@ -535,32 +541,33 @@ shared.open = function (req, cb) {
     },
     required: ["secret"]
   }*/ scheme.open, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    __private.openAccount(body.secret, function (err, account) {
-      var accountData = null;
-      if (!err) {
-        accountData = {
-          address: account.address,
-          unconfirmedBalance: account.u_balance,
-          balance: account.balance,
-          publicKey: account.publicKey,
-          unconfirmedSignature: account.u_secondSignature,
-          secondSignature: account.secondSignature,
-          secondPublicKey: account.secondPublicKey,
-          multisignatures: account.multisignatures,
-          u_multisignatures: account.u_multisignatures,
-          lockHeight: account.lockHeight || 0
-        };
-
-        return cb(null, { account: accountData });
-      } else {
-        return cb(err);
+      if (err) {
+        return cb(err[0].message);
       }
+
+      __private.openAccount(body.secret, function (err, account) {
+        var accountData = null;
+        if (!err) {
+          accountData = {
+            address: account.address,
+            unconfirmedBalance: account.u_balance,
+            balance: account.balance,
+            publicKey: account.publicKey,
+            unconfirmedSignature: account.u_secondSignature,
+            secondSignature: account.secondSignature,
+            secondPublicKey: account.secondPublicKey,
+            multisignatures: account.multisignatures,
+            u_multisignatures: account.u_multisignatures,
+            lockHeight: account.lockHeight || 0,
+            bonus: account.bonus || 0
+          };
+
+          return cb(null, { account: accountData });
+        } else {
+          return cb(err);
+        }
+      });
     });
-  });
 }
 
 shared.open2 = function (req, cb) {
@@ -575,39 +582,40 @@ shared.open2 = function (req, cb) {
     },
     required: ["publicKey"]
   }*/ scheme.open2, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-    __private.openAccount2(body.publicKey, function (err, account) {
-      var accountData = null;
-      if (!err) {
-        accountData = {
-          address: account.address,
-          unconfirmedBalance: account.u_balance,
-          balance: account.balance,
-          publicKey: account.publicKey,
-          unconfirmedSignature: account.u_secondSignature,
-          secondSignature: account.secondSignature,
-          secondPublicKey: account.secondPublicKey,
-          multisignatures: account.multisignatures,
-          u_multisignatures: account.u_multisignatures,
-          lockHeight: account.lockHeight || 0
-        };
-        var latestBlock = modules.blocks.getLastBlock();
-        var ret = {
-          account: accountData,
-          latestBlock: {
-            height: latestBlock.height,
-            timestamp: latestBlock.timestamp
-          },
-          version: modules.peer.getVersion()
-        }
-        return cb(null, ret);
-      } else {
-        return cb(err);
+      if (err) {
+        return cb(err[0].message);
       }
+      __private.openAccount2(body.publicKey, function (err, account) {
+        var accountData = null;
+        if (!err) {
+          accountData = {
+            address: account.address,
+            unconfirmedBalance: account.u_balance,
+            balance: account.balance,
+            publicKey: account.publicKey,
+            unconfirmedSignature: account.u_secondSignature,
+            secondSignature: account.secondSignature,
+            secondPublicKey: account.secondPublicKey,
+            multisignatures: account.multisignatures,
+            u_multisignatures: account.u_multisignatures,
+            lockHeight: account.lockHeight || 0,
+            bonus: account.bonus || 0
+          };
+          var latestBlock = modules.blocks.getLastBlock();
+          var ret = {
+            account: accountData,
+            latestBlock: {
+              height: latestBlock.height,
+              timestamp: latestBlock.timestamp
+            },
+            version: modules.peer.getVersion()
+          }
+          return cb(null, ret);
+        } else {
+          return cb(err);
+        }
+      });
     });
-  });
 }
 
 shared.getBalance = function (req, cb) {
@@ -623,24 +631,24 @@ shared.getBalance = function (req, cb) {
     },
     required: ["address"]
   }*/ scheme.getBalance, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    if (!addressHelper.isAddress(query.address)) {
-      return cb('Invalid address');
-    }
-
-    self.getAccount({ address: query.address }, function (err, account) {
       if (err) {
-        return cb(err.toString());
+        return cb(err[0].message);
       }
-      var balance = account ? account.balance : 0;
-      var unconfirmedBalance = account ? account.u_balance : 0;
-      const totalAmount = library.delayTransferMgr.totalAmount(query.address);
-      cb(null, { balance: balance, unconfirmedBalance: unconfirmedBalance, delayAmount: totalAmount });
+
+      if (!addressHelper.isAddress(query.address)) {
+        return cb('Invalid address');
+      }
+
+      self.getAccount({ address: query.address }, function (err, account) {
+        if (err) {
+          return cb(err.toString());
+        }
+        var balance = account ? account.balance : 0;
+        var unconfirmedBalance = account ? account.u_balance : 0;
+        const totalAmount = library.delayTransferMgr.totalAmount(query.address);
+        cb(null, { balance: balance, unconfirmedBalance: unconfirmedBalance, delayAmount: totalAmount });
+      });
     });
-  });
 }
 
 shared.getPublickey = function (req, cb) {
@@ -655,20 +663,20 @@ shared.getPublickey = function (req, cb) {
     },
     required: ["address"]
   }*/ scheme.getPublicKey, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    self.getAccount({ address: query.address }, function (err, account) {
       if (err) {
-        return cb(err.toString());
+        return cb(err[0].message);
       }
-      if (!account || !account.publicKey) {
-        return cb("Account does not have a public key");
-      }
-      cb(null, { publicKey: account.publicKey });
+
+      self.getAccount({ address: query.address }, function (err, account) {
+        if (err) {
+          return cb(err.toString());
+        }
+        if (!account || !account.publicKey) {
+          return cb("Account does not have a public key");
+        }
+        cb(null, { publicKey: account.publicKey });
+      });
     });
-  });
 }
 
 shared.generatePublickey = function (req, cb) {
@@ -683,20 +691,20 @@ shared.generatePublickey = function (req, cb) {
     },
     required: ["secret"]
   }*/ scheme.generatePublicKey, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    __private.openAccount(body.secret, function (err, account) {
-      var publicKey = null;
-      if (!err && account) {
-        publicKey = account.publicKey;
+      if (err) {
+        return cb(err[0].message);
       }
-      cb(err, {
-        publicKey: publicKey
+
+      __private.openAccount(body.secret, function (err, account) {
+        var publicKey = null;
+        if (!err && account) {
+          publicKey = account.publicKey;
+        }
+        cb(err, {
+          publicKey: publicKey
+        });
       });
     });
-  });
 }
 
 shared.getDelegates = function (req, cb) {
@@ -711,63 +719,63 @@ shared.getDelegates = function (req, cb) {
     },
     required: ["address"]
   }*/ scheme.getDelegates, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    self.getAccount({ address: query.address }, function (err, account) {
       if (err) {
-        return cb(err.toString());
+        return cb(err[0].message);
       }
-      if (!account) {
-        return cb("Account not found");
-      }
-      if (account.delegates) {
-        self.getAccounts({
-          isDelegate: { $gt: 0 },
-          sort: { "vote": -1, "publicKey": 1 }
-        }, ["username", "address", "publicKey", "vote", "missedblocks", "producedblocks"], function (err, delegates) {
-          if (err) {
-            return cb(err.toString());
-          }
 
-          var limit = query.limit || slots.delegates;
-          var offset = query.offset || 0;
-          var orderField = query.orderBy;
+      self.getAccount({ address: query.address }, function (err, account) {
+        if (err) {
+          return cb(err.toString());
+        }
+        if (!account) {
+          return cb("Account not found");
+        }
+        if (account.delegates) {
+          self.getAccounts({
+            isDelegate: { $gt: 0 },
+            sort: { "vote": -1, "publicKey": 1 }
+          }, ["username", "address", "publicKey", "vote", "missedblocks", "producedblocks"], function (err, delegates) {
+            if (err) {
+              return cb(err.toString());
+            }
 
-          orderField = orderField ? orderField.split(':') : null;
-          limit = limit > slots.delegates ? slots.delegates : limit;
+            var limit = query.limit || slots.delegates;
+            var offset = query.offset || 0;
+            var orderField = query.orderBy;
 
-          var orderBy = orderField ? orderField[0] : null;
-          var sortMode = orderField && orderField.length == 2 ? orderField[1] : 'asc';
-          var count = delegates.length;
-          var length = Math.min(limit, count);
-          var realLimit = Math.min(offset + limit, count);
+            orderField = orderField ? orderField.split(':') : null;
+            limit = limit > slots.delegates ? slots.delegates : limit;
 
-          var lastBlock = modules.blocks.getLastBlock();
-          var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
+            var orderBy = orderField ? orderField[0] : null;
+            var sortMode = orderField && orderField.length == 2 ? orderField[1] : 'asc';
+            var count = delegates.length;
+            var length = Math.min(limit, count);
+            var realLimit = Math.min(offset + limit, count);
 
-          for (var i = 0; i < delegates.length; i++) {
-            delegates[i].rate = i + 1;
-            delegates[i].approval = ((delegates[i].vote / totalSupply) * 100).toFixed(2);
+            var lastBlock = modules.blocks.getLastBlock();
+            var totalSupply = __private.blockStatus.calcSupply(lastBlock.height);
 
-            var percent = 100 - (delegates[i].missedblocks / ((delegates[i].producedblocks + delegates[i].missedblocks) / 100));
-            percent = percent || 0;
-            var outsider = i + 1 > slots.delegates;
-            delegates[i].productivity = (!outsider) ? parseFloat(Math.floor(percent * 100) / 100).toFixed(2) : 0;
-          }
+            for (var i = 0; i < delegates.length; i++) {
+              delegates[i].rate = i + 1;
+              delegates[i].approval = ((delegates[i].vote / totalSupply) * 100).toFixed(2);
 
-          var result = delegates.filter(function (delegate) {
-            return account.delegates.indexOf(delegate.publicKey) != -1;
+              var percent = 100 - (delegates[i].missedblocks / ((delegates[i].producedblocks + delegates[i].missedblocks) / 100));
+              percent = percent || 0;
+              var outsider = i + 1 > slots.delegates;
+              delegates[i].productivity = (!outsider) ? parseFloat(Math.floor(percent * 100) / 100).toFixed(2) : 0;
+            }
+
+            var result = delegates.filter(function (delegate) {
+              return account.delegates.indexOf(delegate.publicKey) != -1;
+            });
+
+            cb(null, { delegates: result });
           });
-
-          cb(null, { delegates: result });
-        });
-      } else {
-        cb(null, { delegates: [] });
-      }
+        } else {
+          cb(null, { delegates: [] });
+        }
+      });
     });
-  });
 }
 
 shared.getDelegatesFee = function (req, cb) {
@@ -794,58 +802,93 @@ shared.addDelegates = function (req, cb) {
       }
     }
   }*/ scheme.addDelegates, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
-    var keypair = ed.MakeKeypair(hash);
-
-    if (body.publicKey) {
-      if (keypair.publicKey.toString('hex') != body.publicKey) {
-        return cb("Invalid passphrase");
+      if (err) {
+        return cb(err[0].message);
       }
-    }
 
-    library.balancesSequence.add(function (cb) {
-      if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
-        modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
+      var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+      var keypair = ed.MakeKeypair(hash);
 
-          if (!account) {
-            return cb("Multisignature account not found");
-          }
+      if (body.publicKey) {
+        if (keypair.publicKey.toString('hex') != body.publicKey) {
+          return cb("Invalid passphrase");
+        }
+      }
 
-          if (!account.multisignatures || !account.multisignatures) {
-            return cb("Account does not have multisignatures enabled");
-          }
-
-          if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
-            return cb("Account does not belong to multisignature group");
-          }
-
-          modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+      library.balancesSequence.add(function (cb) {
+        if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
+          modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
             if (err) {
               return cb(err.toString());
             }
 
-            if (!requester || !requester.publicKey) {
-              return cb("Invalid requester");
+            if (!account) {
+              return cb("Multisignature account not found");
             }
 
-            if (requester.secondSignature && !body.secondSecret) {
+            if (!account.multisignatures || !account.multisignatures) {
+              return cb("Account does not have multisignatures enabled");
+            }
+
+            if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
+              return cb("Account does not belong to multisignature group");
+            }
+
+            modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+              if (err) {
+                return cb(err.toString());
+              }
+
+              if (!requester || !requester.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              if (requester.secondSignature && !body.secondSecret) {
+                return cb("Invalid second passphrase");
+              }
+
+              if (requester.publicKey == account.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              var secondKeypair = null;
+
+              if (requester.secondSignature) {
+                var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+                secondKeypair = ed.MakeKeypair(secondHash);
+              }
+
+              try {
+                var transaction = library.base.transaction.create({
+                  type: TransactionTypes.VOTE,
+                  votes: body.delegates,
+                  sender: account,
+                  keypair: keypair,
+                  secondKeypair: secondKeypair,
+                  requester: keypair
+                });
+              } catch (e) {
+                return cb(e.toString());
+              }
+              modules.transactions.receiveTransactions([transaction], cb);
+            });
+          });
+        } else {
+          self.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+            if (err) {
+              return cb(err.toString());
+            }
+            if (!account) {
+              return cb("Account not found");
+            }
+
+            if (account.secondSignature && !body.secondSecret) {
               return cb("Invalid second passphrase");
-            }
-
-            if (requester.publicKey == account.publicKey) {
-              return cb("Invalid requester");
             }
 
             var secondKeypair = null;
 
-            if (requester.secondSignature) {
+            if (account.secondSignature) {
               var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
               secondKeypair = ed.MakeKeypair(secondHash);
             }
@@ -856,57 +899,22 @@ shared.addDelegates = function (req, cb) {
                 votes: body.delegates,
                 sender: account,
                 keypair: keypair,
-                secondKeypair: secondKeypair,
-                requester: keypair
+                secondKeypair: secondKeypair
               });
             } catch (e) {
               return cb(e.toString());
             }
             modules.transactions.receiveTransactions([transaction], cb);
           });
-        });
-      } else {
-        self.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
-          if (!account) {
-            return cb("Account not found");
-          }
+        }
+      }, function (err, transaction) {
+        if (err) {
+          return cb(err.toString());
+        }
 
-          if (account.secondSignature && !body.secondSecret) {
-            return cb("Invalid second passphrase");
-          }
-
-          var secondKeypair = null;
-
-          if (account.secondSignature) {
-            var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
-            secondKeypair = ed.MakeKeypair(secondHash);
-          }
-
-          try {
-            var transaction = library.base.transaction.create({
-              type: TransactionTypes.VOTE,
-              votes: body.delegates,
-              sender: account,
-              keypair: keypair,
-              secondKeypair: secondKeypair
-            });
-          } catch (e) {
-            return cb(e.toString());
-          }
-          modules.transactions.receiveTransactions([transaction], cb);
-        });
-      }
-    }, function (err, transaction) {
-      if (err) {
-        return cb(err.toString());
-      }
-
-      cb(null, { transaction: transaction[0] });
+        cb(null, { transaction: transaction[0] });
+      });
     });
-  });
 }
 
 shared.getAccount = function (req, cb) {
@@ -921,59 +929,61 @@ shared.getAccount = function (req, cb) {
     },
     required: ["address"]
   }*/ scheme.getAccount, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    self.getAccount({ address: query.address }, function (err, account) {
       if (err) {
-        return cb(err.toString());
-      }
-      if (!account) {
-        account = {
-          address: query.address,
-          unconfirmedBalance: 0,
-          balance: 0,
-          publicKey: '',
-          unconfirmedSignature: '',
-          secondSignature: '',
-          secondPublicKey: '',
-          multisignatures: '',
-          u_multisignatures: '',
-          lockHeight: 0,
-          effectivity: false,
-          delayAmount: library.delayTransferMgr.totalAmount(query.address)
-        }
-      } else {
-        const delayAmount = library.delayTransferMgr.totalAmount(query.address);
-        account.effectivity = true;
-        account.delayAmount = delayAmount;
+        return cb(err[0].message);
       }
 
-      var latestBlock = modules.blocks.getLastBlock();
-      cb(null, {
-        account: {
-          address: account.address,
-          unconfirmedBalance: account.u_balance,
-          balance: account.balance,
-          publicKey: account.publicKey,
-          unconfirmedSignature: account.u_secondSignature,
-          secondSignature: account.secondSignature,
-          secondPublicKey: account.secondPublicKey,
-          multisignatures: account.multisignatures,
-          u_multisignatures: account.u_multisignatures,
-          lockHeight: account.lockHeight,
-          effectivity: account.effectivity,
-          delayAmount: account.delayAmount
-        },
-        latestBlock: {
-          height: latestBlock.height,
-          timestamp: latestBlock.timestamp
-        },
-        version: modules.peer.getVersion()
+      self.getAccount({ address: query.address }, function (err, account) {
+        if (err) {
+          return cb(err.toString());
+        }
+        if (!account) {
+          account = {
+            address: query.address,
+            unconfirmedBalance: 0,
+            balance: 0,
+            publicKey: '',
+            unconfirmedSignature: '',
+            secondSignature: '',
+            secondPublicKey: '',
+            multisignatures: '',
+            u_multisignatures: '',
+            lockHeight: 0,
+            effectivity: false,
+            delayAmount: library.delayTransferMgr.totalAmount(query.address),
+            bonus: 0
+          }
+        } else {
+          const delayAmount = library.delayTransferMgr.totalAmount(query.address);
+          account.effectivity = true;
+          account.delayAmount = delayAmount;
+        }
+
+        var latestBlock = modules.blocks.getLastBlock();
+        cb(null, {
+          account: {
+            address: account.address,
+            unconfirmedBalance: account.u_balance,
+            balance: account.balance,
+            publicKey: account.publicKey,
+            unconfirmedSignature: account.u_secondSignature,
+            secondSignature: account.secondSignature,
+            secondPublicKey: account.secondPublicKey,
+            multisignatures: account.multisignatures,
+            u_multisignatures: account.u_multisignatures,
+            lockHeight: account.lockHeight,
+            effectivity: account.effectivity,
+            delayAmount: account.delayAmount,
+            bonus: account.bonus || 0
+          },
+          latestBlock: {
+            height: latestBlock.height,
+            timestamp: latestBlock.timestamp
+          },
+          version: modules.peer.getVersion()
+        });
       });
     });
-  });
 }
 
 shared.accountOnBlockchain = function (req, cb) {
@@ -1033,11 +1043,11 @@ shared.listDelayTransfer = function (req, cb) {
     if (mode == 0) {
       // recipientId
       const list = library.delayTransferMgr.listByRecipientId(address);
-      return cb(null, {result: list, latestHeight: block.height});
+      return cb(null, { result: list, latestHeight: block.height });
     } else if (mode == 1) {
       // senderId
       const list = library.delayTransferMgr.listBySenderId(address);
-      return cb(null, {result: list, latestHeight: block.height});
+      return cb(null, { result: list, latestHeight: block.height });
     } else {
       return cb("Account not found.");
     }

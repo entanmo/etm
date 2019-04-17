@@ -46,7 +46,7 @@ function Loader(cb, scope) {
   self = this;
   self.__private = __private;
   __private.dbPath = path.join(global.Config.baseDir, global.Config.dbName);
-  __private.backupPath =path.join(global.Config.dataDir, global.Config.dbName);
+  __private.backupPath = path.join(global.Config.dataDir, global.Config.dbName);
   __private.attachApi();
   setImmediate(cb, null, self);
 }
@@ -110,7 +110,7 @@ __private.findUpdate = function (lastBlock, peer, cb) {
 
     if (toRemove >= 5) {
       library.logger.error("long fork, with peer", peerStr);
-     // modules.peer.state(peer.ip, peer.port, 0, 3600);
+      // modules.peer.state(peer.ip, peer.port, 0, 3600);
       return cb();
     }
 
@@ -176,7 +176,13 @@ __private.findUpdate = function (lastBlock, peer, cb) {
                 reason: "Failed to rollback blocks before " + commonBlock.height + ", err: " + err.toString()
               }
             });
-            process.exit(1);
+
+            /// rollback v2
+            library.modules.system.recovery(isbackup => { void isbackup; process.exit(1); });
+            /// end rollback v2
+            /// rollback v2
+            // process.exit(1);
+            /// end rollback v2
             return;
           }
           cb();
@@ -191,7 +197,7 @@ __private.findUpdate = function (lastBlock, peer, cb) {
           modules.blocks.loadBlocksFromPeer(peer, commonBlock.id, function (err, lastValidBlock) {
             if (err) {
               library.logger.error("Failed to load blocks from: " + peerStr, err);
-             // modules.peer.state(peer.ip, peer.port, 0, 3600);
+              // modules.peer.state(peer.ip, peer.port, 0, 3600);
             }
             next();
           });
@@ -258,7 +264,7 @@ __private.loadSignatures = function (cb) {
       return cb()
     }
 
-    library.scheme.validate(data,  scheme.loadSignatures, function (err) {
+    library.scheme.validate(data, scheme.loadSignatures, function (err) {
       if (err) {
         return cb();
       }
@@ -282,17 +288,17 @@ __private.loadSignatures = function (cb) {
 __private.loadUnconfirmedTransactions = function (cb) {
 
   modules.peer.randomRequest('getUnconfirmedTransactions', {}, (err, data, peer) => {
-   // console.log("getUnconfirmedTransactions"+JSON.stringify(data))
+    // console.log("getUnconfirmedTransactions"+JSON.stringify(data))
 
     if (err) {
       return cb()
     }
 
     var report = library.scheme.validate(data,
-       scheme.loadUnconfirmedTransactions);
+      scheme.loadUnconfirmedTransactions);
 
     if (!report) {
-      console.log("getUnconfirmedTransactions error "+report )
+      console.log("getUnconfirmedTransactions error " + report)
       return cb(report);
     }
 
@@ -324,7 +330,7 @@ __private.loadBalances = function (cb) {
   library.model.getAllNativeBalances(function (err, results) {
     if (err) return cb('Failed to load native balances: ' + err)
     for (let i = 0; i < results.length; ++i) {
-      let {address, balance} = results[i]
+      let { address, balance } = results[i]
       library.balanceCache.setNativeBalance(address, balance)
     }
     library.balanceCache.commit()
@@ -424,35 +430,35 @@ __private.loadBlockChain = function (cb) {
       }
     });
   }
-  function loadDelegates(count,cb) {
+  function loadDelegates(count, cb) {
     // Load delegates
     library.dbLite.query("SELECT lower(hex(publicKey)) FROM mem_accounts WHERE isDelegate > 0", ['publicKey'], function (err, delegates) {
-     if (err || delegates.length == 0) {
-       library.logger.error(err || "No delegates, reload database");
-       library.logger.info("Failed to verify db integrity 3");
-       load(count);
-     } else {
-       modules.blocks.loadBlocksOffset(1, count, verify, function (err, lastBlock) {
-         if (err) {
-           library.logger.error(err || "Unable to load last block");
-           library.logger.info("Failed to verify db integrity 4");
-           load(count);
-         } else {
-           library.logger.info('Blockchain ready');
-           async.waterfall([
-             (next => __private.loadBalances(next)),
-             (next => __private.loadDelayTransfer(next)),
-             (next => modules.round.roundrewardsRecovery(next))
-           ], cb);
-           /*
-           __private.loadBalances(cb);
-           __private.loadDelayTransfer(cb);
-           */
-         }
-       });
-     }
-   });
- }
+      if (err || delegates.length == 0) {
+        library.logger.error(err || "No delegates, reload database");
+        library.logger.info("Failed to verify db integrity 3");
+        load(count);
+      } else {
+        modules.blocks.loadBlocksOffset(1, count, verify, function (err, lastBlock) {
+          if (err) {
+            library.logger.error(err || "Unable to load last block");
+            library.logger.info("Failed to verify db integrity 4");
+            load(count);
+          } else {
+            library.logger.info('Blockchain ready');
+            async.waterfall([
+              (next => __private.loadBalances(next)),
+              (next => __private.loadDelayTransfer(next)),
+              (next => modules.round.roundrewardsRecovery(next))
+            ], cb);
+            /*
+            __private.loadBalances(cb);
+            __private.loadDelayTransfer(cb);
+            */
+          }
+        });
+      }
+    });
+  }
   library.base.account.createTables(function (err) {
     if (err) {
       throw err;
@@ -489,16 +495,16 @@ __private.loadBlockChain = function (cb) {
                       library.logger.error(err || "Encountered missing block, looks like node went down during block processing");
                       library.logger.info("Failed to verify db integrity 2");
 
-                      modules.system.recovery(function(isbackup){
-                        if(isbackup){
+                      modules.system.recovery(function (isbackup) {
+                        if (isbackup) {
                           library.logger.info("recoveryed ok ");
                           return process.exit(1);
-                        }else{
-                          loadDelegates(count,cb);
+                        } else {
+                          loadDelegates(count, cb);
                         }
                       });
                     } else {
-                      loadDelegates(count,cb);
+                      loadDelegates(count, cb);
                     }
                   });
                 }
@@ -543,7 +549,7 @@ Loader.prototype.startSyncBlocks = function () {
     __private.syncing = false
     __private.blocksToSync = 0
     library.logger.debug('startSyncBlocks squence timeout end');
-   });
+  });
 }
 
 // Events

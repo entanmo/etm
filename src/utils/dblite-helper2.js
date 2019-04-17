@@ -24,7 +24,7 @@ var isMac = /^darwin/.test(process.platform);
 // dblite.bin = path.join(process.cwd(), 'sqlite3', 'sqlite3');
 
 module.exports.connect = function (connectString, cb) {
- // var db2 =new dblite2(connectString);
+  // var db2 =new dblite2(connectString);
   var db = new dblite(connectString);
   var sql = [
     "CREATE TABLE IF NOT EXISTS blocks (id VARCHAR(64) PRIMARY KEY, version INT NOT NULL, timestamp INT NOT NULL, height BIGINT NOT NULL, previousBlock VARCHAR(64), numberOfTransactions INT NOT NULL, totalAmount BIGINT NOT NULL, totalFee BIGINT NOT NULL, reward BIGINT NOT NULL, payloadLength INT NOT NULL, payloadHash BINARY(32) NOT NULL, generatorPublicKey BINARY(32) NOT NULL, blockSignature BINARY(64) NOT NULL, FOREIGN KEY ( previousBlock ) REFERENCES blocks ( id ) ON DELETE SET NULL)",
@@ -41,8 +41,10 @@ module.exports.connect = function (connectString, cb) {
     "CREATE TABLE IF NOT EXISTS peers_dapp (peerId INT NOT NULL, dappId VARCHAR(20) NOT NULL, FOREIGN KEY(peerId) REFERENCES peers(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS storages(content VARBINARY(4096), transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS lock_votes(address VARCHAR(50) NOT NULL, lockAmount BIGINT NOT NULL, originHeight BIGINT NOT NULL, currentHeight BIGINT NOT NULL, transactionId VARCHAR(64), vote BIGINT NOT NULL, state INT NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS lock_votes_backup(transactionId VARCHAR(64) NOT NULL, old BIGINT NOT NULL, new BIGINT NOT NULL, change BIGINT NOT NULL, type INT NOT NULL, status INT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS delay_transfer(expired BIGINT NOT NULL, transactionId VARCHAR(64), state INT NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
-    "CREATE TABLE IF NOT EXISTS mem_roundrewards(round BIGINT NOT NULL, isTop INT NOT NULL, delegatePublicKey BINARY(32) NOT NULL, voters TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS mem_roundrewards(round BIGINT NOT NULL, delegatePublicKey BINARY(32) NOT NULL, voters TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS mem_rollbackbackup(name TEXT NOT NULL, round INT NOT NULL, data TEXT NOT NULL, state INT NOT NULL)",
     // UIA transactions
     "CREATE TABLE IF NOT EXISTS issuers(name VARCHAR(16) NOT NULL PRIMARY KEY, desc VARCHAR(4096) NOT NULL, issuerId VARCHAR(50), transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS assets(name VARCHAR(22) NOT NULL PRIMARY KEY, desc VARCHAR(4096) NOT NULL, maximum VARCHAR(50) NOT NULL, precision TINYINT NOT NULL, strategy TEXT, quantity VARCHAR(50), issuerName VARCHAR(16) NOT NULL, acl TINYINT, writeoff TINYINT, allowWriteoff TINYINT, allowWhitelist TINYINT, allowBlacklist TINYINT, transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
@@ -50,7 +52,7 @@ module.exports.connect = function (connectString, cb) {
     "CREATE TABLE IF NOT EXISTS issues(currency VARCHAR(22) NOT NULL, amount VARCHAR(50) NOT NULL, transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS acls(currency VARCHAR(22) NOT NULL, flag TINYINT NOT NULL, operator CHAR(1) NOT NULL, list TEXT NOT NULL, transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS transfers(currency VARCHAR(22) NOT NULL, amount VARCHAR(50) NOT NULL, transactionId VARCHAR(64) NOT NULL, FOREIGN KEY(transactionId) REFERENCES trs(id) ON DELETE CASCADE)",
-    
+
     // UIA states
     "CREATE TABLE IF NOT EXISTS mem_asset_balances(currency VARCHAR(22) NOT NULL, address VARCHAR(64) NOT NULL, balance VARCHAR(50) NOT NULL)",
     "CREATE TABLE IF NOT EXISTS acl_white(currency VARCHAR(22) NOT NULL, address VARCHAR(50) NOT NULL)",
@@ -115,14 +117,14 @@ module.exports.connect = function (connectString, cb) {
     "PRAGMA temp_store = 2"
     //TODO use better-sqlite3 pragma statment
   ];
-//
+  //
   var post = [
     "UPDATE peers SET state = 1, clock = null where state != 0"
   ];
 
   async.eachSeries(sql, function (command, cb) {
     db.query(command, function (err, data) {
-    //  console.log("data"+JSON.stringify(data));
+      //  console.log("data"+JSON.stringify(data));
       cb(err, data);
     });
   }, function (err) {

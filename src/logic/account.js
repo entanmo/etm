@@ -20,7 +20,7 @@ jsonSql.setDialect("sqlite")
 var constants = require('../utils/constants.js');
 var genesisBlock = null;
 var LRU = require("lru-cache");
-var cache = new LRU({ max: 50000,maxAge: 1000 * 60 * 60 * 168});
+var cache = new LRU({ max: 50000, maxAge: 1000 * 60 * 60 * 168 });
 var __private = {};
 
 // Constructor
@@ -329,6 +329,15 @@ function Account(scope, cb) {
       default: 0
     },
     {
+      name: "bonus",
+      type: "BigInt",
+      filter: {
+        type: "integer"
+      },
+      conv: Number,
+      default: 0
+    },
+    {
       name: "lockHeight",
       type: "BigInt",
       filter: {
@@ -598,31 +607,31 @@ Account.prototype.toDB = function (raw) {
 
 Account.prototype.get = function (filter, fields, cb) {
   library.logger.trace('enter Account.prototype.get....')
-  if (typeof(fields) == 'function') {
+  if (typeof (fields) == 'function') {
     cb = fields;
     fields = this.fields.map(function (field) {
       return field.alias || field.field;
     });
   }
-  var address =filter["address"];
-  if(address && cache.has(address)){
-     // console.log('cache get '+JSON.stringify(cache.get(address)));
-      cb(null,cache.get(address))
-      return
+  var address = filter["address"];
+  if (address && cache.has(address)) {
+    // console.log('cache get '+JSON.stringify(cache.get(address)));
+    cb(null, cache.get(address))
+    return
   }
   this.getAll(filter, fields, function (err, data) {
     library.logger.trace('enter Account.prototype.get.... callback' + err, data)
-   var d = data && data.length ? data[0] : null
-    if(d){
-    //  console.log('cache account'+JSON.stringify(d));
-     cache.set(address,d)
+    var d = data && data.length ? data[0] : null
+    if (d) {
+      //  console.log('cache account'+JSON.stringify(d));
+      cache.set(address, d)
     }
     cb(err, data && data.length ? data[0] : null)
   })
 }
 
 Account.prototype.getAll = function (filter, fields, cb) {
-  if (typeof(fields) == 'function') {
+  if (typeof (fields) == 'function') {
     cb = fields;
     fields = this.fields.map(function (field) {
       return field.alias || field.field;
@@ -665,7 +674,7 @@ Account.prototype.getAll = function (filter, fields, cb) {
     condition: filter,
     fields: realFields
   });
-  
+
   this.scope.dbLite.query(sql.query, sql.values, realConv, function (err, data) {
     if (err) {
       return cb(err);
@@ -678,16 +687,16 @@ Account.prototype.getAll = function (filter, fields, cb) {
 Account.prototype.set = function (address, fields, cb) {
   var self = this;
 
-  if (fields.publicKey !== undefined && !fields.publicKey){
+  if (fields.publicKey !== undefined && !fields.publicKey) {
     console.log("!!!!!!!!!!!!!!!!!!!!!!!", address, diff)
   }
 
   fields.address = address;
   var account = fields;
   var sqles = []
-  if(address && cache.has(address)){
+  if (address && cache.has(address)) {
     cache.del(address)
-	}
+  }
   var sql = jsonSql.build({
     type: 'insert',
     or: "ignore",
@@ -719,7 +728,7 @@ Account.prototype.set = function (address, fields, cb) {
 }
 Account.prototype.create = function (address, fields, cb) {
   var self = this;
-  if (fields.publicKey !== undefined && !fields.publicKey){
+  if (fields.publicKey !== undefined && !fields.publicKey) {
     console.log("!!!!!!!!!!!!!!!!!!!!!!!", address, diff)
   }
   //TODO 验证地址和publickey?
@@ -851,7 +860,7 @@ Account.prototype.merge = function (address, diff, cb) {
         type: 'remove',
         table: self.table + "2" + el,
         condition: {
-          dependentId: {$in: remove[el]},
+          dependentId: { $in: remove[el] },
           accountId: address
         }
       });
@@ -935,12 +944,12 @@ Account.prototype.merge = function (address, diff, cb) {
         self.scope.dbLite.query(sql.query, sql.values, next);
       }, next);
     }
-  ], function(err) {
+  ], function (err) {
     if (err) {
       console.log('!!!!!!! merge sql error: ' + err);
       cb('Account merge failed: ' + err);
     } else {
-      self.get({address: address}, cb);
+      self.get({ address: address }, cb);
     }
   });
 }
