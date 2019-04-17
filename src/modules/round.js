@@ -649,7 +649,7 @@ __private.calcProductivity = function (m, n, avg) {
   if (n === 0) {
     v = avg;
   } else if (m === 0) {
-    v = 1 / (10 * n * n);
+    v = 1 / Math.pow(2, n);
   } else {
     v = m / n;
   }

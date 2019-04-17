@@ -84,9 +84,9 @@ function Transfer() {
 
   this.apply = function (trs, block, sender, cb) {
     modules.accounts.loadOrCreate({ address: trs.recipientId }, function (err, recipient) {
-     if (err) {
-       return cb(err);
-     }
+      if (err) {
+        return cb(err);
+      }
 
       modules.accounts.mergeAccountAndGet({
         address: trs.recipientId,
@@ -277,7 +277,7 @@ function Lock() {
     var lastBlock = modules.blocks.getLastBlock()
 
     if (isNaN(lockHeight) || lockHeight <= lastBlock.height) return cb('Invalid lock height')
-    if (global.featureSwitch.enableLockReset){
+    if (global.featureSwitch.enableLockReset) {
       if (sender.lockHeight && lastBlock.height + 1 <= sender.lockHeight && lockHeight <= sender.lockHeight) return cb('Account is already locked at height ' + sender.lockHeight)
     } else {
       if (sender.lockHeight && lastBlock.height + 1 <= sender.lockHeight) return cb('Account is already locked at height ' + sender.lockHeight)
@@ -382,6 +382,7 @@ __private.attachApi = function () {
     "put /": "addTransactions",
     "put /batch": "addBatchTransations",
     "put /delay": "addDelayTransactions",
+    "put /signed": "addSignedTransactions",
   });
 
   router.use(function (req, res, next) {
@@ -679,7 +680,7 @@ Transactions.prototype.applyUnconfirmedList = function (ids, cb) {
   async.eachSeries(ids, function (id, cb) {
     var transaction = self.getUnconfirmedTransaction(id);
     modules.accounts.setAccountAndGet({ publicKey: transaction.senderPublicKey }, function (err, sender) {
-   if (err) {
+      if (err) {
         self.removeUnconfirmedTransaction(id);
         return setImmediate(cb);
       }
@@ -748,7 +749,7 @@ Transactions.prototype.undoUnconfirmed = function (transaction, cb) {
 }
 
 Transactions.prototype.receiveTransactions = function (transactions, cb) {
-  if (__private.unconfirmedNumber  + transactions.length > constants.maxTxsCache) {
+  if (__private.unconfirmedNumber + transactions.length > constants.maxTxsCache) {
     setImmediate(cb, "Too many transactions");
     return;
   }
@@ -847,18 +848,18 @@ shared.getTransactions = function (req, cb) {
       }
     }
   }*/ scheme.getTransactions, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    __private.list(query, function (err, data) {
       if (err) {
-        return cb("Failed to get transactions");
+        return cb(err[0].message);
       }
 
-      cb(null, { transactions: data.transactions, count: data.count });
+      __private.list(query, function (err, data) {
+        if (err) {
+          return cb("Failed to get transactions");
+        }
+
+        cb(null, { transactions: data.transactions, count: data.count });
+      });
     });
-  });
 }
 
 shared.getTransaction = function (req, cb) {
@@ -873,17 +874,17 @@ shared.getTransaction = function (req, cb) {
     },
     required: ['id']
   }*/ scheme.getTransaction, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    __private.getById(query.id, function (err, transaction) {
-      if (!transaction || err) {
-        return cb("Transaction not found");
+      if (err) {
+        return cb(err[0].message);
       }
-      cb(null, { transaction: transaction });
+
+      __private.getById(query.id, function (err, transaction) {
+        if (!transaction || err) {
+          return cb("Transaction not found");
+        }
+        cb(null, { transaction: transaction });
+      });
     });
-  });
 }
 
 shared.getUnconfirmedTransaction = function (req, cb) {
@@ -899,18 +900,18 @@ shared.getUnconfirmedTransaction = function (req, cb) {
     },
     required: ['id']
   }*/ scheme.getUnconfirmedTransaction, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
+      if (err) {
+        return cb(err[0].message);
+      }
 
-    var unconfirmedTransaction = self.getUnconfirmedTransaction(query.id);
+      var unconfirmedTransaction = self.getUnconfirmedTransaction(query.id);
 
-    if (!unconfirmedTransaction) {
-      return cb("Transaction not found");
-    }
+      if (!unconfirmedTransaction) {
+        return cb("Transaction not found");
+      }
 
-    cb(null, { transaction: unconfirmedTransaction });
-  });
+      cb(null, { transaction: unconfirmedTransaction });
+    });
 }
 
 shared.getUnconfirmedTransactions = function (req, cb) {
@@ -927,27 +928,27 @@ shared.getUnconfirmedTransactions = function (req, cb) {
       }
     }
   }*/ scheme.getUnconfirmedTransactions, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
+      if (err) {
+        return cb(err[0].message);
+      }
 
-    var transactions = self.getUnconfirmedTransactionList(true),
-      toSend = [];
+      var transactions = self.getUnconfirmedTransactionList(true),
+        toSend = [];
 
-    if (query.senderPublicKey || query.address) {
-      for (var i = 0; i < transactions.length; i++) {
-        if (transactions[i].senderPublicKey == query.senderPublicKey || transactions[i].recipientId == query.address) {
+      if (query.senderPublicKey || query.address) {
+        for (var i = 0; i < transactions.length; i++) {
+          if (transactions[i].senderPublicKey == query.senderPublicKey || transactions[i].recipientId == query.address) {
+            toSend.push(transactions[i]);
+          }
+        }
+      } else {
+        for (var i = 0; i < transactions.length; i++) {
           toSend.push(transactions[i]);
         }
       }
-    } else {
-      for (var i = 0; i < transactions.length; i++) {
-        toSend.push(transactions[i]);
-      }
-    }
 
-    cb(null, { transactions: toSend });
-  });
+      cb(null, { transactions: toSend });
+    });
 }
 
 shared.addTransactions = function (req, cb) {
@@ -990,70 +991,109 @@ shared.addTransactions = function (req, cb) {
     },
     required: ["secret", "amount", "recipientId"]
   }*/ scheme.addTransactions, function (err) {
-    if (err) {
-      return cb(err[0].message + ': ' + err[0].path);
-    }
-
-    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
-    var keypair = ed.MakeKeypair(hash);
-
-    if (body.publicKey) {
-      if (keypair.publicKey.toString('hex') != body.publicKey) {
-        return cb("Invalid passphrase");
+      if (err) {
+        return cb(err[0].message + ': ' + err[0].path);
       }
-    }
-    
-    var query = { address: body.recipientId };
 
-    library.balancesSequence.add(function (cb) {
-      modules.accounts.getAccount(query, function (err, recipient) {
-        if (err) {
-          return cb(err.toString());
+      var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+      var keypair = ed.MakeKeypair(hash);
+
+      if (body.publicKey) {
+        if (keypair.publicKey.toString('hex') != body.publicKey) {
+          return cb("Invalid passphrase");
         }
+      }
 
-        var recipientId = recipient ? recipient.address : body.recipientId;
-        if (!recipientId) {
-          return cb("Recipient not found");
-        }
+      var query = { address: body.recipientId };
 
-        if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
-          modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
-            if (err) {
-              return cb(err.toString());
-            }
+      library.balancesSequence.add(function (cb) {
+        modules.accounts.getAccount(query, function (err, recipient) {
+          if (err) {
+            return cb(err.toString());
+          }
 
-            if (!account) {
-              return cb("Multisignature account not found");
-            }
+          var recipientId = recipient ? recipient.address : body.recipientId;
+          if (!recipientId) {
+            return cb("Recipient not found");
+          }
 
-            if (!account.multisignatures || !account.multisignatures) {
-              return cb("Account does not have multisignatures enabled");
-            }
-
-            if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
-              return cb("Account does not belong to multisignature group");
-            }
-
-            modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+          if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
+            modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
               if (err) {
                 return cb(err.toString());
               }
 
-              if (!requester || !requester.publicKey) {
-                return cb("Invalid requester");
+              if (!account) {
+                return cb("Multisignature account not found");
               }
 
-              if (requester.secondSignature && !body.secondSecret) {
+              if (!account.multisignatures || !account.multisignatures) {
+                return cb("Account does not have multisignatures enabled");
+              }
+
+              if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
+                return cb("Account does not belong to multisignature group");
+              }
+
+              modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+                if (err) {
+                  return cb(err.toString());
+                }
+
+                if (!requester || !requester.publicKey) {
+                  return cb("Invalid requester");
+                }
+
+                if (requester.secondSignature && !body.secondSecret) {
+                  return cb("Invalid second passphrase");
+                }
+
+                if (requester.publicKey == account.publicKey) {
+                  return cb("Invalid requester");
+                }
+
+                var secondKeypair = null;
+
+                if (requester.secondSignature) {
+                  var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+                  secondKeypair = ed.MakeKeypair(secondHash);
+                }
+
+                try {
+                  var transaction = library.base.transaction.create({
+                    type: TransactionTypes.SEND,
+                    amount: body.amount,
+                    sender: account,
+                    recipientId: recipientId,
+                    keypair: keypair,
+                    requester: keypair,
+                    secondKeypair: secondKeypair,
+                    message: body.message
+                  });
+                } catch (e) {
+                  return cb(e.toString());
+                }
+                modules.transactions.receiveTransactions([transaction], cb);
+              });
+            });
+          } else {
+            // library.logger.debug('publicKey is: ', keypair.publicKey.toString('hex'))
+            modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+              // library.logger.debug('after getAccount =============', account.address)
+              if (err) {
+                return cb(err.toString());
+              }
+              if (!account) {
+                return cb("Account not found");
+              }
+
+              if (account.secondSignature && !body.secondSecret) {
                 return cb("Invalid second passphrase");
-              }
-
-              if (requester.publicKey == account.publicKey) {
-                return cb("Invalid requester");
               }
 
               var secondKeypair = null;
 
-              if (requester.secondSignature) {
+              if (account.secondSignature) {
                 var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
                 secondKeypair = ed.MakeKeypair(secondHash);
               }
@@ -1065,71 +1105,32 @@ shared.addTransactions = function (req, cb) {
                   sender: account,
                   recipientId: recipientId,
                   keypair: keypair,
-                  requester: keypair,
                   secondKeypair: secondKeypair,
                   message: body.message
                 });
               } catch (e) {
                 return cb(e.toString());
               }
+
               modules.transactions.receiveTransactions([transaction], cb);
             });
-          });
-        } else {
-         // library.logger.debug('publicKey is: ', keypair.publicKey.toString('hex'))
-          modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-           // library.logger.debug('after getAccount =============', account.address)
-            if (err) {
-              return cb(err.toString());
-            }
-            if (!account) {
-              return cb("Account not found");
-            }
-
-            if (account.secondSignature && !body.secondSecret) {
-              return cb("Invalid second passphrase");
-            }
-
-            var secondKeypair = null;
-
-            if (account.secondSignature) {
-              var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
-              secondKeypair = ed.MakeKeypair(secondHash);
-            }
-
-            try {
-              var transaction = library.base.transaction.create({
-                type: TransactionTypes.SEND,
-                amount: body.amount,
-                sender: account,
-                recipientId: recipientId,
-                keypair: keypair,
-                secondKeypair: secondKeypair,
-                message: body.message
-              });
-            } catch (e) {
-              return cb(e.toString());
-            }
-
-            modules.transactions.receiveTransactions([transaction], cb);
-          });
+          }
+        });
+      }, function (err, transaction) {
+        if (err) {
+          return cb(err.toString());
         }
+        reportor.report("transactions", {
+          subaction: "add",
+          trType: TransactionTypes.SEND,
+          id: transaction[0].id,
+          timestamp: transaction[0].timestamp,
+          senderPublicKey: transaction[0].senderPublicKey,
+          duration: reportor.uptime - addUptime
+        });
+        cb(null, { transactionId: transaction[0].id });
       });
-    }, function (err, transaction) {
-      if (err) {
-        return cb(err.toString());
-      }
-      reportor.report("transactions", {
-        subaction: "add",
-        trType: TransactionTypes.SEND,
-        id: transaction[0].id,
-        timestamp: transaction[0].timestamp,
-        senderPublicKey: transaction[0].senderPublicKey,
-        duration: reportor.uptime - addUptime
-      });
-      cb(null, { transactionId: transaction[0].id });
     });
-  });
 }
 
 shared.addDelayTransactions = function (req, cb) {
@@ -1172,32 +1173,299 @@ shared.addDelayTransactions = function (req, cb) {
     },
     required: ["secret", "amount", "recipientId"]
   }*/ scheme.addDelayTransactions, function (err) {
-    if (err) {
-      return cb(err[0].message + ': ' + err[0].path);
-    }
-
-    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
-    var keypair = ed.MakeKeypair(hash);
-
-    if (body.publicKey) {
-      if (keypair.publicKey.toString('hex') != body.publicKey) {
-        return cb("Invalid passphrase");
+      if (err) {
+        return cb(err[0].message + ': ' + err[0].path);
       }
-    }
-    
-    var query = { address: body.recipientId };
 
-    library.balancesSequence.add(function (cb) {
-      modules.accounts.getAccount(query, function (err, recipient) {
+      var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+      var keypair = ed.MakeKeypair(hash);
+
+      if (body.publicKey) {
+        if (keypair.publicKey.toString('hex') != body.publicKey) {
+          return cb("Invalid passphrase");
+        }
+      }
+
+      var query = { address: body.recipientId };
+
+      library.balancesSequence.add(function (cb) {
+        modules.accounts.getAccount(query, function (err, recipient) {
+          if (err) {
+            return cb(err.toString());
+          }
+
+          var recipientId = recipient ? recipient.address : body.recipientId;
+          if (!recipientId) {
+            return cb("Recipient not found");
+          }
+
+          if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
+            modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
+              if (err) {
+                return cb(err.toString());
+              }
+
+              if (!account) {
+                return cb("Multisignature account not found");
+              }
+
+              if (!account.multisignatures || !account.multisignatures) {
+                return cb("Account does not have multisignatures enabled");
+              }
+
+              if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
+                return cb("Account does not belong to multisignature group");
+              }
+
+              modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+                if (err) {
+                  return cb(err.toString());
+                }
+
+                if (!requester || !requester.publicKey) {
+                  return cb("Invalid requester");
+                }
+
+                if (requester.secondSignature && !body.secondSecret) {
+                  return cb("Invalid second passphrase");
+                }
+
+                if (requester.publicKey == account.publicKey) {
+                  return cb("Invalid requester");
+                }
+
+                var secondKeypair = null;
+
+                if (requester.secondSignature) {
+                  var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+                  secondKeypair = ed.MakeKeypair(secondHash);
+                }
+
+                try {
+                  var transaction = library.base.transaction.create({
+                    type: TransactionTypes.DELAY_TRANSFER,
+                    amount: body.amount,
+                    sender: account,
+                    recipientId: recipientId,
+                    expired: body.expired,
+                    keypair: keypair,
+                    requester: keypair,
+                    secondKeypair: secondKeypair,
+                    message: body.message,
+                    args: body.args
+                  });
+                } catch (e) {
+                  return cb(e.toString());
+                }
+                modules.transactions.receiveTransactions([transaction], cb);
+              });
+            });
+          } else {
+            // library.logger.debug('publicKey is: ', keypair.publicKey.toString('hex'))
+            modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+              // library.logger.debug('after getAccount =============', account.address)
+              if (err) {
+                return cb(err.toString());
+              }
+              if (!account) {
+                return cb("Account not found");
+              }
+
+              if (account.secondSignature && !body.secondSecret) {
+                return cb("Invalid second passphrase");
+              }
+
+              var secondKeypair = null;
+
+              if (account.secondSignature) {
+                var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+                secondKeypair = ed.MakeKeypair(secondHash);
+              }
+
+              try {
+                var transaction = library.base.transaction.create({
+                  type: TransactionTypes.DELAY_TRANSFER,
+                  amount: body.amount,
+                  sender: account,
+                  recipientId: recipientId,
+                  keypair: keypair,
+                  secondKeypair: secondKeypair,
+                  message: body.message,
+                  args: body.args
+                });
+              } catch (e) {
+                return cb(e.toString());
+              }
+
+              modules.transactions.receiveTransactions([transaction], cb);
+            });
+          }
+        });
+      }, function (err, transaction) {
         if (err) {
           return cb(err.toString());
         }
+        reportor.report("transactions", {
+          subaction: "add",
+          trType: TransactionTypes.DELAY_TRANSFER,
+          id: transaction[0].id,
+          timestamp: transaction[0].timestamp,
+          senderPublicKey: transaction[0].senderPublicKey,
+          duration: reportor.uptime - addUptime
+        });
+        cb(null, { transactionId: transaction[0].id });
+      });
+    });
+}
 
-        var recipientId = recipient ? recipient.address : body.recipientId;
-        if (!recipientId) {
-          return cb("Recipient not found");
+shared.addBatchTransations = (req, cb) => {
+  if (!req.body || !req.body.transactions) {
+    return cb('Invalid params')
+  }
+  const trs = req.body.transactions
+  let transactions = []
+
+
+  async.eachSeries(trs, function (t, next) {
+    var hash = crypto.createHash('sha256').update(t.secret, 'utf8').digest();
+    var keypair = ed.MakeKeypair(hash);
+
+    if (t.publicKey) {
+      if (keypair.publicKey.toString('hex') != t.publicKey) {
+        return cb("Invalid passphrase");
+      }
+    }
+    modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+      // library.logger.debug('after getAccount =============', account.address)
+      if (err) {
+        return cb(err.toString());
+      }
+      if (!account) {
+        return cb("Account not found");
+      }
+
+      if (account.secondSignature && !body.secondSecret) {
+        return cb("Invalid second passphrase");
+      }
+
+      var secondKeypair = null;
+
+      if (account.secondSignature) {
+        var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+        secondKeypair = ed.MakeKeypair(secondHash);
+      }
+
+      try {
+        var transaction = library.base.transaction.create({
+          type: TransactionTypes.SEND,
+          amount: t.amount,
+          sender: account,
+          recipientId: t.recipientId,
+          keypair: keypair,
+          secondKeypair: secondKeypair,
+          message: t.message
+        });
+      } catch (e) {
+        return cb(e.toString());
+      }
+
+      transactions.push(transaction)
+      next();
+    });
+  }, function (err) {
+    // console.log(JSON.stringify(transactions))
+    modules.transactions.receiveTransactions(transactions, function (err, transaction) {
+      if (err) {
+        return cb(err.toString());
+      }
+      return cb(null, transactions);
+    });
+  });
+
+}
+
+shared.addSignedTransactions = (req, cb) => {
+  if (!req.body || !req.body.transactions || !(req.body.transactions instanceof Array)) {
+    return cb('Invalid params')
+  }
+
+  let trs = req.body.transactions;
+  trs = trs.map(tr => {
+    let transaction = library.base.transaction.objectNormalize(tr);
+    transaction.asset = transaction.asset || {};
+    return transaction;
+  });
+  modules.transactions.receiveTransactions(trs, function (err, transactions) {
+    if (err) {
+      return cb(err.toString());
+    }
+
+    cb(null, transactions);
+  });
+}
+
+shared.putStorage = function (req, cb) {
+  var body = req.body;
+  library.scheme.validate(body, /*{
+    type: "object",
+    properties: {
+      secret: {
+        type: "string",
+        minLength: 1,
+        maxLength: 100
+      },
+      secondSecret: {
+        type: "string",
+        minLength: 1,
+        maxLength: 100
+      },
+      multisigAccountPublicKey: {
+        type: "string",
+        format: "publicKey"
+      },
+      content: {
+        type: "string",
+        minLength: 1,
+        maxLength: 4096,
+      },
+      encode: {
+        type: "string",
+        minLength: 1,
+        maxLength: 10
+      },
+      wait: {
+        type: "integer",
+        minimum: 0,
+        maximum: 6
+      }
+    },
+    required: ["secret", "content"]
+  }*/ scheme.putStorage, function (err) {
+      if (err) {
+        return cb(err[0].message);
+      }
+      var encode = body.encode;
+      if (!encode) {
+        encode = 'raw';
+      }
+      if (encode != 'raw' && encode != 'base64' && encode != 'hex') {
+        return cb('Invalide content encode type');
+      }
+      var content;
+      if (encode != 'raw') {
+        try {
+          content = new Buffer(body.content, encode);
+        } catch (e) {
+          return cb('Invalid content format with encode type ' + encode);
         }
+      } else {
+        content = new Buffer(body.content);
+      }
 
+      var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+      var keypair = ed.MakeKeypair(hash);
+
+      library.balancesSequence.add(function (cb) {
         if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
           modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
             if (err) {
@@ -1242,16 +1510,12 @@ shared.addDelayTransactions = function (req, cb) {
 
               try {
                 var transaction = library.base.transaction.create({
-                  type: TransactionTypes.DELAY_TRANSFER,
-                  amount: body.amount,
+                  type: TransactionTypes.STORAGE,
                   sender: account,
-                  recipientId: recipientId,
-                  expired: body.expired,
                   keypair: keypair,
                   requester: keypair,
                   secondKeypair: secondKeypair,
-                  message: body.message,
-                  args: body.args
+                  content: content
                 });
               } catch (e) {
                 return cb(e.toString());
@@ -1260,9 +1524,7 @@ shared.addDelayTransactions = function (req, cb) {
             });
           });
         } else {
-         // library.logger.debug('publicKey is: ', keypair.publicKey.toString('hex'))
           modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-           // library.logger.debug('after getAccount =============', account.address)
             if (err) {
               return cb(err.toString());
             }
@@ -1283,216 +1545,9 @@ shared.addDelayTransactions = function (req, cb) {
 
             try {
               var transaction = library.base.transaction.create({
-                type: TransactionTypes.DELAY_TRANSFER,
-                amount: body.amount,
-                sender: account,
-                recipientId: recipientId,
-                keypair: keypair,
-                secondKeypair: secondKeypair,
-                message: body.message,
-                args: body.args
-              });
-            } catch (e) {
-              return cb(e.toString());
-            }
-
-            modules.transactions.receiveTransactions([transaction], cb);
-          });
-        }
-      });
-    }, function (err, transaction) {
-      if (err) {
-        return cb(err.toString());
-      }
-      reportor.report("transactions", {
-        subaction: "add",
-        trType: TransactionTypes.DELAY_TRANSFER,
-        id: transaction[0].id,
-        timestamp: transaction[0].timestamp,
-        senderPublicKey: transaction[0].senderPublicKey,
-        duration: reportor.uptime - addUptime
-      });
-      cb(null, { transactionId: transaction[0].id });
-    });
-  });
-}
-
-shared.addBatchTransations = (req, cb) => {
-  if (!req.body || !req.body.transactions) {
-    return cb('Invalid params')
-  }
-   const trs = req.body.transactions
-   let transactions =[]
-
-
-    async.eachSeries(trs, function (t, next) {
-      var hash = crypto.createHash('sha256').update(t.secret, 'utf8').digest();
-      var keypair = ed.MakeKeypair(hash);
-  
-      if (t.publicKey) {
-        if (keypair.publicKey.toString('hex') != t.publicKey) {
-          return cb("Invalid passphrase");
-        }
-      }
-      modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-        // library.logger.debug('after getAccount =============', account.address)
-         if (err) {
-           return cb(err.toString());
-         }
-         if (!account) {
-           return cb("Account not found");
-         }
-
-         if (account.secondSignature && !body.secondSecret) {
-           return cb("Invalid second passphrase");
-         }
-
-         var secondKeypair = null;
-
-         if (account.secondSignature) {
-           var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
-           secondKeypair = ed.MakeKeypair(secondHash);
-         }
-
-         try {
-           var transaction = library.base.transaction.create({
-             type: TransactionTypes.SEND,
-             amount: t.amount,
-             sender: account,
-             recipientId: t.recipientId,
-             keypair: keypair,
-             secondKeypair: secondKeypair,
-             message: t.message
-           });
-         } catch (e) {
-           return cb(e.toString());
-         }
-
-         transactions.push(transaction)
-         next();
-       });
-    }, function (err) {
-     // console.log(JSON.stringify(transactions))
-      modules.transactions.receiveTransactions(transactions,  function (err, transaction) {
-        if (err) {
-          return cb(err.toString());
-        }
-        return  cb(null, transactions);
-      });
-    });
-
-}
-
-shared.putStorage = function (req, cb) {
-  var body = req.body;
-  library.scheme.validate(body, /*{
-    type: "object",
-    properties: {
-      secret: {
-        type: "string",
-        minLength: 1,
-        maxLength: 100
-      },
-      secondSecret: {
-        type: "string",
-        minLength: 1,
-        maxLength: 100
-      },
-      multisigAccountPublicKey: {
-        type: "string",
-        format: "publicKey"
-      },
-      content: {
-        type: "string",
-        minLength: 1,
-        maxLength: 4096,
-      },
-      encode: {
-        type: "string",
-        minLength: 1,
-        maxLength: 10
-      },
-      wait: {
-        type: "integer",
-        minimum: 0,
-        maximum: 6
-      }
-    },
-    required: ["secret", "content"]
-  }*/ scheme.putStorage, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-    var encode = body.encode;
-    if (!encode) {
-      encode = 'raw';
-    }
-    if (encode != 'raw' && encode != 'base64' && encode != 'hex') {
-      return cb('Invalide content encode type');
-    }
-    var content;
-    if (encode != 'raw') {
-      try {
-        content = new Buffer(body.content, encode);
-      } catch (e) {
-        return cb('Invalid content format with encode type ' + encode);
-      }
-    } else {
-      content = new Buffer(body.content);
-    }
-
-    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
-    var keypair = ed.MakeKeypair(hash);
-
-    library.balancesSequence.add(function (cb) {
-      if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
-        modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
-
-          if (!account) {
-            return cb("Multisignature account not found");
-          }
-
-          if (!account.multisignatures || !account.multisignatures) {
-            return cb("Account does not have multisignatures enabled");
-          }
-
-          if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
-            return cb("Account does not belong to multisignature group");
-          }
-
-          modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
-            if (err) {
-              return cb(err.toString());
-            }
-
-            if (!requester || !requester.publicKey) {
-              return cb("Invalid requester");
-            }
-
-            if (requester.secondSignature && !body.secondSecret) {
-              return cb("Invalid second passphrase");
-            }
-
-            if (requester.publicKey == account.publicKey) {
-              return cb("Invalid requester");
-            }
-
-            var secondKeypair = null;
-
-            if (requester.secondSignature) {
-              var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
-              secondKeypair = ed.MakeKeypair(secondHash);
-            }
-
-            try {
-              var transaction = library.base.transaction.create({
                 type: TransactionTypes.STORAGE,
                 sender: account,
                 keypair: keypair,
-                requester: keypair,
                 secondKeypair: secondKeypair,
                 content: content
               });
@@ -1501,60 +1556,26 @@ shared.putStorage = function (req, cb) {
             }
             modules.transactions.receiveTransactions([transaction], cb);
           });
-        });
-      } else {
-        modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
-          if (!account) {
-            return cb("Account not found");
-          }
-
-          if (account.secondSignature && !body.secondSecret) {
-            return cb("Invalid second passphrase");
-          }
-
-          var secondKeypair = null;
-
-          if (account.secondSignature) {
-            var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
-            secondKeypair = ed.MakeKeypair(secondHash);
-          }
-
-          try {
-            var transaction = library.base.transaction.create({
-              type: TransactionTypes.STORAGE,
-              sender: account,
-              keypair: keypair,
-              secondKeypair: secondKeypair,
-              content: content
-            });
-          } catch (e) {
-            return cb(e.toString());
-          }
-          modules.transactions.receiveTransactions([transaction], cb);
-        });
-      }
-    }, function (err, transaction) {
-      if (err) {
-        return cb(err.toString());
-      }
-      // if (!body.wait) {
-      if (1 === 1) {
-        return cb(null, { transactionId: transaction[0].id });
-      }
-
-      var confirms = 0;
-      function onConfirmed() {
-        if (++confirms >= body.wait) {
-          library.bus.removeListener('newBlock', onConfirmed);
-          cb(null, { transactionId: transaction[0].id });
         }
-      }
-      library.bus.on('newBlock', onConfirmed);
+      }, function (err, transaction) {
+        if (err) {
+          return cb(err.toString());
+        }
+        // if (!body.wait) {
+        if (1 === 1) {
+          return cb(null, { transactionId: transaction[0].id });
+        }
+
+        var confirms = 0;
+        function onConfirmed() {
+          if (++confirms >= body.wait) {
+            library.bus.removeListener('newBlock', onConfirmed);
+            cb(null, { transactionId: transaction[0].id });
+          }
+        }
+        library.bus.on('newBlock', onConfirmed);
+      });
     });
-  });
 }
 
 shared.getStorage = function (req, cb) {
@@ -1574,33 +1595,33 @@ shared.getStorage = function (req, cb) {
     },
     required: ['id']
   }*/ scheme.getStorage, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
+      if (err) {
+        return cb(err[0].message);
+      }
 
-    library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
-      "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
-      "lower(hex(st.content)), " +
-      "(select max(height) + 1 from blocks) - b.height " +
-      "from trs t " +
-      "inner join blocks b on t.blockId = b.id " +
-      "inner join storages st on st.transactionId = t.id " +
-      "where t.id = $id",
-      { id: query.id },
-      [
-        't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
-        't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
-        'st_content', 'confirmations'
-      ],
-      function (err, rows) {
-        if (err || !rows.length) {
-          return cb(err || "Can't find transaction: " + query.id);
-        }
+      library.dbLite.query("select t.id, b.height, t.blockId, t.type, t.timestamp, lower(hex(t.senderPublicKey)), " +
+        "t.senderId, t.recipientId, t.amount, t.fee, lower(hex(t.signature)), lower(hex(t.signSignature)), " +
+        "lower(hex(st.content)), " +
+        "(select max(height) + 1 from blocks) - b.height " +
+        "from trs t " +
+        "inner join blocks b on t.blockId = b.id " +
+        "inner join storages st on st.transactionId = t.id " +
+        "where t.id = $id",
+        { id: query.id },
+        [
+          't_id', 'b_height', 't_blockId', 't_type', 't_timestamp', 't_senderPublicKey',
+          't_senderId', 't_recipientId', 't_amount', 't_fee', 't_signature', 't_signSignature',
+          'st_content', 'confirmations'
+        ],
+        function (err, rows) {
+          if (err || !rows.length) {
+            return cb(err || "Can't find transaction: " + query.id);
+          }
 
-        var transacton = library.base.transaction.dbRead(rows[0]);
-        cb(null, transacton);
-      });
-  });
+          var transacton = library.base.transaction.dbRead(rows[0]);
+          cb(null, transacton);
+        });
+    });
 }
 
 
