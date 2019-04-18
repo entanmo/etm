@@ -1390,11 +1390,16 @@ shared.addSignedTransactions = (req, cb) => {
   }
 
   let trs = req.body.transactions;
-  trs = trs.map(tr => {
-    let transaction = library.base.transaction.objectNormalize(tr);
-    transaction.asset = transaction.asset || {};
-    return transaction;
-  });
+  try {
+    trs = trs.map(tr => {
+      let transaction = library.base.transaction.objectNormalize(tr);
+      transaction.asset = transaction.asset || {};
+      return transaction;
+    });
+  } catch (error) {
+    return cb(error.toString());
+  }
+
   modules.transactions.receiveTransactions(trs, function (err, transactions) {
     if (err) {
       return cb(err.toString());
