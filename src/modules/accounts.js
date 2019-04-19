@@ -327,7 +327,7 @@ __private.openAccount2 = function (publicKey, cb) {
       u_multisignatures: '',
       bonus: 0
     }
-    account.publicKey = account.publicKey || account.publicKey;
+    account.publicKey = account.publicKey || publicKey;
     return cb(null, account)
   });
 }
