@@ -263,7 +263,8 @@ class DelayTransferManager {
 
     async delayTransferUnaction(key, data, block) {
         return new Promise((resolve, reject) => {
-            library.dbLite.query("UPDATE delay_transfer SET state = 1 WHERE transactiondId=$transactionId", {
+            /* "UPDATE delay_transfer SET state=2 WHERE transactiondId=$transactionId" */
+            library.dbLite.query("DELETE FROM delay_transfer WHERE transactionId=$transactionId AND state=1", {
                 transactionId: key
             }, err => {
                 if (err) {
