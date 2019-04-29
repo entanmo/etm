@@ -73,18 +73,37 @@ class VoterBonus {
     async save(value) {
         return new Promise((resolve, reject) => {
             // console.log("++++++++++++++++++++++ saveToDB:", JSON.stringify(value, null, 2));
-            const base64Voters = Buffer.from(value.voters, "utf8").toString("base64");
-            library.dbLite.query("INSERT INTO mem_roundrewards(round, delegatePublicKey, voters)" +
-                "VALUES($round, $delegatePublicKey, $voters);", {
+            library.dbLite.query("SELECT delegatePublicKey FROM mem_roundrewards " +
+                "WHERE round=$round AND delegatePublicKey=$delegatePublicKey", {
                     round: value.round,
-                    delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
-                    voters: base64Voters
-                }, err => {
-                    if (err) {
-                        return reject(err);
-                    }
+                    delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex")
+                }, ["delegatePublicKey"], (err, rows) => {
+                    if (err) return reject(err);
 
-                    return resolve();
+                    const base64Voters = Buffer.from(value.voters, "utf8").toString("base64");
+                    if (rows.length > 0) {
+                        library.dbLite.query("UPDATE mem_roundrewards SET voters=$voters " +
+                            "WHERE round=$round AND delegatePublicKey=$delegatePublicKey", {
+                                round: value.round,
+                                delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
+                                voters: base64Voters
+                            }, err => {
+                                if (err) return reject(err);
+
+                                return resolve();
+                            });
+                    } else {
+                        library.dbLite.query("INSERT INTO mem_roundrewards(round, delegatePublicKey, voters) " +
+                            "VALUES($round, $delegatePublicKey, $voters);", {
+                                round: value.round,
+                                delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
+                                voters: base64Voters
+                            }, err => {
+                                if (err) return reject(err);
+
+                                return resolve();
+                            });
+                    }
                 });
         });
     }

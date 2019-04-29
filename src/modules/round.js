@@ -916,7 +916,6 @@ Round.prototype.onBlockchainReady = function () {
   */
   const lastHeight = modules.blocks.getLastBlock().height;
   var round = self.calc(lastHeight);
-  const startHeightByRound = (round - 1) * slots.roundBlocks + 1;
   library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / " + slots.roundBlocks + " as integer) + (case when b.height % " + slots.roundBlocks + " > 0 then 1 else 0 end))) = $round", {
     round: round
   }, {
@@ -929,11 +928,8 @@ Round.prototype.onBlockchainReady = function () {
       __private.delegatesByRound[round] = rows[0].delegates;
       // recovery bonusByRound for start or restart
       __private.bonusByRound[round] = [];
+      const startHeightByRound = lastHeight - (rows[0].delegates || []).length + 1;
       for (let i = startHeightByRound; i <= lastHeight; i++) {
-        if (i == 1) {
-          // Ignore genesisBlock
-          continue;
-        }
         __private.bonusByRound[round].push(__private.blockStatus.calcDelegateVotersBonus(i));
       }
       __private.loaded = true;
