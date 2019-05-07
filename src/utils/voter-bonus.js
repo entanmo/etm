@@ -7,10 +7,6 @@ const slots = require("./slots");
 class VoterBonus {
     constructor() {
         this.roundCaches = {};
-
-        // setInterval(() => {
-        //     console.log("VoterBonus Caches:", JSON.stringify(this.roundCaches, null, 2));
-        // }, 5000);
     }
 
     async getAccountsAsync(filter, fields) {
@@ -72,38 +68,16 @@ class VoterBonus {
 
     async save(value) {
         return new Promise((resolve, reject) => {
-            // console.log("++++++++++++++++++++++ saveToDB:", JSON.stringify(value, null, 2));
-            library.dbLite.query("SELECT delegatePublicKey FROM mem_roundrewards " +
-                "WHERE round=$round AND delegatePublicKey=$delegatePublicKey", {
+            const base64Voters = Buffer.from(value.voters, "utf8").toString("base64");
+            library.dbLite.query("INSERT INTO mem_roundrewards(round, delegatePublicKey, voters) " +
+                "VALUES($round, $delegatePublicKey, $voters);", {
                     round: value.round,
-                    delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex")
-                }, ["delegatePublicKey"], (err, rows) => {
+                    delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
+                    voters: base64Voters
+                }, err => {
                     if (err) return reject(err);
 
-                    const base64Voters = Buffer.from(value.voters, "utf8").toString("base64");
-                    if (rows.length > 0) {
-                        library.dbLite.query("UPDATE mem_roundrewards SET voters=$voters " +
-                            "WHERE round=$round AND delegatePublicKey=$delegatePublicKey", {
-                                round: value.round,
-                                delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
-                                voters: base64Voters
-                            }, err => {
-                                if (err) return reject(err);
-
-                                return resolve();
-                            });
-                    } else {
-                        library.dbLite.query("INSERT INTO mem_roundrewards(round, delegatePublicKey, voters) " +
-                            "VALUES($round, $delegatePublicKey, $voters);", {
-                                round: value.round,
-                                delegatePublicKey: Buffer.from(value.delegatePublicKey, "hex"),
-                                voters: base64Voters
-                            }, err => {
-                                if (err) return reject(err);
-
-                                return resolve();
-                            });
-                    }
+                    return resolve();
                 });
         });
     }
@@ -120,7 +94,6 @@ class VoterBonus {
                         return reject(err);
                     }
 
-                    // console.log("-----------------------------:", rows);
                     return resolve(rows);
                 });
         });
@@ -159,27 +132,28 @@ class VoterBonus {
 
     async rollbackBeginBonus(round, caches) {
         this.roundCaches[round] = caches;
-        const { voters } = caches;
-        const newCaches = [];
-        Object.keys(voters).forEach(el => {
-            newCaches.push({
+        const { delegates, voters } = caches;
+
+        // delete all caches in db
+        await this.flush();
+
+        // update new caches to db
+        for (let delegate of delegates) {
+            await this.save({
                 round: round,
-                delegatePublicKey: el,
-                voters: JSON.stringify(voters[el])
+                delegatePublicKey: delegate,
+                voters: JSON.stringify(voters[delegate] || {})
             });
-        });
-        for (let c of newCaches) {
-            await this.save(c);
         }
 
         return this.roundCaches[round];
     }
 
     async beginBonus(round, block) {
-        // console.log("begin bonus:", round, block.height);
         const delegates = await this.genDelegatesAsync(block.height);
         const voters = {};
         for (let delegate of delegates) {
+            if (voters[delegate] != null) continue;
             const vs = await this.getVotersAsync(delegate);
             const vvs = {};
             for (let account of vs.accounts) {
@@ -200,17 +174,15 @@ class VoterBonus {
         this.roundCaches[round].delegates = delegates;
         this.roundCaches[round].voters = voters;
 
-        const caches = [];
-        Object.keys(voters).forEach(el => {
-            caches.push({
+        // delete all caches in db
+        await this.flush();
+        // update new caches to db
+        for (let delegate of delegates) {
+            await this.save({
                 round: round,
-                delegatePublicKey: el,
-                isTop: true,
-                voters: JSON.stringify(voters[el])
+                delegatePublicKey: delegate,
+                voters: JSON.stringify(voters[delegate] || {})
             });
-        });
-        for (let c of caches) {
-            await this.save(c);
         }
 
         return this.roundCaches[round];
@@ -285,6 +257,7 @@ class VoterBonus {
                 }
             }
         }
+        // delete all caches in db
         await this.flush();
 
         return results;
