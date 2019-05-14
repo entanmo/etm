@@ -1,0 +1,61 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "famous merge stamp click night crack odor poverty number smart build future",
+      "large eye educate expand energy artwork voyage chef clown kitchen act when",
+      "tattoo senior monster profit chunk slow coin domain cheese include attitude intact",
+      "pitch receive tent walnut adjust friend evil bachelor bomb bleak student employ",
+      "decorate limit bundle dash silly iron dutch sure burst duty there address",
+      "glory intact punch region music aware pudding gloom lamp stove tray repair",
+      "post floor pretty hour coach train razor napkin version inner rate umbrella",
+      "idle throw excuse huge try mask fuel train exotic first ketchup better",
+      "lottery material pattern plunge rifle skull slide bird monitor sauce danger this"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}

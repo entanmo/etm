@@ -1,0 +1,61 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "pen bid few gesture because version about vast marble dragon warfare ski",
+      "limb rapid update sail where marriage slot glove boil adjust kitten offer",
+      "upset subject evidence sister laugh toast flag space symbol fantasy indoor wedding",
+      "crucial era coil purity aim cereal expand begin you salon false utility",
+      "argue fix mosquito lounge sport song globe number south loyal vault zero",
+      "swamp canyon gas raven icon hammer main tool merge crucial health effort",
+      "purity mutual very galaxy robust science harvest awful gather sea rare taste",
+      "valve dignity acid win oppose resource proof car clock catch prepare cash",
+      "forum that common foster rubber render river wife cute sea solid wine"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}

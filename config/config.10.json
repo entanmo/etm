@@ -1,0 +1,62 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "wagon shaft enforce riot awake garment clump loyal learn sand office three",
+      "busy now claim ancient century feature dune clinic chef local story exact",
+      "fame safe tip anxiety hood human crowd sand depart betray borrow kit",
+      "powder hire offer picnic window exotic infant case credit loan extra bacon",
+      "repair doctor net choice month catalog salute mixture again prison feel voyage",
+      "praise coin display private climb ugly divorce barely rotate speed dismiss drop",
+      "basic breeze joke street aim argue work act flight mesh exist cannon",
+      "cabin acid false unaware adult cute pottery glue nature salon begin midnight",
+      "improve border yard cram brother situate brass pave quarter breeze health easy",
+      "seek mesh tooth quiz fitness ocean party catch crane saddle ozone ski"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}
