@@ -24,13 +24,13 @@ module.exports = function init(options) {
 
     // 获取工作目录
     var baseDir = program.base || path.resolve('.');
-    
+
     var pidFile = path.join(baseDir, 'etm.pid');
     if (fs.existsSync(pidFile)) {
         console.log('Failed: etm server already started.');
-        return ;
+        return;
     }
-    
+
     var appConfigFile = path.join(baseDir, 'config', 'config.json');
     if (program.config) {
         appConfigFile = path.resolve(process.cwd(), program.config);
@@ -46,7 +46,7 @@ module.exports = function init(options) {
         });
         fs.writeFileSync(appConfigFile, JSON.stringify(appConfig, null, 2), "utf8");
     }
-    
+
     // if(!(appConfig.forging && appConfig.forging.secret && Array.isArray(appConfig.forging.secret) && appConfig.forging.secret.length < 2)){
     //     console.log('secret error,the length needs to be less than or equal to 1');
     //     return;
@@ -58,11 +58,11 @@ module.exports = function init(options) {
     appConfig.netVersion = process.env.NET_VERSION || 'localnet';
     appConfig.publicDir = path.join(baseDir, 'public', 'dist');
     appConfig.dappsDir = program.dapps || path.join(baseDir, 'dapps');
-    appConfig.dbName = 'blockchain.db';
-    if(program.dataDir){
-        appConfig.dataDir =  path.join(baseDir, program.dataDir);
-    }else{
-        appConfig.dataDir =  path.join(baseDir, 'data');
+    appConfig.dbName = 'blockchain-personal.db';
+    if (program.dataDir) {
+        appConfig.dataDir = path.join(baseDir, program.dataDir);
+    } else {
+        appConfig.dataDir = path.join(baseDir, 'data');
     }
     appConfig.upnp = program.upnp;
     appConfig.acquireip = program.acquireip;
@@ -70,7 +70,7 @@ module.exports = function init(options) {
 
     global.Config = appConfig;
 
-    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock.json');
+    var genesisblockFile = path.join(baseDir, 'config', 'genesisBlock-personal.json');
     if (program.genesisblock) {
         genesisblockFile = path.resolve(process.cwd(), program.genesisblock);
     }
@@ -129,7 +129,7 @@ module.exports = function init(options) {
 
     if (program.daemon) {
         console.log('etm server started as daemon ...');
-        require('daemon')({cwd: process.cwd()});
+        require('daemon')({ cwd: process.cwd() });
         fs.writeFileSync(pidFile, process.pid, 'utf8');
     }
 
@@ -155,7 +155,7 @@ module.exports = function init(options) {
 
     global.featureSwitch = {}
     global.state = {}
-    
+
     global.featureSwitch.enableLongId = true
     global.featureSwitch.enable1_3_0 = true
     global.featureSwitch.enableClubBonus = (!!global.state.clubInfo)
