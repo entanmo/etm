@@ -548,8 +548,8 @@ Loader.prototype.startSyncBlocks = function () {
     err && library.logger.error('loadBlocks timeout:', err);
     __private.syncing = false
     __private.blocksToSync = 0
-    library.logger.debug('startSyncBlocks squence timeout end');
-  });
+   // library.logger.debug('startSyncBlocks squence timeout end');
+   });
 }
 
 // Events

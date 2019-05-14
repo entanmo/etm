@@ -62,10 +62,10 @@ __private.attachApi = function () {
   //   if (modules && __private.loaded && !modules.loader.syncing()) return next();
   //   res.status(500).send({ success: false, error: "Blockchain is loading" });
   // });
-
+  
   router.use(function (req, res, next) {
     var peerIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-
+    res.set(__private.headers)
     if (!peerIp) {
       return res.status(500).send({ success: false, error: "Wrong header data" });
     }
@@ -77,6 +77,7 @@ __private.attachApi = function () {
       if (!report.isValid) return res.status(500).send({ success: false, error: report.issues });
 
       if (req.headers['magic'] !== library.config.magic) {
+        modules.peer.setNodeIncompatible(req.ip, req.headers.magic)
         return res.status(500).send({
           success: false,
           error: "Request is made on the wrong network",

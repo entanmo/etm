@@ -70,3 +70,4 @@ package-lock.json
 
 # sqlite3 databases
 *.db
+/dapps/

@@ -31,7 +31,7 @@ function tick(task, cb) {
   }
   setTimeout(() => {
     if (!isCallbacked) {
-      library.logger.debug('Worker task timeout')
+      //library.logger.debug('Worker task timeout')
       done('Worker task timeout')
     }
   }, TASK_TIMEOUT_MS)
