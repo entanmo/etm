@@ -1,0 +1,61 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "license escape cave link nerve clever limb regular syrup debris dish repair",
+      "announce lake coin detail great during chronic busy dash now concert mean",
+      "dinosaur lesson multiply acquire two giraffe shuffle bless foil daring ocean phone",
+      "flee powder differ army deposit become naive cup rescue ostrich grace gate",
+      "mesh sail firm ahead drip fox ankle recall swarm region safe cushion",
+      "spice expire soldier error cheese book grant that fatigue prefer upset stone",
+      "satoshi measure ready uniform live jazz identify onion profit swear neutral deer",
+      "discover glad divert team rotate couch waste entry field exhaust shine similar",
+      "surge confirm slam aisle urban pupil shaft sun domain fame prefer arrest"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}

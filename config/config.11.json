@@ -1,0 +1,62 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "lumber seminar cram giraffe exercise payment common coach insane bird fish frozen",
+      "since blue fly friend cover myth donor leg elephant maple easily fat",
+      "journey shell risk lucky female this forum spot seek crouch toy unable",
+      "anger stay wheel arctic crack gold nose judge load rug toddler aware",
+      "kite sibling chalk improve kick problem extend better income family lunar imitate",
+      "lazy siren tag under acoustic mind shed author quality cat wish jewel",
+      "glue skate helmet list wise slogan excuse claim water art alley world",
+      "rookie silk actress satoshi wet miracle mammal common uphold build derive salad",
+      "penalty drip genius feel emerge divert pipe until case push adjust regular",
+      "subject below favorite picture quote voyage own frozen asset priority nest solution"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}

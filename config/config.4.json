@@ -1,0 +1,61 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "angle music throw essence ring message bike reason leopard veteran thank family",
+      "dial pear motion habit rescue record ladder tragic crumble chef reopen card",
+      "judge orchard hour elbow bargain display coach pyramid person fly exit transfer",
+      "clock hand long height health mammal expire glass erosion midnight black future",
+      "outdoor stairs screen wine woman luggage craft sphere deposit monkey bubble submit",
+      "time much accuse orange wisdom print view bird action public fortune soul",
+      "timber west notable inspire motion mammal key fortune vanish pledge settle crystal",
+      "host sugar palace fault swift song dentist tunnel debris nice combine orient",
+      "end region depart bus drastic atom scorpion bag marine cross above table"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}

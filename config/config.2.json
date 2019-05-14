@@ -1,0 +1,61 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "congress square glory convince hospital language rate sadness blue fame man battle",
+      "retire virus concert prison exotic unhappy toward rebel receive wide sleep drift",
+      "exact gas judge doll nasty hospital punch physical library cluster lab level",
+      "enact melt usual tumble result unfair waste fat lawsuit paddle baby gasp",
+      "analyst gate wink dentist universe legal pottery whale rule upper clock juice",
+      "winter patrol office save pyramid flame ticket spike labor public follow drop",
+      "predict coyote cash plug mixed sing burden vital fantasy settle medal popular",
+      "fluid bracket forum either face bird toy april boss stamp february pencil",
+      "pass movie matter gown laugh leaf spoon game fiscal soft bonus twenty"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}

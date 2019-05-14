@@ -1,0 +1,61 @@
+{
+  "port": 5010,
+  "peerPort": 5011,
+  "address": "0.0.0.0",
+  "publicIp": "",
+  "logLevel": "debug",
+  "magic": "20190514",
+  "api": {
+    "access": {
+      "whiteList": []
+    }
+  },
+  "peers": {
+    "list": [
+      {
+        "ip": "47.102.135.35",
+        "port": 5011
+      }
+    ],
+    "blackList": [],
+    "options": {
+      "timeout": 4000,
+      "pingTimeout": 500
+    }
+  },
+  "forging": {
+    "secret": [
+      "bridge depth genre rapid weird cancel habit sentence coil swarm base medal",
+      "shy hat tortoise suggest nice ramp asthma basic extra blouse great fiscal",
+      "anchor naive bonus travel loan paddle chest film awkward recycle surround window",
+      "glow wasp stock glass resist toddler common melody mom claim hybrid voyage",
+      "obtain dinner divorce patrol fit base science friend spin mammal fury bless",
+      "innocent farm team view genuine deer jealous boring relief critic mystery depth",
+      "grunt ship silent angry evidence pride recipe dance muffin bullet subway tide",
+      "survey wild pizza way forget recipe control tilt monster oblige couple panic",
+      "wise level couch shaft find next news fence public enemy web dignity"
+    ],
+    "access": {
+      "whiteList": [
+        "127.0.0.1"
+      ]
+    }
+  },
+  "loading": {
+    "verifyOnLoading": false,
+    "loadPerIteration": 5000
+  },
+  "ssl": {
+    "enabled": false,
+    "options": {
+      "port": 443,
+      "address": "0.0.0.0",
+      "key": "./ssl/server.key",
+      "cert": "./ssl/server.crt"
+    }
+  },
+  "dapp": {
+    "masterpassword": "ytfACAMegjrK",
+    "params": {}
+  }
+}
