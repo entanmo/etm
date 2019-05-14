@@ -31,7 +31,7 @@ module.exports = function init(options) {
         return;
     }
 
-    var appConfigFile = path.join(baseDir, 'config', 'config.json');
+    var appConfigFile = path.join(baseDir, 'config', 'config-personal.json');
     if (program.config) {
         appConfigFile = path.resolve(process.cwd(), program.config);
     }

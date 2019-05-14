@@ -2,7 +2,7 @@
   "port": 5010,
   "peerPort": 5011,
   "address": "0.0.0.0",
-  "publicIp": "",
+  "publicIp": "106.14.155.8",
   "logLevel": "debug",
   "magic": "20190514",
   "api": {
