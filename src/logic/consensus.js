@@ -90,7 +90,7 @@ Consensus.prototype.getVoteHash = function (height, id) {
 Consensus.prototype.hasEnoughVotes = function (votes, diffTimestamp = 0) {
   // return votes && votes.signatures && votes.signatures.length > slots.delegates * 2 / 3;
   // return votes && votes.signatures && votes.signatures.length > slots.delegates * ConsensusState(diffTimestamp);
-  return votes && votes.signatures && votes.signatures.length > slots.delegates / 2 * ConsensusState(diffTimestamp);
+  return votes && votes.signatures && votes.signatures.length >= 6;
 }
 
 Consensus.prototype.hasEnoughVotesRemote = function (votes) {
