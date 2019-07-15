@@ -2083,50 +2083,50 @@ __private.launch = function (body, cb) {
     },
     required: ["id"]
   }*/ scheme.launch, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    if (__private.launched[body.id]) {
-      return cb("Dapp already launched");
-    }
-
-    body.params = body.params || [''];
-
-    async.auto({
-      dapp: async.apply(__private.get, body.id),
-
-      installedIds: async.apply(__private.getInstalledIds),
-
-      symlink: ['dapp', 'installedIds', function (results, next) {
-        if (results.installedIds.indexOf(body.id) < 0) {
-          return next('Dapp not installed');
-        }
-        __private.symlink(results.dapp, next);
-      }],
-
-      launch: ['symlink', function (results, next) {
-        __private.launchApp(results.dapp, body.params, next);
-      }],
-
-      route: ['launch', function (results, next) {
-        __private.dappRoutes(results.dapp, function (err) {
-          if (err) {
-            return __private.stop(results.dapp, next);
-          }
-          next();
-        });
-      }]
-    }, function (err, results) {
       if (err) {
-        library.logger.error('Failed to launch dapp ' + body.id + ': ' + err);
-        cb('Failed to launch dapp');
-      } else {
-        __private.launched[body.id] = true;
-        cb();
+        return cb(err[0].message);
       }
+
+      if (__private.launched[body.id]) {
+        return cb("Dapp already launched");
+      }
+
+      body.params = body.params || [''];
+
+      async.auto({
+        dapp: async.apply(__private.get, body.id),
+
+        installedIds: async.apply(__private.getInstalledIds),
+
+        symlink: ['dapp', 'installedIds', function (results, next) {
+          if (results.installedIds.indexOf(body.id) < 0) {
+            return next('Dapp not installed');
+          }
+          __private.symlink(results.dapp, next);
+        }],
+
+        launch: ['symlink', function (results, next) {
+          __private.launchApp(results.dapp, body.params, next);
+        }],
+
+        route: ['launch', function (results, next) {
+          __private.dappRoutes(results.dapp, function (err) {
+            if (err) {
+              return __private.stop(results.dapp, next);
+            }
+            next();
+          });
+        }]
+      }, function (err, results) {
+        if (err) {
+          library.logger.error('Failed to launch dapp ' + body.id + ': ' + err);
+          cb('Failed to launch dapp');
+        } else {
+          __private.launched[body.id] = true;
+          cb();
+        }
+      });
     });
-  });
 }
 
 __private.readJson = function (file, cb) {
@@ -2253,60 +2253,97 @@ __private.addTransactions = function (req, cb) {
     },
     required: ["secret", "amount", "dappId"]
   }*/ scheme.addTransactions, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
-
-    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
-    var keypair = ed.MakeKeypair(hash);
-
-    if (body.publicKey) {
-      if (keypair.publicKey.toString('hex') != body.publicKey) {
-        return cb("Invalid passphrase");
+      if (err) {
+        return cb(err[0].message);
       }
-    }
 
-    var query = {};
+      var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+      var keypair = ed.MakeKeypair(hash);
 
-    library.balancesSequence.add(function (cb) {
-      if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
-        modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
+      if (body.publicKey) {
+        if (keypair.publicKey.toString('hex') != body.publicKey) {
+          return cb("Invalid passphrase");
+        }
+      }
 
-          if (!account) {
-            return cb("Multisignature account not found");
-          }
+      var query = {};
 
-          if (!account.multisignatures || !account.multisignatures) {
-            return cb("Account does not have multisignatures enabled");
-          }
-
-          if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
-            return cb("Account does not belong to multisignature group");
-          }
-
-          modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+      library.balancesSequence.add(function (cb) {
+        if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
+          modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
             if (err) {
               return cb(err.toString());
             }
 
-            if (!requester || !requester.publicKey) {
-              return cb("Invalid requester");
+            if (!account) {
+              return cb("Multisignature account not found");
             }
 
-            if (requester.secondSignature && !body.secondSecret) {
+            if (!account.multisignatures || !account.multisignatures) {
+              return cb("Account does not have multisignatures enabled");
+            }
+
+            if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
+              return cb("Account does not belong to multisignature group");
+            }
+
+            modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+              if (err) {
+                return cb(err.toString());
+              }
+
+              if (!requester || !requester.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              if (requester.secondSignature && !body.secondSecret) {
+                return cb("Invalid second passphrase");
+              }
+
+              if (requester.publicKey == account.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              var secondKeypair = null;
+
+              if (requester.secondSignature) {
+                var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+                secondKeypair = ed.MakeKeypair(secondHash);
+              }
+
+              try {
+                var transaction = library.base.transaction.create({
+                  type: TransactionTypes.IN_TRANSFER,
+                  amount: body.amount,
+                  sender: account,
+                  keypair: keypair,
+                  requester: keypair,
+                  secondKeypair: secondKeypair,
+                  dappId: body.dappId
+                });
+              } catch (e) {
+                return cb(e.toString());
+              }
+
+              modules.transactions.receiveTransactions([transaction], cb);
+            });
+          });
+        } else {
+          modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+            if (err) {
+              return cb(err.toString());
+            }
+            if (!account) {
+              return cb("Account not found");
+            }
+
+            if (account.secondSignature && !body.secondSecret) {
               return cb("Invalid second passphrase");
-            }
-
-            if (requester.publicKey == account.publicKey) {
-              return cb("Invalid requester");
             }
 
             var secondKeypair = null;
 
-            if (requester.secondSignature) {
+            if (account.secondSignature) {
               var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
               secondKeypair = ed.MakeKeypair(secondHash);
             }
@@ -2317,7 +2354,6 @@ __private.addTransactions = function (req, cb) {
                 amount: body.amount,
                 sender: account,
                 keypair: keypair,
-                requester: keypair,
                 secondKeypair: secondKeypair,
                 dappId: body.dappId
               });
@@ -2327,51 +2363,15 @@ __private.addTransactions = function (req, cb) {
 
             modules.transactions.receiveTransactions([transaction], cb);
           });
-        });
-      } else {
-        modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
-          if (!account) {
-            return cb("Account not found");
-          }
+        }
+      }, function (err, transaction) {
+        if (err) {
+          return cb(err.toString());
+        }
 
-          if (account.secondSignature && !body.secondSecret) {
-            return cb("Invalid second passphrase");
-          }
-
-          var secondKeypair = null;
-
-          if (account.secondSignature) {
-            var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
-            secondKeypair = ed.MakeKeypair(secondHash);
-          }
-
-          try {
-            var transaction = library.base.transaction.create({
-              type: TransactionTypes.IN_TRANSFER,
-              amount: body.amount,
-              sender: account,
-              keypair: keypair,
-              secondKeypair: secondKeypair,
-              dappId: body.dappId
-            });
-          } catch (e) {
-            return cb(e.toString());
-          }
-
-          modules.transactions.receiveTransactions([transaction], cb);
-        });
-      }
-    }, function (err, transaction) {
-      if (err) {
-        return cb(err.toString());
-      }
-
-      cb(null, { transactionId: transaction[0].id });
+        cb(null, { transactionId: transaction[0].id });
+      });
     });
-  });
 }
 
 // Public methods
@@ -2577,57 +2577,95 @@ shared.sendWithdrawal = function (req, cb) {
     },
     required: ["secret", 'recipientId', "amount", "transactionId"]
   }*/ scheme.sendWithdrawal, function (err) {
-    if (err) {
-      return cb(err[0].message);
-    }
+      if (err) {
+        return cb(err[0].message);
+      }
 
-    var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
-    var keypair = ed.MakeKeypair(hash);
-    var query = {};
+      var hash = crypto.createHash('sha256').update(body.secret, 'utf8').digest();
+      var keypair = ed.MakeKeypair(hash);
+      var query = {};
 
-    if (!addressHelper.isAddress(body.recipientId)) {
-      return cb("Invalid address");
-    }
+      if (!addressHelper.isAddress(body.recipientId)) {
+        return cb("Invalid address");
+      }
 
-    library.balancesSequence.add(function (cb) {
-      if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
-        modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
-
-          if (!account) {
-            return cb("Multisignature account not found");
-          }
-
-          if (!account.multisignatures || !account.multisignatures) {
-            return cb("Account does not have multisignatures enabled");
-          }
-
-          if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
-            return cb("Account does not belong to multisignature group");
-          }
-
-          modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+      library.balancesSequence.add(function (cb) {
+        if (body.multisigAccountPublicKey && body.multisigAccountPublicKey != keypair.publicKey.toString('hex')) {
+          modules.accounts.getAccount({ publicKey: body.multisigAccountPublicKey }, function (err, account) {
             if (err) {
               return cb(err.toString());
             }
 
-            if (!requester || !requester.publicKey) {
-              return cb("Invalid requester");
+            if (!account) {
+              return cb("Multisignature account not found");
             }
 
-            if (requester.secondSignature && !body.secondSecret) {
+            if (!account.multisignatures || !account.multisignatures) {
+              return cb("Account does not have multisignatures enabled");
+            }
+
+            if (account.multisignatures.indexOf(keypair.publicKey.toString('hex')) < 0) {
+              return cb("Account does not belong to multisignature group");
+            }
+
+            modules.accounts.getAccount({ publicKey: keypair.publicKey }, function (err, requester) {
+              if (err) {
+                return cb(err.toString());
+              }
+
+              if (!requester || !requester.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              if (requester.secondSignature && !body.secondSecret) {
+                return cb("Invalid second passphrase");
+              }
+
+              if (requester.publicKey == account.publicKey) {
+                return cb("Invalid requester");
+              }
+
+              var secondKeypair = null;
+
+              if (requester.secondSignature) {
+                var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
+                secondKeypair = ed.MakeKeypair(secondHash);
+              }
+
+              try {
+                var transaction = library.base.transaction.create({
+                  type: TransactionTypes.OUT_TRANSFER,
+                  amount: body.amount,
+                  sender: account,
+                  recipientId: body.recipientId,
+                  keypair: keypair,
+                  secondKeypair: secondKeypair,
+                  requester: keypair,
+                  dappId: req.dappId,
+                  transactionId: body.transactionId
+                });
+              } catch (e) {
+                return cb(e.toString());
+              }
+              modules.transactions.receiveTransactions([transaction], cb);
+            });
+          });
+        } else {
+          modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
+            if (err) {
+              return cb(err.toString());
+            }
+            if (!account) {
+              return cb("Account not found");
+            }
+
+            if (account.secondSignature && !body.secondSecret) {
               return cb("Invalid second passphrase");
-            }
-
-            if (requester.publicKey == account.publicKey) {
-              return cb("Invalid requester");
             }
 
             var secondKeypair = null;
 
-            if (requester.secondSignature) {
+            if (account.secondSignature) {
               var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
               secondKeypair = ed.MakeKeypair(secondHash);
             }
@@ -2640,62 +2678,24 @@ shared.sendWithdrawal = function (req, cb) {
                 recipientId: body.recipientId,
                 keypair: keypair,
                 secondKeypair: secondKeypair,
-                requester: keypair,
                 dappId: req.dappId,
                 transactionId: body.transactionId
               });
             } catch (e) {
               return cb(e.toString());
             }
+
             modules.transactions.receiveTransactions([transaction], cb);
           });
-        });
-      } else {
-        modules.accounts.getAccount({ publicKey: keypair.publicKey.toString('hex') }, function (err, account) {
-          if (err) {
-            return cb(err.toString());
-          }
-          if (!account) {
-            return cb("Account not found");
-          }
+        }
+      }, function (err, transaction) {
+        if (err) {
+          return cb(err.toString());
+        }
 
-          if (account.secondSignature && !body.secondSecret) {
-            return cb("Invalid second passphrase");
-          }
-
-          var secondKeypair = null;
-
-          if (account.secondSignature) {
-            var secondHash = crypto.createHash('sha256').update(body.secondSecret, 'utf8').digest();
-            secondKeypair = ed.MakeKeypair(secondHash);
-          }
-
-          try {
-            var transaction = library.base.transaction.create({
-              type: TransactionTypes.OUT_TRANSFER,
-              amount: body.amount,
-              sender: account,
-              recipientId: body.recipientId,
-              keypair: keypair,
-              secondKeypair: secondKeypair,
-              dappId: req.dappId,
-              transactionId: body.transactionId
-            });
-          } catch (e) {
-            return cb(e.toString());
-          }
-
-          modules.transactions.receiveTransactions([transaction], cb);
-        });
-      }
-    }, function (err, transaction) {
-      if (err) {
-        return cb(err.toString());
-      }
-
-      cb(null, { transactionId: transaction[0].id });
+        cb(null, { transactionId: transaction[0].id });
+      });
     });
-  });
 }
 
 shared.getWithdrawalLastTransaction = function (req, cb) {
@@ -2773,6 +2773,15 @@ shared.registerInterface = function (req, cb) {
     });
   });
   cb(null)
+}
+
+shared.notification = function (req, cb) {
+  const dappId = req.dappId;
+  const eventName = req.body.event;
+  const eventBody = req.body.eventData || {};
+  library.network.io.sockets.emit(`${dappId}/${eventName}`, eventBody);
+  library.logger.debug("[DappId] notification: ", dappId, eventName, JSON.stringify(eventBody));
+  cb(null);
 }
 
 module.exports = DApps;
