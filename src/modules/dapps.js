@@ -2780,7 +2780,7 @@ shared.notification = function (req, cb) {
   const eventName = req.body.event;
   const eventBody = req.body.eventData || {};
   library.network.io.sockets.emit(`${dappId}/${eventName}`, eventBody);
-  library.logger.debug("[DappId] notification: ", dappId, eventName, JSON.stringify(eventBody));
+  console.log(`[DappId] notification:${dappId},${eventName},${JSON.stringify(eventBody)}`);
   cb(null);
 }
 
