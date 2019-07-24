@@ -55,6 +55,8 @@ __private.defaultRouteId = null;
 
 const WITNESS_CLUB_DAPP_NAME = 'entanmo-community'
 
+function noop() { }
+
 function OutTransfer() {
   this.create = function (data, trs) {
     trs.recipientId = data.recipientId;
@@ -1891,7 +1893,7 @@ __private.downloadLink = function (dapp, dappPath, cb) {
           hasCallbacked = true;
           if (err) {
             fs.exists(tmpPath, function (exists) {
-              fs.unlink(tmpPath);
+              fs.unlink(tmpPath, noop);
             });
           }
           serialCb(err);
@@ -1919,7 +1921,7 @@ __private.downloadLink = function (dapp, dappPath, cb) {
 
       unzipper.on("error", function (err) {
         fs.exists(tmpPath, function (exists) {
-          fs.unlink(tmpPath);
+          fs.unlink(tmpPath, noop);
         });
         rmdir(dappPath, function () { });
         serialCb("Failed to decompress zip file: " + err);
@@ -1928,7 +1930,7 @@ __private.downloadLink = function (dapp, dappPath, cb) {
       unzipper.on("extract", function (log) {
         library.logger.info(dapp.transactionId + " Finished extracting");
         fs.exists(tmpPath, function (exists) {
-          fs.unlink(tmpPath);
+          fs.unlink(tmpPath, noop);
         });
         serialCb(null);
       });
@@ -1939,7 +1941,9 @@ __private.downloadLink = function (dapp, dappPath, cb) {
 
       unzipper.extract({
         path: dappPath,
-        strip: 1
+        strip: 1,
+        restrict: false,
+        filter: fileDesc => fileDesc.type !== "Directory"
       });
     }
   },
@@ -2319,7 +2323,8 @@ __private.addTransactions = function (req, cb) {
                   keypair: keypair,
                   requester: keypair,
                   secondKeypair: secondKeypair,
-                  dappId: body.dappId
+                  dappId: body.dappId,
+                  currency: body.currency || "ETM"
                 });
               } catch (e) {
                 return cb(e.toString());
@@ -2355,7 +2360,8 @@ __private.addTransactions = function (req, cb) {
                 sender: account,
                 keypair: keypair,
                 secondKeypair: secondKeypair,
-                dappId: body.dappId
+                dappId: body.dappId,
+                currency: body.currency || "ETM"
               });
             } catch (e) {
               return cb(e.toString());
@@ -2642,7 +2648,8 @@ shared.sendWithdrawal = function (req, cb) {
                   secondKeypair: secondKeypair,
                   requester: keypair,
                   dappId: req.dappId,
-                  transactionId: body.transactionId
+                  transactionId: body.transactionId,
+                  currency: body.currency || "ETM"
                 });
               } catch (e) {
                 return cb(e.toString());
@@ -2679,7 +2686,8 @@ shared.sendWithdrawal = function (req, cb) {
                 keypair: keypair,
                 secondKeypair: secondKeypair,
                 dappId: req.dappId,
-                transactionId: body.transactionId
+                transactionId: body.transactionId,
+                currency: body.currency || "ETM"
               });
             } catch (e) {
               return cb(e.toString());
