@@ -74,12 +74,12 @@ class dblite {
                 }
                 try {
                     let sta=  this.db.prepare(sql)
-                    if(sta.returnsData){
+                    if(sta.reader){
                         ret.result = sta.all(params || [])
                     }else{
                         const r = sta.run(params || []);
                         ret.result = {
-                            lastInsertRowId: r.lastInsertROWID.toString(),
+                            lastInsertRowid: r.lastInsertRowid.toString(),
                             rowsEffected: r.changes
                         }
                     }
@@ -109,7 +109,7 @@ class dblite {
 
         try {
             let sta=  this.db.prepare(sql)
-            if(sta.returnsData){
+            if(sta.reader){
                 ret.result = sta.all(params || [])
                 if(fields){
                 ret.result= Array.isArray(fields) ?
@@ -120,7 +120,7 @@ class dblite {
             }else{
                 const r = sta.run(params || []);
                 ret.result = {
-                    lastInsertRowId: r.lastInsertROWID.toString(),
+                    lastInsertRowid: r.lastInsertRowid.toString(),
                     rowsEffected: r.changes
                  }
              //    var tables=dbutil.getModifyTable(str)
@@ -163,12 +163,12 @@ class dblite {
                 }
                 try {
                     let sta=  this.db.prepare(sql)
-                    if(sta.returnsData){
+                    if(sta.reader){
                         ret.result = sta.all(params || [])
                     }else{
                         const r = sta.run(params || []);
                         ret.result = {
-                            lastInsertRowId: r.lastInsertROWID.toString(),
+                            lastInsertRowid: r.lastInsertRowid.toString(),
                             rowsEffected: r.changes
                         }
                     }
@@ -195,7 +195,7 @@ class dblite {
 
         try {
             let sta=  this.db.prepare(sql)
-            if(sta.returnsData){
+            if(sta.reader){
                 ret.result = sta.all(params || [])
                 ret.result.map(this.row2string)
                 // ret.result= Array.isArray(fields) ?
@@ -204,7 +204,7 @@ class dblite {
             }else{
                 const r = sta.run(params || []);
                 ret.result = {
-                    lastInsertRowId: r.lastInsertROWID.toString(),
+                    lastInsertRowid: r.lastInsertRowid.toString(),
                     rowsEffected: r.changes
                  }
             }

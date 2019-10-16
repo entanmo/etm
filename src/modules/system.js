@@ -72,29 +72,15 @@ System.prototype.onNewBlock = function (block, votes, broadcast) {
     }
     library.logger.debug("chaos get hours "+hours)
     if(index == hours){// 0 - 23   hours
-      if(os.platform() == 'win32'){
-          shell2.exec('copy /y '+ __private.dbPath + ' '+ __private.backupPath ,
-          function(code, stdout, stderr) {
-          library.logger.debug('Exit code:', code);
-          library.logger.debug('backupDb Program stderr:', stderr);
-          library.logger.debug("copy blockchain.db in system at height : "+JSON.stringify(block.height));
-          if(!stderr){
-            __private.backupDate = fullday
-            library.logger.debug("backupDb ok "+fullday + ' at hours ' + hours)
-          }
-        });
-      }else{
-        shell2.exec('cp -f '+ __private.dbPath + ' '+ __private.backupPath ,
-        function(code, stdout, stderr) {
-        library.logger.debug('Exit code:', code);
-        library.logger.debug('backupDb Program stderr:', stderr);
-        library.logger.debug("copy blockchain.db in system at height : "+JSON.stringify(block.height));
-        if(!stderr){
+        library.dbLite.db.backup(__private.backupPath)
+        .then(() => {
           __private.backupDate = fullday
           library.logger.debug("backupDb ok "+fullday + ' at hours ' + hours)
-        }
-      });
-    }
+        })
+        .catch((err) => {
+          console.log('backup failed:', err);
+        });
+    
    }
  }
 }
