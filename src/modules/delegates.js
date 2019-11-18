@@ -45,7 +45,7 @@ function Delegate() {
   this.create = function (data, trs) {
     // trs.recipientId = null;
     // trs.amount = 0;
-    trs.recipientId = "A4MFB3MaPd355ug19GYPMSakCAWKbLjDTb";//TODO:零时添加以后换成基金会地址
+    trs.recipientId = "A66ztfnYcv71bpa6uvkggW72UzLJprmLfo";//TODO:零时添加以后换成基金会地址
     trs.amount = 1000 * constants.fixedPoint;
     trs.asset.delegate = {
       username: data.username,
