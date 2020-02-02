@@ -810,11 +810,12 @@ Round.prototype.tick = function (block, cb) {
           });
         },
         function (cb) { // 更新锁仓系数
+         
           modules.delegates.generateDelegateList(block.height + 1, function (err, roundDelegates) {
             if (err) {
               return cb(err);
             }
-
+           
             // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
             async.eachSeries(roundDelegates, function (delegate, cb) {
               modules.delegates.getDelegateVoters(delegate, function (err, voters) {
@@ -823,9 +824,15 @@ Round.prototype.tick = function (block, cb) {
                 }
 
                 async.eachSeries(voters.accounts, function (voter, cb) {
+                  library.dbLite.query("SAVEPOINT update_voters");
                   lockvotesRollback.push({ address: voter.address, height: block.height });
                   modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, 1, function (err) {
-
+                    if(err){
+                      library.dbLite.query("ROLLBACK TO SAVEPOINT update_voters");
+                    }else{
+                      library.dbLite.query("RELEASE SAVEPOINT update_voters");
+                    }
+                   
                     return cb(err);
                   });
                 }, function (err) {
