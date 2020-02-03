@@ -810,12 +810,12 @@ Round.prototype.tick = function (block, cb) {
           });
         },
         function (cb) { // 更新锁仓系数
-         
+
           modules.delegates.generateDelegateList(block.height + 1, function (err, roundDelegates) {
             if (err) {
               return cb(err);
             }
-           
+
             // 被选中受托人的投票者票系数减半（每次进入下一轮时减一次，创世块不减）
             async.eachSeries(roundDelegates, function (delegate, cb) {
               modules.delegates.getDelegateVoters(delegate, function (err, voters) {
@@ -827,12 +827,12 @@ Round.prototype.tick = function (block, cb) {
                   library.dbLite.query("SAVEPOINT update_voters");
                   lockvotesRollback.push({ address: voter.address, height: block.height });
                   modules.lockvote.updateLockVotes(voter.address, block.height, 0.5, 1, function (err) {
-                    if(err){
+                    if (err) {
                       library.dbLite.query("ROLLBACK TO SAVEPOINT update_voters");
-                    }else{
+                    } else {
                       library.dbLite.query("RELEASE SAVEPOINT update_voters");
                     }
-                   
+
                     return cb(err);
                   });
                 }, function (err) {
@@ -840,8 +840,15 @@ Round.prototype.tick = function (block, cb) {
                 });
               });
             }, function (err) {
-              library.bus.message('finishRound', round);
-              return cb(err);
+              const delMaxChange = block.height - 10 * slots.roundBlocks;
+              library.dbLite.query(
+                `DELETE FROM lock_votes_backup WHERE change < ${delMaxChange};`,
+                (err, rows) => {
+                  library.bus.message('finishRound', round);
+                  return cb(err);
+                });
+              // library.bus.message('finishRound', round);
+              // return cb(err);
             });
           });
         },
@@ -926,21 +933,21 @@ Round.prototype.onBlockchainReady = function () {
   library.dbLite.query("select sum(b.totalFee), GROUP_CONCAT(b.reward), GROUP_CONCAT(lower(hex(b.generatorPublicKey))) from blocks b where (select (cast(b.height / " + slots.roundBlocks + " as integer) + (case when b.height % " + slots.roundBlocks + " > 0 then 1 else 0 end))) = $round", {
     round: round
   }, {
-      fees: Number,
-      rewards: Array,
-      delegates: Array
-    }, function (err, rows) {
-      __private.feesByRound[round] = rows[0].fees;
-      __private.rewardsByRound[round] = rows[0].rewards;
-      __private.delegatesByRound[round] = rows[0].delegates;
-      // recovery bonusByRound for start or restart
-      __private.bonusByRound[round] = [];
-      const startHeightByRound = lastHeight - (rows[0].delegates || []).length + 1;
-      for (let i = startHeightByRound; i <= lastHeight; i++) {
-        __private.bonusByRound[round].push(__private.blockStatus.calcDelegateVotersBonus(i));
-      }
-      __private.loaded = true;
-    });
+    fees: Number,
+    rewards: Array,
+    delegates: Array
+  }, function (err, rows) {
+    __private.feesByRound[round] = rows[0].fees;
+    __private.rewardsByRound[round] = rows[0].rewards;
+    __private.delegatesByRound[round] = rows[0].delegates;
+    // recovery bonusByRound for start or restart
+    __private.bonusByRound[round] = [];
+    const startHeightByRound = lastHeight - (rows[0].delegates || []).length + 1;
+    for (let i = startHeightByRound; i <= lastHeight; i++) {
+      __private.bonusByRound[round].push(__private.blockStatus.calcDelegateVotersBonus(i));
+    }
+    __private.loaded = true;
+  });
 }
 
 Round.prototype.onFinishRound = function (round) {
